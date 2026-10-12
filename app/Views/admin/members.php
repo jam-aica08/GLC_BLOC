@@ -85,14 +85,20 @@
                             <td class="py-3 text-center">
                                 <?php if (($member['status'] ?? 'Active') === 'Active'): ?>
                                     <form action="<?= base_url('admin/members/deactivate/' . $member['id']) ?>" method="post"
-                                          onsubmit="return confirm('Deactivate member <?= esc($member['first_name']) ?>?')">
+                                          onsubmit="return confirm('Deactivate member ' + <?= json_encode(($member['first_name'] ?? '') . ' ' . ($member['last_name'] ?? '')) ?> + '?')">
                                         <?= csrf_field() ?>
                                         <button type="submit" class="btn btn-sm btn-outline-danger" title="Deactivate">
                                             <i class="fa-solid fa-user-slash me-1"></i>Deactivate
                                         </button>
                                     </form>
                                 <?php else: ?>
-                                    <span class="badge bg-secondary">Inactive</span>
+                                    <form action="<?= base_url('admin/members/reactivate/' . $member['id']) ?>" method="post"
+                                          onsubmit="return confirm('Reactivate member ' + <?= json_encode(($member['first_name'] ?? '') . ' ' . ($member['last_name'] ?? '')) ?> + '?')">
+                                        <?= csrf_field() ?>
+                                        <button type="submit" class="btn btn-sm btn-outline-success" title="Reactivate">
+                                            <i class="fa-solid fa-user-check me-1"></i>Reactivate
+                                        </button>
+                                    </form>
                                 <?php endif; ?>
                             </td>
                         </tr>

@@ -19,10 +19,10 @@ class AuthFilter implements FilterInterface
             $required = $arguments[0] ?? null;
             $userRole = session()->get('role');
 
-            if ($required === 'admin' && $userRole !== 'Admin') {
+            if ($required === 'admin' && strtolower((string) $userRole) !== 'admin') {
                 return redirect()->to('/login')->with('error', 'Unauthorized access.');
             }
-            if ($required === 'member' && $userRole !== 'Member') {
+            if ($required === 'member' && strtolower((string) $userRole) !== 'member') {
                 return redirect()->to('/login')->with('error', 'Unauthorized access.');
             }
         }
