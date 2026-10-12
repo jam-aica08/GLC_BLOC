@@ -554,7 +554,7 @@ class Member extends BaseController
         $ledgerEntries = [];
         if ($accountIds) {
             $ledgerEntries = $db->table('blockchain_ledger bl')
-                                ->select('bl.ledger_id, bl.ledger_sequence, bl.transaction_hash, bl.previous_hash, bl.recorded_at, bl.verification_status, fr.record_type, fr.amount, fr.transaction_date, fr.approval_status, ca.account_number')
+                                ->select('bl.ledger_id, bl.financial_record_id, bl.ledger_sequence, bl.transaction_hash, bl.previous_hash, bl.recorded_at, bl.verification_status, fr.record_type, fr.amount, fr.transaction_date, fr.approval_status, ca.account_number')
                                 ->join('financial_records fr', 'fr.financial_record_id = bl.financial_record_id', 'left')
                                 ->join('cooperative_accounts ca', 'ca.account_id = fr.account_id', 'left')
                                 ->whereIn('fr.account_id', $accountIds)
