@@ -133,17 +133,26 @@ class Member extends BaseController
         $contributions = [];
         if ($accountIds) {
             $contributions = $db->table('contributions c')
-                                ->select('c.*, ca.account_number')
+                                ->select('c.contribution_id AS id, c.contribution_period, c.amount, c.payment_date, c.payment_status, c.financial_record_id, c.created_at, ca.account_number, fr.approval_status')
                                 ->join('cooperative_accounts ca', 'ca.account_id = c.account_id', 'left')
+                                ->join('financial_records fr', 'fr.financial_record_id = c.financial_record_id', 'left')
                                 ->whereIn('c.account_id', $accountIds)
                                 ->orderBy('c.created_at', 'DESC')
                                 ->get()
                                 ->getResultArray();
         }
 
+        $totalPaid    = (float) array_sum(array_column(
+            array_filter($contributions, fn($c) => ($c['approval_status'] ?? '') === 'Approved'),
+            'amount'
+        ));
+        $pendingCount = count(array_filter($contributions, fn($c) => in_array($c['approval_status'] ?? 'Pending', ['Pending', ''])));
+
         return view('member/contributions', [
             'contributions' => $contributions,
             'accounts'      => $accounts,
+            'totalPaid'     => $totalPaid,
+            'pendingCount'  => $pendingCount,
         ]);
     }
 
@@ -174,6 +183,16 @@ class Member extends BaseController
 
         if (! $account) {
             session()->setFlashdata('error', 'Invalid account selection.');
+            return redirect()->to('/member/contributions');
+        }
+
+        // Prevent duplicate contribution for the same period
+        $periodCheck = $db->table('contributions')
+                          ->where('account_id', $accountId)
+                          ->where('contribution_period', $period ?: date('Y-m'))
+                          ->get()->getRowArray();
+        if ($periodCheck) {
+            session()->setFlashdata('error', 'A contribution for this period already exists.');
             return redirect()->to('/member/contributions');
         }
 
@@ -247,12 +266,27 @@ class Member extends BaseController
         $loans = [];
         if ($accountIds) {
             $loans = $db->table('loans l')
-                        ->select('l.*, ca.account_number')
+                        ->select('l.loan_id AS id, l.loan_amount, l.interest_rate, l.loan_term_months AS term_months, l.application_date AS applied_date, l.loan_status AS status, l.account_id, ca.account_number')
                         ->join('cooperative_accounts ca', 'ca.account_id = l.account_id', 'left')
                         ->whereIn('l.account_id', $accountIds)
                         ->orderBy('l.application_date', 'DESC')
                         ->get()
                         ->getResultArray();
+
+            foreach ($loans as &$loan) {
+                $balRow = $db->table('loan_installments')
+                             ->selectSum('remaining_balance')
+                             ->where('loan_id', $loan['id'])
+                             ->get()->getRowArray();
+                $loan['outstanding_balance'] = (float)($balRow['remaining_balance'] ?? $loan['loan_amount']);
+
+                $firstInst = $db->table('loan_installments')
+                                ->where('loan_id', $loan['id'])
+                                ->orderBy('installment_number', 'ASC')
+                                ->limit(1)->get()->getRowArray();
+                $loan['monthly_payment'] = $firstInst ? (float)$firstInst['amount_due'] : 0.0;
+            }
+            unset($loan);
         }
 
         return view('member/loans', [
@@ -385,6 +419,11 @@ class Member extends BaseController
 
         if (! $loan) {
             session()->setFlashdata('error', 'Loan not found.');
+            return redirect()->to('/member/loans');
+        }
+
+        if (! in_array($loan['loan_status'] ?? '', ['Active', 'Approved'])) {
+            session()->setFlashdata('error', 'This loan is not currently active.');
             return redirect()->to('/member/loans');
         }
 
@@ -525,12 +564,8 @@ class Member extends BaseController
         $memberId = $this->requireMember();
         $db       = db_connect();
 
-        $member = $db->table('members m')
-                     ->select('m.*, u.username, u.email, u.account_status AS user_status')
-                     ->join('users u', 'u.user_id = m.user_id', 'left')
-                     ->where('m.member_id', $memberId)
-                     ->get()
-                     ->getRowArray();
+        $memberModel = model(MemberModel::class);
+        $member      = $memberModel->getMemberWithUser($memberId);
 
         $accounts = $db->table('cooperative_accounts')
                        ->where('member_id', $memberId)

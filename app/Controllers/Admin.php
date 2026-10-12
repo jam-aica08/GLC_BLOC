@@ -148,7 +148,12 @@ class Admin extends BaseController
                                ->get()
                                ->getRowArray()['role_id'] ?? 2;
 
-            $password     = $this->request->getPost('password');
+            $password = $this->request->getPost('password');
+            if (strlen($password) < 8) {
+                $db->transRollback();
+                session()->setFlashdata('error', 'Password must be at least 8 characters.');
+                return redirect()->to('/admin/members');
+            }
             $userId       = $userModel->insert([
                 'role_id'        => $memberRoleId,
                 'username'       => $this->request->getPost('username'),
@@ -179,7 +184,8 @@ class Admin extends BaseController
 
             // 3. Create cooperative_account
             $accountType   = $this->request->getPost('account_type') ?: 'Basic';
-            $accountNumber = 'ACC-' . str_pad($memberId, 6, '0', STR_PAD_LEFT);
+            $accountModel  = model(CooperativeAccountModel::class);
+            $accountNumber = $accountModel->getNextAccountNumber();
 
             $db->table('cooperative_accounts')->insert([
                 'member_id'            => $memberId,
@@ -989,6 +995,15 @@ class Admin extends BaseController
 
         $db = db_connect();
 
+        // Prevent duplicate distribution for the same year
+        $existingDividend = $db->table('dividends')
+                               ->where('distribution_year', $distributionYear)
+                               ->limit(1)->get()->getRowArray();
+        if ($existingDividend) {
+            session()->setFlashdata('error', "Dividends for year {$distributionYear} have already been distributed.");
+            return redirect()->to('/admin/dividends');
+        }
+
         // Get eligible (Active) accounts
         $accounts = $db->table('cooperative_accounts')
                        ->where('account_status', 'Active')
@@ -1195,7 +1210,7 @@ class Admin extends BaseController
         $labels         = array_column($historical, 'label');
         $actual         = array_map('floatval', array_column($historical, 'total'));
         $forecastLabels = array_column($forecast, 'label');
-        $forecastValues = array_map('floatval', array_column($forecast, 'total'));
+        $forecastValues = array_map('floatval', array_column($forecast, 'predicted'));
 
         $db = db_connect();
         $totalMembers       = $db->table('members')->countAllResults();
@@ -1204,7 +1219,7 @@ class Admin extends BaseController
             ->where('approval_status', 'Approved')
             ->selectSum('amount')->get()->getRowArray()['amount'] ?? 0);
         $activeLoans        = $db->table('financial_records')
-            ->where('record_type', 'Loan')
+            ->where('record_type', 'Loan Disbursement')
             ->where('approval_status', 'Approved')
             ->countAllResults();
         $currentEquity      = (float) ($db->table('financial_records')
