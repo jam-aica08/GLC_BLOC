@@ -86,7 +86,7 @@ CREATE TABLE `cooperative_accounts` (
 ) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 INSERT INTO `cooperative_accounts` VALUES
-(1,1,'ACC-2026-001','Pioneer','2026-01-01',300.00,'Active');
+(1,1,'ACC-2026-001','Pioneer','2026-01-01',500.00,'Active');
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
 CREATE TABLE `dividends` (

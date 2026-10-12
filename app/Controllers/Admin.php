@@ -116,12 +116,25 @@ class Admin extends BaseController
 
         $db = db_connect();
         $members = $db->table('members m')
-                      ->select('m.member_id AS id, m.member_number, m.first_name, m.last_name, m.membership_date, m.membership_status AS status, u.username, u.email, u.account_status AS user_status, ca.account_number, ca.account_type, ca.account_status')
+                      ->select('m.member_id AS id, m.member_number, m.first_name, m.last_name, m.membership_date, m.membership_status AS status, u.username, u.email, u.account_status AS user_status')
                       ->join('users u', 'u.user_id = m.user_id', 'left')
-                      ->join('cooperative_accounts ca', 'ca.member_id = m.member_id', 'left')
                       ->orderBy('m.member_id', 'ASC')
                       ->get()
                       ->getResultArray();
+
+        $accountsByMember = [];
+        $accounts = $db->table('cooperative_accounts')
+                       ->select('member_id, account_number, account_type, account_status, monthly_contribution')
+                       ->orderBy('account_id', 'ASC')
+                       ->get()
+                       ->getResultArray();
+        foreach ($accounts as $acc) {
+            $accountsByMember[$acc['member_id']][] = $acc;
+        }
+        foreach ($members as &$member) {
+            $member['accounts'] = $accountsByMember[$member['id']] ?? [];
+        }
+        unset($member);
 
         return view('admin/members', ['members' => $members]);
     }
@@ -183,18 +196,11 @@ class Admin extends BaseController
             }
 
             // 3. Create cooperative_account
-            $accountType   = $this->request->getPost('account_type') ?: 'Basic';
-            $accountModel  = model(CooperativeAccountModel::class);
-            $accountNumber = $accountModel->getNextAccountNumber();
-
-            $db->table('cooperative_accounts')->insert([
-                'member_id'            => $memberId,
-                'account_number'       => $accountNumber,
-                'account_type'         => $accountType,
-                'account_start_date'   => date('Y-m-d'),
-                'monthly_contribution' => ($accountType === 'Pioneer') ? 500.00 : 300.00,
-                'account_status'       => 'Active',
-            ]);
+            $accountType = $this->request->getPost('account_type');
+            if (! isset(CooperativeAccountModel::MONTHLY_CONTRIBUTION[$accountType])) {
+                $accountType = 'Basic';
+            }
+            $this->insertAccount($db, (int) $memberId, $accountType);
 
             $db->transComplete();
 
@@ -209,6 +215,55 @@ class Admin extends BaseController
         }
 
         return redirect()->to('/admin/members');
+    }
+
+    /**
+     * POST: open an additional cooperative account for an existing member.
+     */
+    public function addAccount(int $memberId)
+    {
+        $this->requireAdmin();
+
+        if (! $this->request->is('post')) {
+            return redirect()->to('/admin/members');
+        }
+
+        $member = model(MemberModel::class)->find($memberId);
+        if (! $member) {
+            session()->setFlashdata('error', 'Member not found.');
+            return redirect()->to('/admin/members');
+        }
+        if ($member['membership_status'] !== 'Active') {
+            session()->setFlashdata('error', 'Reactivate this member before opening a new account.');
+            return redirect()->to('/admin/members');
+        }
+
+        $accountType = $this->request->getPost('account_type');
+        if (! isset(CooperativeAccountModel::MONTHLY_CONTRIBUTION[$accountType])) {
+            session()->setFlashdata('error', 'Please choose a valid account type.');
+            return redirect()->to('/admin/members');
+        }
+
+        $accountNumber = $this->insertAccount(db_connect(), $memberId, $accountType);
+
+        session()->setFlashdata('success', "{$accountType} account {$accountNumber} opened for {$member['first_name']} {$member['last_name']}.");
+        return redirect()->to('/admin/members');
+    }
+
+    private function insertAccount($db, int $memberId, string $accountType): string
+    {
+        $accountNumber = model(CooperativeAccountModel::class)->getNextAccountNumber();
+
+        $db->table('cooperative_accounts')->insert([
+            'member_id'            => $memberId,
+            'account_number'       => $accountNumber,
+            'account_type'         => $accountType,
+            'account_start_date'   => date('Y-m-d'),
+            'monthly_contribution' => CooperativeAccountModel::MONTHLY_CONTRIBUTION[$accountType],
+            'account_status'       => 'Active',
+        ]);
+
+        return $accountNumber;
     }
 
     /**

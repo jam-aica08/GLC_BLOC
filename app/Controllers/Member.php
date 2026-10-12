@@ -170,7 +170,6 @@ class Member extends BaseController
         }
 
         $accountId = (int) $this->request->getPost('account_id');
-        $amount    = (float) $this->request->getPost('amount');
         $period    = (string) $this->request->getPost('contribution_period');  // YYYY-MM
 
         if (! preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', $period)) {
@@ -190,6 +189,9 @@ class Member extends BaseController
             session()->setFlashdata('error', 'Invalid account selection.');
             return redirect()->to('/member/contributions');
         }
+
+        // The amount is fixed by the account type; never taken from the form.
+        $amount = CooperativeAccountModel::MONTHLY_CONTRIBUTION[$account['account_type']] ?? (float) $account['monthly_contribution'];
 
         // Prevent duplicate contribution for the same period
         $periodCheck = $db->table('contributions')
@@ -315,7 +317,6 @@ class Member extends BaseController
         $accountId    = (int) $this->request->getPost('account_id');
         $loanAmount   = (float) $this->request->getPost('loan_amount');
         $termMonths   = (int) $this->request->getPost('loan_term_months');
-        $interestRate = 1.00; // fixed cooperative rate — never accept from POST
 
         $allowedTerms = [3, 6, 12, 18, 24];
         if (! in_array($termMonths, $allowedTerms, true)) {
@@ -335,6 +336,9 @@ class Member extends BaseController
             session()->setFlashdata('error', 'Invalid account selection.');
             return redirect()->to('/member/loans');
         }
+
+        // Rate is fixed by account type; never taken from the form.
+        $interestRate = CooperativeAccountModel::LOAN_INTEREST_RATE[$account['account_type']] ?? 5.00;
 
         if ($loanAmount <= 0) {
             session()->setFlashdata('error', 'Loan amount must be greater than zero.');
