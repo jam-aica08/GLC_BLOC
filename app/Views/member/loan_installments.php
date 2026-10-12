@@ -10,7 +10,7 @@
             <?= esc($loan['loan_term_months'] ?? '') ?> months
         </p>
     </div>
-    <a href="/member/loans" class="btn btn-outline-secondary btn-sm">
+    <a href="<?= base_url('member/loans') ?>" class="btn btn-outline-secondary btn-sm">
         <i class="fas fa-arrow-left me-1"></i>Back to Loans
     </a>
 </div>
@@ -86,7 +86,7 @@
 <div class="modal fade" id="payModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
-            <form method="post" action="/member/loans/<?= esc($loan['loan_id'] ?? '') ?>/pay">
+            <form method="post" action="<?= base_url('member/loans/' . esc($loan['loan_id'] ?? '0') . '/pay') ?>">
                 <?= csrf_field() ?>
                 <input type="hidden" name="installment_ids[]" id="payInstallmentId">
                 <div class="modal-header">
