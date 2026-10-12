@@ -23,11 +23,13 @@ class Auth extends BaseController
     {
         $session = session();
 
-        $data = [
-            'error' => $session->getFlashdata('login_error'),
-        ];
+        // Redirect already-authenticated users to their dashboard
+        if ($session->get('logged_in')) {
+            $role = strtolower((string) $session->get('role'));
+            return redirect()->to($role === 'admin' ? '/admin/dashboard' : '/member/dashboard');
+        }
 
-        return view('auth/login', $data);
+        return view('auth/login');
     }
 
     // -------------------------------------------------------------------------
@@ -52,7 +54,8 @@ class Auth extends BaseController
 
         // Basic input presence check (no blanks)
         if ($username === '' || $password === '') {
-            session()->setFlashdata('login_error', 'Username and password are required.');
+            session()->destroy();
+            session()->setFlashdata('error', 'Username and password are required.');
             return redirect()->to('/login');
         }
 
@@ -63,7 +66,9 @@ class Auth extends BaseController
                                ->first();
 
         if (! $user || ! password_verify($password, $user['password_hash'])) {
-            session()->setFlashdata('login_error', 'Invalid username or password.');
+            // Destroy any existing session so a stale login cannot persist
+            session()->destroy();
+            session()->setFlashdata('error', 'Invalid username or password.');
             return redirect()->to('/login');
         }
 
