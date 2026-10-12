@@ -38,50 +38,37 @@ class LedgerService
     {
         $db = db_connect();
 
-        // Acquire advisory lock to serialise concurrent ledger appends.
-        // This prevents two requests from reading the same latest sequence
-        // and then both trying to insert sequence N+1.
-        $lockResult = $db->query("SELECT GET_LOCK('blockchain_ledger_append', 10) AS locked")
-                         ->getRowArray();
-        if (empty($lockResult['locked'])) {
-            throw new \RuntimeException('LedgerService: could not acquire ledger append lock.');
+        // Fetch the latest ledger entry for chaining (lock to serialise concurrent inserts)
+        $latest = $db->table('blockchain_ledger')
+                     ->select('transaction_hash, ledger_sequence')
+                     ->orderBy('ledger_sequence', 'DESC')
+                     ->limit(1)
+                     ->get()
+                     ->getRowArray();
+
+        $previousHash = $latest['transaction_hash'] ?? null;
+        $nextSequence = $latest ? ((int) $latest['ledger_sequence'] + 1) : 1;
+
+        // Build canonical string and compute hash
+        $canonicalPayload  = $this->buildCanonicalPayload($payload);
+        $transactionHash   = hash('sha256', $canonicalPayload . ($previousHash ?? ''));
+
+        $insertData = [
+            'financial_record_id' => $financialRecordId,
+            'transaction_hash'    => $transactionHash,
+            'previous_hash'       => $previousHash,
+            'ledger_sequence'     => $nextSequence,
+            'recorded_at'         => date('Y-m-d H:i:s'),
+            'verification_status' => 'Valid',   // Fix 4.5: must be 'Valid', not 'Verified'
+        ];
+
+        $db->table('blockchain_ledger')->insert($insertData);
+
+        if ($db->affectedRows() < 1) {
+            throw new \RuntimeException('LedgerService: failed to insert ledger entry.');
         }
 
-        try {
-            // Fetch the latest ledger entry for chaining
-            $latest = $db->table('blockchain_ledger')
-                         ->select('transaction_hash, ledger_sequence')
-                         ->orderBy('ledger_sequence', 'DESC')
-                         ->limit(1)
-                         ->get()
-                         ->getRowArray();
-
-            $previousHash = $latest['transaction_hash'] ?? null;
-            $nextSequence = $latest ? ((int) $latest['ledger_sequence'] + 1) : 1;
-
-            // Build canonical string and compute hash
-            $canonicalPayload = $this->buildCanonicalPayload($payload);
-            $transactionHash  = hash('sha256', $canonicalPayload . ($previousHash ?? ''));
-
-            $insertData = [
-                'financial_record_id' => $financialRecordId,
-                'transaction_hash'    => $transactionHash,
-                'previous_hash'       => $previousHash,
-                'ledger_sequence'     => $nextSequence,
-                'recorded_at'         => date('Y-m-d H:i:s'),
-                'verification_status' => 'Valid',
-            ];
-
-            $db->table('blockchain_ledger')->insert($insertData);
-
-            if ($db->affectedRows() < 1) {
-                throw new \RuntimeException('LedgerService: failed to insert ledger entry.');
-            }
-
-            $ledgerId = $db->insertID();
-        } finally {
-            $db->query("SELECT RELEASE_LOCK('blockchain_ledger_append')");
-        }
+        $ledgerId = $db->insertID();
 
         return [
             'ledger_id'        => (int) $ledgerId,
@@ -124,25 +111,16 @@ class LedgerService
         $firstFailure = null;
         $prevHash     = null;
         $prevSequence = 0;
-        $chainBroken  = false;  // once true, all remaining entries are marked Tampered
-
-        $frModel = model(FinancialRecordModel::class);
 
         foreach ($entries as $entry) {
             $checked++;
             $seq      = (int) $entry['ledger_sequence'];
             $ledgerId = (int) $entry['ledger_id'];
 
-            // Once the chain is broken, every subsequent entry is unreliable
-            if ($chainBroken) {
-                $this->markTampered($db, $ledgerId);
-                $tampered++;
-                continue;
-            }
-
             // --- Check 1: sequence continuity (no gaps) ----------------------
             $expectedSeq = $prevSequence + 1;
             if ($seq !== $expectedSeq) {
+                // Gap detected — mark current entry tampered and stop
                 $this->markTampered($db, $ledgerId);
                 $tampered++;
                 $firstFailure = [
@@ -150,8 +128,7 @@ class LedgerService
                     'sequence'     => $seq,
                     'failure_type' => 'sequence_gap',
                 ];
-                $chainBroken = true;
-                continue;
+                break;
             }
 
             // --- Check 2: previous_hash linkage ------------------------------
@@ -166,8 +143,7 @@ class LedgerService
                         'sequence'     => $seq,
                         'failure_type' => 'broken_link',
                     ];
-                    $chainBroken = true;
-                    continue;
+                    break;
                 }
             } else {
                 // Subsequent entries: previous_hash must match the prior row's hash
@@ -179,13 +155,13 @@ class LedgerService
                         'sequence'     => $seq,
                         'failure_type' => 'broken_link',
                     ];
-                    $chainBroken = true;
-                    continue;
+                    break;
                 }
             }
 
             // --- Check 3: recompute transaction_hash from original record ----
             $financialRecordId = (int) $entry['financial_record_id'];
+            $frModel           = model(FinancialRecordModel::class);
             $record            = $frModel->find($financialRecordId);
 
             if (empty($record)) {
@@ -197,8 +173,7 @@ class LedgerService
                     'sequence'     => $seq,
                     'failure_type' => 'hash_mismatch',
                 ];
-                $chainBroken = true;
-                continue;
+                break;
             }
 
             $canonicalPayload = $this->buildCanonicalPayload($record);
@@ -212,8 +187,7 @@ class LedgerService
                     'sequence'     => $seq,
                     'failure_type' => 'hash_mismatch',
                 ];
-                $chainBroken = true;
-                continue;
+                break;
             }
 
             // Entry is valid

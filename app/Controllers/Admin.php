@@ -1003,46 +1003,22 @@ class Admin extends BaseController
 
         $dividendPerAccount = round($profitPool / $eligibleCount, 2);
         $now                = date('Y-m-d H:i:s');
-        $currentUserId      = (int) session()->get('user_id');
 
         $db->transStart();
 
-        $insertedFrIds = [];
-
         foreach ($accounts as $account) {
             $db->table('dividends')->insert([
-                'account_id'             => $account['account_id'],
-                'distribution_year'      => $distributionYear,
-                'profit_pool'            => $profitPool,
-                'eligible_account_count' => $eligibleCount,
-                'dividend_per_account'   => $dividendPerAccount,
-                'dividend_amount'        => $dividendPerAccount,
-                'distribution_date'      => $distributionDate,
-                'dividend_status'        => 'Distributed',
-                'created_at'             => $now,
-                'updated_at'             => $now,
+                'account_id'            => $account['account_id'],
+                'distribution_year'     => $distributionYear,
+                'profit_pool'           => $profitPool,
+                'eligible_account_count'=> $eligibleCount,
+                'dividend_per_account'  => $dividendPerAccount,
+                'dividend_amount'       => $dividendPerAccount,
+                'distribution_date'     => $distributionDate,
+                'dividend_status'       => 'Distributed',
+                'created_at'            => $now,
+                'updated_at'            => $now,
             ]);
-
-            // Create a financial_record for this dividend so it enters the ledger
-            $db->table('financial_records')->insert([
-                'account_id'          => $account['account_id'],
-                'record_type'         => 'Dividend',
-                'transaction_date'    => $distributionDate,
-                'amount'              => $dividendPerAccount,
-                'approval_status'     => 'Approved',
-                'processed_by'        => $currentUserId,
-                'first_approved_by'   => $currentUserId,
-                'first_approval_date' => $now,
-                'second_approved_by'  => $currentUserId,
-                'second_approval_date'=> $now,
-                'created_at'          => $now,
-                'updated_at'          => $now,
-            ]);
-
-            $insertedFrIds[] = [
-                'fr_id'      => (int) $db->insertID(),
-                'account_id' => (int) $account['account_id'],
-            ];
         }
 
         $db->transComplete();
@@ -1050,21 +1026,6 @@ class Admin extends BaseController
         if (! $db->transStatus()) {
             session()->setFlashdata('error', 'Failed to distribute dividends.');
             return redirect()->to('/admin/dividends');
-        }
-
-        // Append ledger entries for each dividend financial record
-        $frModel       = model(FinancialRecordModel::class);
-        $ledgerService = new LedgerService();
-        foreach ($insertedFrIds as $item) {
-            $frFresh = $frModel->find($item['fr_id']);
-            if (! $frFresh) {
-                continue;
-            }
-            try {
-                $ledgerService->createEntry($item['fr_id'], $frFresh);
-            } catch (\Throwable $e) {
-                log_message('error', 'LedgerService::createEntry failed for Dividend FR #' . $item['fr_id'] . ': ' . $e->getMessage());
-            }
         }
 
         session()->setFlashdata('success', "Dividends distributed: {$eligibleCount} accounts × PHP {$dividendPerAccount}.");
