@@ -151,7 +151,7 @@
                         <div class="col-md-6">
                             <label for="password" class="form-label fw-semibold small">Password <span class="text-danger">*</span></label>
                             <input type="password" class="form-control" id="modal_password" name="password"
-                                   placeholder="Minimum 8 characters" required>
+                                   placeholder="Minimum 8 characters" minlength="8" required>
                         </div>
                         <div class="col-md-6">
                             <label for="account_type" class="form-label fw-semibold small">Account Type <span class="text-danger">*</span></label>

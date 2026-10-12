@@ -126,6 +126,18 @@
             <form action="<?= base_url('member/contributions/submit') ?>" method="post">
                 <?= csrf_field() ?>
                 <div class="modal-body p-4">
+                    <?php if (count($accounts ?? []) > 1): ?>
+                    <div class="mb-3">
+                        <label for="account_id" class="form-label fw-semibold small">Account <span class="text-danger">*</span></label>
+                        <select class="form-select" id="account_id" name="account_id" required>
+                            <?php foreach ($accounts as $acc): ?>
+                                <option value="<?= esc($acc['account_id']) ?>"><?= esc($acc['account_number']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <?php else: ?>
+                        <input type="hidden" name="account_id" value="<?= esc($accounts[0]['account_id'] ?? '') ?>">
+                    <?php endif; ?>
                     <div class="mb-3">
                         <label for="contribution_period" class="form-label fw-semibold small">Contribution Period <span class="text-danger">*</span></label>
                         <input type="month" class="form-control" id="contribution_period"

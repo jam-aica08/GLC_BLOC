@@ -13,21 +13,21 @@
                 <table class="table table-borderless table-sm mb-0">
                     <tr>
                         <th class="text-muted" style="width:45%">Username</th>
-                        <td><?= esc($user['username'] ?? '') ?></td>
+                        <td><?= esc($member['username'] ?? '') ?></td>
                     </tr>
                     <tr>
                         <th class="text-muted">Email</th>
-                        <td><?= esc($user['email'] ?? '') ?></td>
+                        <td><?= esc($member['email'] ?? '') ?></td>
                     </tr>
                     <tr>
                         <th class="text-muted">Role</th>
-                        <td><span class="badge bg-primary"><?= esc($user['role_name'] ?? 'Member') ?></span></td>
+                        <td><span class="badge bg-primary"><?= esc($member['role_name'] ?? 'Member') ?></span></td>
                     </tr>
                     <tr>
                         <th class="text-muted">Status</th>
                         <td>
-                            <span class="badge bg-<?= ($user['account_status'] ?? '') === 'Active' ? 'success' : 'secondary' ?>">
-                                <?= esc($user['account_status'] ?? '') ?>
+                            <span class="badge bg-<?= ($member['user_status'] ?? '') === 'Active' ? 'success' : 'secondary' ?>">
+                                <?= esc($member['user_status'] ?? '') ?>
                             </span>
                         </td>
                     </tr>

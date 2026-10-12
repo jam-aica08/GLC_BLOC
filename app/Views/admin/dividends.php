@@ -70,7 +70,7 @@
 <div class="modal fade" id="distributeModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
-            <form method="post" action="/admin/dividends/distribute">
+            <form method="post" action="<?= base_url('admin/dividends/distribute') ?>">
                 <?= csrf_field() ?>
                 <div class="modal-header">
                     <h5 class="modal-title"><i class="fas fa-coins me-2"></i>Distribute Dividends</h5>
