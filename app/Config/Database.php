@@ -200,5 +200,22 @@ class Database extends Config
         if (ENVIRONMENT === 'testing') {
             $this->defaultGroup = 'tests';
         }
+
+        // Hosted deployments (e.g. Vercel) supply credentials via plain env vars.
+        if (getenv('DB_HOST') !== false) {
+            $this->default['hostname'] = getenv('DB_HOST');
+            $this->default['port']     = (int) (getenv('DB_PORT') ?: 3306);
+            $this->default['username'] = (string) getenv('DB_USERNAME');
+            $this->default['password'] = (string) getenv('DB_PASSWORD');
+            $this->default['database'] = (string) getenv('DB_DATABASE');
+            $this->default['DBDebug']  = ENVIRONMENT !== 'production';
+
+            if (filter_var(getenv('DB_SSL'), FILTER_VALIDATE_BOOLEAN)) {
+                $this->default['encrypt'] = [
+                    'ssl_ca'     => getenv('DB_SSL_CA') ?: '/etc/pki/tls/certs/ca-bundle.crt',
+                    'ssl_verify' => true,
+                ];
+            }
+        }
     }
 }

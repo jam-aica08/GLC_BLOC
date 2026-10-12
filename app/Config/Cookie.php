@@ -7,6 +7,15 @@ use DateTimeInterface;
 
 class Cookie extends BaseConfig
 {
+    public function __construct()
+    {
+        parent::__construct();
+
+        if (getenv('VERCEL') !== false) {
+            $this->secure = true;
+        }
+    }
+
     /**
      * --------------------------------------------------------------------------
      * Cookie Prefix

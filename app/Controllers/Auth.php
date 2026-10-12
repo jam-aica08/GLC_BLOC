@@ -19,7 +19,7 @@ class Auth extends BaseController
     /**
      * Display the login form (GET /).
      */
-    public function index(): string
+    public function index(): string|\CodeIgniter\HTTP\RedirectResponse
     {
         $session = session();
 
@@ -54,7 +54,7 @@ class Auth extends BaseController
 
         // Basic input presence check (no blanks)
         if ($username === '' || $password === '') {
-            session()->destroy();
+            $this->clearAuth();
             session()->setFlashdata('error', 'Username and password are required.');
             return redirect()->to('/login');
         }
@@ -66,8 +66,7 @@ class Auth extends BaseController
                                ->first();
 
         if (! $user || ! password_verify($password, $user['password_hash'])) {
-            // Destroy any existing session so a stale login cannot persist
-            session()->destroy();
+            $this->clearAuth();
             session()->setFlashdata('error', 'Invalid username or password.');
             return redirect()->to('/login');
         }
@@ -110,6 +109,17 @@ class Auth extends BaseController
         }
 
         return redirect()->to('/member/dashboard');
+    }
+
+    /**
+     * Drop any existing login without destroying the session, so a flash
+     * message set afterwards survives the redirect.
+     */
+    private function clearAuth(): void
+    {
+        $session = session();
+        $session->remove(['user_id', 'username', 'role', 'member_id', 'logged_in']);
+        $session->regenerate(true);
     }
 
     // -------------------------------------------------------------------------
