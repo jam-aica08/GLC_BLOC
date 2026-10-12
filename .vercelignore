@@ -1,0 +1,8 @@
+.env
+env
+.github
+builds
+database
+tests
+writable
+phpunit.dist.xml

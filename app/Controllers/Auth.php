@@ -19,15 +19,17 @@ class Auth extends BaseController
     /**
      * Display the login form (GET /).
      */
-    public function index(): string
+    public function index(): string|\CodeIgniter\HTTP\RedirectResponse
     {
         $session = session();
 
-        $data = [
-            'error' => $session->getFlashdata('login_error'),
-        ];
+        // Redirect already-authenticated users to their dashboard
+        if ($session->get('logged_in')) {
+            $role = strtolower((string) $session->get('role'));
+            return redirect()->to($role === 'admin' ? '/admin/dashboard' : '/member/dashboard');
+        }
 
-        return view('auth/login', $data);
+        return view('auth/login');
     }
 
     // -------------------------------------------------------------------------
@@ -52,7 +54,8 @@ class Auth extends BaseController
 
         // Basic input presence check (no blanks)
         if ($username === '' || $password === '') {
-            session()->setFlashdata('login_error', 'Username and password are required.');
+            $this->clearAuth();
+            session()->setFlashdata('error', 'Username and password are required.');
             return redirect()->to('/login');
         }
 
@@ -63,7 +66,8 @@ class Auth extends BaseController
                                ->first();
 
         if (! $user || ! password_verify($password, $user['password_hash'])) {
-            session()->setFlashdata('login_error', 'Invalid username or password.');
+            $this->clearAuth();
+            session()->setFlashdata('error', 'Invalid username or password.');
             return redirect()->to('/login');
         }
 
@@ -105,6 +109,17 @@ class Auth extends BaseController
         }
 
         return redirect()->to('/member/dashboard');
+    }
+
+    /**
+     * Drop any existing login without destroying the session, so a flash
+     * message set afterwards survives the redirect.
+     */
+    private function clearAuth(): void
+    {
+        $session = session();
+        $session->remove(['user_id', 'username', 'role', 'member_id', 'logged_in']);
+        $session->regenerate(true);
     }
 
     // -------------------------------------------------------------------------

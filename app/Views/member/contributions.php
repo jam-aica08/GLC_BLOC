@@ -70,10 +70,8 @@
                         <th class="px-4 py-3">ID</th>
                         <th class="py-3">Period</th>
                         <th class="py-3">Amount</th>
-                        <th class="py-3">Payment Method</th>
                         <th class="py-3">Date Submitted</th>
-                        <th class="py-3">Payment Status</th>
-                        <th class="py-3">Approval Status</th>
+                        <th class="py-3">Status</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -81,16 +79,9 @@
                         <?php foreach ($contributions as $contribution): ?>
                         <tr>
                             <td class="px-4 py-3"><code>#<?= esc($contribution['id']) ?></code></td>
-                            <td class="py-3"><?= esc($contribution['contribution_period'] ?? $contribution['period'] ?? '-') ?></td>
+                            <td class="py-3"><?= esc($contribution['contribution_period'] ?? '-') ?></td>
                             <td class="py-3 fw-semibold">&#8369;<?= number_format($contribution['amount'] ?? 0, 2) ?></td>
-                            <td class="py-3"><?= esc($contribution['payment_method'] ?? '-') ?></td>
                             <td class="py-3 text-muted small"><?= esc($contribution['created_at'] ?? '-') ?></td>
-                            <td class="py-3">
-                                <?php $ps = $contribution['payment_status'] ?? 'Unpaid'; ?>
-                                <span class="badge <?= ($ps === 'Paid') ? 'bg-success' : (($ps === 'Partial') ? 'bg-warning text-dark' : 'bg-secondary') ?>">
-                                    <?= esc($ps) ?>
-                                </span>
-                            </td>
                             <td class="py-3">
                                 <?php $as = $contribution['approval_status'] ?? 'Pending'; ?>
                                 <span class="badge <?= ($as === 'Approved') ? 'bg-success' : (($as === 'Rejected') ? 'bg-danger' : 'bg-warning text-dark') ?>">
@@ -101,7 +92,7 @@
                         <?php endforeach; ?>
                     <?php else: ?>
                         <tr>
-                            <td colspan="7" class="text-center py-5 text-muted">
+                            <td colspan="5" class="text-center py-5 text-muted">
                                 <i class="fa-solid fa-piggy-bank fa-2x mb-3 d-block opacity-25"></i>
                                 No contributions yet. Click "Submit Contribution" to get started.
                             </td>

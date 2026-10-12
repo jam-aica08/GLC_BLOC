@@ -171,7 +171,12 @@ class Member extends BaseController
 
         $accountId = (int) $this->request->getPost('account_id');
         $amount    = (float) $this->request->getPost('amount');
-        $period    = $this->request->getPost('contribution_period');  // YYYY-MM
+        $period    = (string) $this->request->getPost('contribution_period');  // YYYY-MM
+
+        if (! preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', $period)) {
+            session()->setFlashdata('error', 'Invalid contribution period format.');
+            return redirect()->to('/member/contributions');
+        }
 
         // Ownership check: the account must belong to this member
         $db      = db_connect();
@@ -307,10 +312,16 @@ class Member extends BaseController
             return redirect()->to('/member/loans');
         }
 
-        $accountId   = (int) $this->request->getPost('account_id');
-        $loanAmount  = (float) $this->request->getPost('loan_amount');
-        $interestRate= (float) $this->request->getPost('interest_rate');
-        $termMonths  = (int) $this->request->getPost('loan_term_months');
+        $accountId    = (int) $this->request->getPost('account_id');
+        $loanAmount   = (float) $this->request->getPost('loan_amount');
+        $termMonths   = (int) $this->request->getPost('loan_term_months');
+        $interestRate = 1.00; // fixed cooperative rate — never accept from POST
+
+        $allowedTerms = [3, 6, 12, 18, 24];
+        if (! in_array($termMonths, $allowedTerms, true)) {
+            session()->setFlashdata('error', 'Invalid loan term. Please select a valid option.');
+            return redirect()->to('/member/loans');
+        }
 
         // Ownership check
         $db      = db_connect();
@@ -543,7 +554,7 @@ class Member extends BaseController
         $ledgerEntries = [];
         if ($accountIds) {
             $ledgerEntries = $db->table('blockchain_ledger bl')
-                                ->select('bl.ledger_id, bl.ledger_sequence, bl.transaction_hash, bl.previous_hash, bl.recorded_at, bl.verification_status, fr.record_type, fr.amount, fr.transaction_date, fr.approval_status, ca.account_number')
+                                ->select('bl.ledger_id, bl.financial_record_id, bl.ledger_sequence, bl.transaction_hash, bl.previous_hash, bl.recorded_at, bl.verification_status, fr.record_type, fr.amount, fr.transaction_date, fr.approval_status, ca.account_number')
                                 ->join('financial_records fr', 'fr.financial_record_id = bl.financial_record_id', 'left')
                                 ->join('cooperative_accounts ca', 'ca.account_id = fr.account_id', 'left')
                                 ->whereIn('fr.account_id', $accountIds)
