@@ -72,37 +72,37 @@
                     <?php if (!empty($loans)): ?>
                         <?php foreach ($loans as $loan): ?>
                         <tr>
-                            <td class="px-4 py-3"><code>#<?= esc($loan['id']) ?></code></td>
+                            <td class="px-4 py-3"><code>#<?= esc($loan['id'] ?? '-') ?></code></td>
                             <td class="py-3"><code><?= esc($loan['account_number'] ?? '-') ?></code></td>
                             <td class="py-3">
                                 <div class="fw-semibold"><?= esc($loan['member_name'] ?? '-') ?></div>
+                                <small class="text-muted"><?= esc($loan['member_number'] ?? '') ?></small>
                             </td>
-                            <td class="py-3 fw-semibold">&#8369;<?= number_format($loan['loan_amount'] ?? $loan['amount'] ?? 0, 2) ?></td>
+                            <td class="py-3 fw-semibold">&#8369;<?= number_format($loan['loan_amount'] ?? 0, 2) ?></td>
                             <td class="py-3"><?= esc($loan['interest_rate'] ?? '0') ?>%</td>
-                            <td class="py-3"><?= esc($loan['term_months'] ?? $loan['term'] ?? '-') ?> mo.</td>
+                            <td class="py-3"><?= esc($loan['term_months'] ?? '-') ?> mo.</td>
                             <td class="py-3">
                                 <?php $status = $loan['status'] ?? 'Pending'; ?>
                                 <span class="badge
-                                    <?= ($status === 'Approved' || $status === 'Active') ? 'bg-success' :
+                                    <?= ($status === 'Active') ? 'bg-primary' :
+                                        (($status === 'Approved') ? 'bg-success' :
                                         (($status === 'Rejected') ? 'bg-danger' :
-                                        (($status === 'Paid') ? 'bg-secondary' : 'bg-warning text-dark')) ?>">
+                                        (($status === 'Paid') ? 'bg-secondary' : 'bg-warning text-dark'))) ?>">
                                     <?= esc($status) ?>
                                 </span>
                             </td>
-                            <td class="py-3 text-muted"><?= esc($loan['applied_date'] ?? $loan['created_at'] ?? '-') ?></td>
+                            <td class="py-3 text-muted"><?= esc($loan['applied_date'] ?? '-') ?></td>
                             <td class="py-3 text-center">
-                                <?php if (($loan['status'] ?? 'Pending') === 'Pending'): ?>
+                                <?php if ($status === 'Pending'): ?>
                                     <div class="d-flex gap-1 justify-content-center">
-                                        <!-- Approve Form -->
-                                        <form action="<?= base_url('admin/loans/' . $loan['id'] . '/approve') ?>" method="post">
+                                        <form action="<?= base_url('admin/loans/approve/' . ($loan['id'] ?? 0)) ?>" method="post">
                                             <?= csrf_field() ?>
                                             <button type="submit" class="btn btn-sm btn-success"
                                                     onclick="return confirm('Approve this loan application?')">
                                                 <i class="fa-solid fa-check me-1"></i>Approve
                                             </button>
                                         </form>
-                                        <!-- Reject Form -->
-                                        <form action="<?= base_url('admin/loans/' . $loan['id'] . '/reject') ?>" method="post">
+                                        <form action="<?= base_url('admin/loans/reject/' . ($loan['id'] ?? 0)) ?>" method="post">
                                             <?= csrf_field() ?>
                                             <button type="submit" class="btn btn-sm btn-danger"
                                                     onclick="return confirm('Reject this loan application?')">
@@ -110,11 +110,10 @@
                                             </button>
                                         </form>
                                     </div>
-                                <?php elseif (($loan['status'] ?? '') === 'Approved' || ($loan['status'] ?? '') === 'Active'): ?>
-                                    <a href="<?= base_url('admin/loans/' . $loan['id'] . '/installments') ?>"
-                                       class="btn btn-sm btn-outline-primary">
-                                        <i class="fa-solid fa-calendar-days me-1"></i>Installments
-                                    </a>
+                                <?php elseif ($status === 'Active'): ?>
+                                    <span class="text-success small"><i class="fa-solid fa-circle-check me-1"></i>Active</span>
+                                <?php elseif ($status === 'Paid'): ?>
+                                    <span class="text-muted small"><i class="fa-solid fa-check-double me-1"></i>Paid Off</span>
                                 <?php else: ?>
                                     <span class="text-muted small">—</span>
                                 <?php endif; ?>

@@ -151,23 +151,6 @@
                                 <option value="24" <?= (old('term_months') == '24') ? 'selected' : '' ?>>24 months</option>
                             </select>
                         </div>
-                        <div class="col-12">
-                            <label for="loan_purpose" class="form-label fw-semibold small">Purpose of Loan <span class="text-danger">*</span></label>
-                            <select class="form-select" id="loan_purpose" name="loan_purpose" required>
-                                <option value="" disabled selected>Select purpose</option>
-                                <option value="Business Capital" <?= (old('loan_purpose') === 'Business Capital') ? 'selected' : '' ?>>Business Capital</option>
-                                <option value="Education" <?= (old('loan_purpose') === 'Education') ? 'selected' : '' ?>>Education</option>
-                                <option value="Medical Emergency" <?= (old('loan_purpose') === 'Medical Emergency') ? 'selected' : '' ?>>Medical Emergency</option>
-                                <option value="Home Improvement" <?= (old('loan_purpose') === 'Home Improvement') ? 'selected' : '' ?>>Home Improvement</option>
-                                <option value="Personal" <?= (old('loan_purpose') === 'Personal') ? 'selected' : '' ?>>Personal</option>
-                                <option value="Other" <?= (old('loan_purpose') === 'Other') ? 'selected' : '' ?>>Other</option>
-                            </select>
-                        </div>
-                        <div class="col-12">
-                            <label for="loan_notes" class="form-label fw-semibold small">Additional Details</label>
-                            <textarea class="form-control" id="loan_notes" name="loan_notes" rows="3"
-                                      placeholder="Describe how you plan to use the loan (optional)"><?= esc(old('loan_notes')) ?></textarea>
-                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">

@@ -32,14 +32,14 @@ class Member extends BaseController
 
         if (! $session->get('logged_in') || strtolower((string) $session->get('role')) !== 'member') {
             $session->destroy();
-            header('Location: ' . site_url('/login'));
+            redirect()->to('/login')->send();
             exit;
         }
 
         $memberId = (int) $session->get('member_id');
         if ($memberId < 1) {
             $session->destroy();
-            header('Location: ' . site_url('/login'));
+            redirect()->to('/login')->send();
             exit;
         }
 
@@ -63,44 +63,55 @@ class Member extends BaseController
 
         $accountIds = array_column($accounts, 'account_id');
 
-        // Recent contributions (last 5)
-        $recentContributions = [];
+        // Recent financial records for activity feed
+        $recentRecords = [];
         if ($accountIds) {
-            $recentContributions = $db->table('contributions')
-                                      ->whereIn('account_id', $accountIds)
-                                      ->orderBy('created_at', 'DESC')
-                                      ->limit(5)
-                                      ->get()
-                                      ->getResultArray();
+            $recentRecords = $db->table('financial_records')
+                                ->whereIn('account_id', $accountIds)
+                                ->orderBy('created_at', 'DESC')
+                                ->limit(5)
+                                ->get()
+                                ->getResultArray();
         }
 
-        // Active loans
-        $activeLoans = [];
+        // Total contributions (approved)
+        $totalContributions = 0.0;
         if ($accountIds) {
-            $activeLoans = $db->table('loans')
-                              ->whereIn('account_id', $accountIds)
-                              ->where('loan_status', 'Active')
-                              ->get()
-                              ->getResultArray();
+            $row = $db->table('financial_records')
+                      ->whereIn('account_id', $accountIds)
+                      ->where('record_type', 'Contribution')
+                      ->where('approval_status', 'Approved')
+                      ->selectSum('amount')
+                      ->get()->getRowArray();
+            $totalContributions = (float) ($row['amount'] ?? 0);
         }
 
-        // Dividends received
-        $dividends = [];
+        // Active loans count
+        $activeLoansCount = 0;
         if ($accountIds) {
-            $dividends = $db->table('dividends')
-                            ->whereIn('account_id', $accountIds)
-                            ->where('dividend_status', 'Distributed')
-                            ->orderBy('distribution_year', 'DESC')
-                            ->limit(5)
-                            ->get()
-                            ->getResultArray();
+            $activeLoansCount = $db->table('loans')
+                                   ->whereIn('account_id', $accountIds)
+                                   ->where('loan_status', 'Active')
+                                   ->countAllResults();
+        }
+
+        // Total dividends distributed
+        $totalDividends = 0.0;
+        if ($accountIds) {
+            $row = $db->table('dividends')
+                      ->whereIn('account_id', $accountIds)
+                      ->where('dividend_status', 'Distributed')
+                      ->selectSum('dividend_amount')
+                      ->get()->getRowArray();
+            $totalDividends = (float) ($row['dividend_amount'] ?? 0);
         }
 
         return view('member/dashboard', [
-            'accounts'             => $accounts,
-            'recent_contributions' => $recentContributions,
-            'active_loans'         => $activeLoans,
-            'dividends'            => $dividends,
+            'accounts'           => $accounts,
+            'recentRecords'      => $recentRecords,
+            'totalContributions' => $totalContributions,
+            'activeLoansCount'   => $activeLoansCount,
+            'totalDividends'     => $totalDividends,
         ]);
     }
 

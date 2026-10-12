@@ -33,9 +33,8 @@ class Admin extends BaseController
     {
         $session = session();
         if (! $session->get('logged_in') || strtolower((string) $session->get('role')) !== 'admin') {
-            // Destroy potentially stale session and redirect
             $session->destroy();
-            header('Location: ' . site_url('/login'));
+            redirect()->to('/login')->send();
             exit;
         }
     }
@@ -48,9 +47,7 @@ class Admin extends BaseController
     {
         $this->requireAdmin();
 
-        $db              = db_connect();
-        $frModel         = model(FinancialRecordModel::class);
-        $loanModel       = model(LoanModel::class);
+        $db = db_connect();
 
         $pendingContributions = $db->table('contributions')
                                    ->where('payment_status', 'Pending')
@@ -64,23 +61,48 @@ class Admin extends BaseController
                               ->where('payment_status', 'Pending')
                               ->countAllResults();
 
-        $recentRecords = $db->table('financial_records fr')
-                            ->select('fr.*, ca.account_number, m.first_name, m.last_name')
-                            ->join('cooperative_accounts ca', 'ca.account_id = fr.account_id', 'left')
-                            ->join('members m', 'm.member_id = ca.member_id', 'left')
-                            ->orderBy('fr.created_at', 'DESC')
-                            ->limit(10)
-                            ->get()
-                            ->getResultArray();
+        $totalMembers = $db->table('members')->countAllResults();
 
-        $equityTotal = $frModel->getTotalApprovedByType('Contribution');
+        $totalContributions = (float) ($db->table('financial_records')
+            ->where('record_type', 'Contribution')
+            ->where('approval_status', 'Approved')
+            ->selectSum('amount')->get()->getRowArray()['amount'] ?? 0);
+
+        $activeLoans = $db->table('loans')
+            ->where('loan_status', 'Active')
+            ->countAllResults();
+
+        $pendingApprovals = $pendingContributions + $pendingLoans + $pendingPayments;
+
+        $rawRecords = $db->table('financial_records fr')
+                         ->select('fr.financial_record_id AS id, fr.record_type AS transaction_type, fr.amount, fr.created_at, fr.first_approved_by, fr.second_approved_by, ca.account_number, m.first_name, m.last_name')
+                         ->join('cooperative_accounts ca', 'ca.account_id = fr.account_id', 'left')
+                         ->join('members m', 'm.member_id = ca.member_id', 'left')
+                         ->orderBy('fr.created_at', 'DESC')
+                         ->limit(10)
+                         ->get()
+                         ->getResultArray();
+
+        $recentFinancialRecords = array_map(function ($r) {
+            $r['approval_count'] = (!empty($r['second_approved_by']) ? 2 : (!empty($r['first_approved_by']) ? 1 : 0));
+            return $r;
+        }, $rawRecords);
+
+        $recentActivity = array_map(fn($r) => [
+            'description' => ($r['transaction_type'] ?? 'Transaction') . ' — ₱' . number_format($r['amount'], 2),
+            'created_at'  => $r['created_at'],
+        ], array_slice($recentFinancialRecords, 0, 6));
 
         return view('admin/dashboard', [
-            'pending_contributions' => $pendingContributions,
-            'pending_loans'         => $pendingLoans,
-            'pending_payments'      => $pendingPayments,
-            'recent_records'        => $recentRecords,
-            'equity_total'          => $equityTotal,
+            'totalMembers'           => $totalMembers,
+            'totalContributions'     => $totalContributions,
+            'activeLoans'            => $activeLoans,
+            'pendingApprovals'       => $pendingApprovals,
+            'pendingContributions'   => $pendingContributions,
+            'pendingLoans'           => $pendingLoans,
+            'pendingPayments'        => $pendingPayments,
+            'recentFinancialRecords' => $recentFinancialRecords,
+            'recentActivity'         => $recentActivity,
         ]);
     }
 
@@ -94,7 +116,7 @@ class Admin extends BaseController
 
         $db = db_connect();
         $members = $db->table('members m')
-                      ->select('m.*, u.username, u.email, u.account_status AS user_status, ca.account_number, ca.account_type, ca.account_status')
+                      ->select('m.member_id AS id, m.member_number, m.first_name, m.last_name, m.membership_date, m.membership_status AS status, u.username, u.email, u.account_status AS user_status, ca.account_number, ca.account_type, ca.account_status')
                       ->join('users u', 'u.user_id = m.user_id', 'left')
                       ->join('cooperative_accounts ca', 'ca.member_id = m.member_id', 'left')
                       ->orderBy('m.member_id', 'ASC')
@@ -209,16 +231,26 @@ class Admin extends BaseController
     {
         $this->requireAdmin();
 
+        $filterStatus = $this->request->getGet('status') ?: '';
         $db = db_connect();
-        $contributions = $db->table('contributions c')
-                            ->select('c.*, ca.account_number, ca.account_type, m.member_number, m.first_name, m.last_name')
-                            ->join('cooperative_accounts ca', 'ca.account_id = c.account_id', 'left')
-                            ->join('members m', 'm.member_id = ca.member_id', 'left')
-                            ->orderBy('c.created_at', 'DESC')
-                            ->get()
-                            ->getResultArray();
 
-        return view('admin/contributions', ['contributions' => $contributions]);
+        $query = $db->table('contributions c')
+                    ->select("c.contribution_id AS id, c.contribution_period, c.amount, c.payment_date, c.payment_status, c.created_at, ca.account_number, ca.account_type, m.member_number, CONCAT(m.first_name, ' ', m.last_name) AS member_name, fr.approval_status, fr.first_approved_by, fr.second_approved_by")
+                    ->join('cooperative_accounts ca', 'ca.account_id = c.account_id', 'left')
+                    ->join('members m', 'm.member_id = ca.member_id', 'left')
+                    ->join('financial_records fr', 'fr.financial_record_id = c.financial_record_id', 'left')
+                    ->orderBy('c.created_at', 'DESC');
+
+        if ($filterStatus !== '') {
+            $query->where('c.payment_status', $filterStatus);
+        }
+
+        $contributions = $query->get()->getResultArray();
+
+        return view('admin/contributions', [
+            'contributions' => $contributions,
+            'filterStatus'  => $filterStatus,
+        ]);
     }
 
     /**
@@ -397,16 +429,25 @@ class Admin extends BaseController
     {
         $this->requireAdmin();
 
+        $filterStatus = $this->request->getGet('status') ?: '';
         $db    = db_connect();
-        $loans = $db->table('loans l')
-                    ->select('l.*, ca.account_number, ca.account_type, m.member_number, m.first_name, m.last_name')
+
+        $query = $db->table('loans l')
+                    ->select("l.loan_id AS id, l.loan_amount, l.interest_rate, l.loan_term_months AS term_months, l.loan_status AS status, l.application_date AS applied_date, l.approval_date, l.release_date, l.account_id, ca.account_number, ca.account_type, m.member_number, CONCAT(m.first_name, ' ', m.last_name) AS member_name")
                     ->join('cooperative_accounts ca', 'ca.account_id = l.account_id', 'left')
                     ->join('members m', 'm.member_id = ca.member_id', 'left')
-                    ->orderBy('l.application_date', 'DESC')
-                    ->get()
-                    ->getResultArray();
+                    ->orderBy('l.application_date', 'DESC');
 
-        return view('admin/loans', ['loans' => $loans]);
+        if ($filterStatus !== '') {
+            $query->where('l.loan_status', $filterStatus);
+        }
+
+        $loans = $query->get()->getResultArray();
+
+        return view('admin/loans', [
+            'loans'        => $loans,
+            'filterStatus' => $filterStatus,
+        ]);
     }
 
     /**
@@ -536,17 +577,26 @@ class Admin extends BaseController
     {
         $this->requireAdmin();
 
+        $filterStatus = $this->request->getGet('status') ?: '';
         $db       = db_connect();
-        $payments = $db->table('loan_payments lp')
-                       ->select('lp.*, l.loan_amount, ca.account_number, m.first_name, m.last_name')
-                       ->join('loans l', 'l.loan_id = lp.loan_id', 'left')
-                       ->join('cooperative_accounts ca', 'ca.account_id = l.account_id', 'left')
-                       ->join('members m', 'm.member_id = ca.member_id', 'left')
-                       ->orderBy('lp.created_at', 'DESC')
-                       ->get()
-                       ->getResultArray();
 
-        return view('admin/payments', ['payments' => $payments]);
+        $query = $db->table('loan_payments lp')
+                    ->select("lp.payment_id AS id, lp.loan_id, lp.amount_paid, lp.payment_date, lp.payment_status AS status, l.loan_amount, ca.account_number, CONCAT(m.first_name, ' ', m.last_name) AS member_name")
+                    ->join('loans l', 'l.loan_id = lp.loan_id', 'left')
+                    ->join('cooperative_accounts ca', 'ca.account_id = l.account_id', 'left')
+                    ->join('members m', 'm.member_id = ca.member_id', 'left')
+                    ->orderBy('lp.created_at', 'DESC');
+
+        if ($filterStatus !== '') {
+            $query->where('lp.payment_status', $filterStatus);
+        }
+
+        $payments = $query->get()->getResultArray();
+
+        return view('admin/payments', [
+            'payments'     => $payments,
+            'filterStatus' => $filterStatus,
+        ]);
     }
 
     /**
@@ -756,15 +806,16 @@ class Admin extends BaseController
 
         $db      = db_connect();
         $records = $db->table('financial_records fr')
-                      ->select('fr.*, ca.account_number, m.first_name, m.last_name, pu.username AS processed_by_username')
+                      ->select("fr.financial_record_id AS id, fr.record_type AS transaction_type, fr.amount, fr.transaction_date, fr.approval_status, fr.created_at, fr.first_approved_by AS approver1_id, fr.first_approval_date AS approved_at_1, fr.second_approved_by, fr.second_approval_date AS approved_at_2, ca.account_number, CONCAT(m.first_name, ' ', m.last_name) AS member_name, u1.username AS approver1_name, u2.username AS approver2_name, (CASE WHEN fr.second_approved_by IS NOT NULL THEN 2 WHEN fr.first_approved_by IS NOT NULL THEN 1 ELSE 0 END) AS approval_count")
                       ->join('cooperative_accounts ca', 'ca.account_id = fr.account_id', 'left')
                       ->join('members m', 'm.member_id = ca.member_id', 'left')
-                      ->join('users pu', 'pu.user_id = fr.processed_by', 'left')
+                      ->join('users u1', 'u1.user_id = fr.first_approved_by', 'left')
+                      ->join('users u2', 'u2.user_id = fr.second_approved_by', 'left')
                       ->orderBy('fr.created_at', 'DESC')
                       ->get()
                       ->getResultArray();
 
-        return view('admin/financial_records', ['records' => $records]);
+        return view('admin/financial_records', ['financialRecords' => $records]);
     }
 
     /**
@@ -1045,6 +1096,47 @@ class Admin extends BaseController
     {
         $this->requireAdmin();
         return view('admin/analytics');
+    }
+
+    // =========================================================================
+    // Reports
+    // =========================================================================
+
+    public function reports(): string
+    {
+        $this->requireAdmin();
+
+        $db = db_connect();
+
+        $totalMembers       = $db->table('members')->countAllResults();
+        $activeMembers      = $db->table('members')->where('membership_status', 'Active')->countAllResults();
+        $totalContributions = (float) ($db->table('financial_records')
+            ->where('record_type', 'Contribution')->where('approval_status', 'Approved')
+            ->selectSum('amount')->get()->getRowArray()['amount'] ?? 0);
+        $activeLoans        = $db->table('loans')->where('loan_status', 'Active')->countAllResults();
+        $totalLoanAmount    = (float) ($db->table('financial_records')
+            ->where('record_type', 'Loan Disbursement')->where('approval_status', 'Approved')
+            ->selectSum('amount')->get()->getRowArray()['amount'] ?? 0);
+        $totalPayments      = (float) ($db->table('financial_records')
+            ->where('record_type', 'Loan Payment')->where('approval_status', 'Approved')
+            ->selectSum('amount')->get()->getRowArray()['amount'] ?? 0);
+        $totalDividends     = (float) ($db->table('financial_records')
+            ->where('record_type', 'Dividend')->where('approval_status', 'Approved')
+            ->selectSum('amount')->get()->getRowArray()['amount'] ?? 0);
+        $ledgerCount        = $db->table('blockchain_ledger')->countAllResults();
+        $tamperedCount      = $db->table('blockchain_ledger')->where('verification_status', 'Tampered')->countAllResults();
+
+        return view('admin/reports', [
+            'totalMembers'       => $totalMembers,
+            'activeMembers'      => $activeMembers,
+            'totalContributions' => $totalContributions,
+            'activeLoans'        => $activeLoans,
+            'totalLoanAmount'    => $totalLoanAmount,
+            'totalPayments'      => $totalPayments,
+            'totalDividends'     => $totalDividends,
+            'ledgerCount'        => $ledgerCount,
+            'tamperedCount'      => $tamperedCount,
+        ]);
     }
 
     /**

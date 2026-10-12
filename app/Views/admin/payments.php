@@ -68,15 +68,15 @@
                     <?php if (!empty($payments)): ?>
                         <?php foreach ($payments as $payment): ?>
                         <tr>
-                            <td class="px-4 py-3"><code>#<?= esc($payment['id']) ?></code></td>
+                            <td class="px-4 py-3"><code>#<?= esc($payment['id'] ?? '-') ?></code></td>
                             <td class="py-3"><code>#<?= esc($payment['loan_id'] ?? '-') ?></code></td>
                             <td class="py-3"><code><?= esc($payment['account_number'] ?? '-') ?></code></td>
                             <td class="py-3">
                                 <div class="fw-semibold"><?= esc($payment['member_name'] ?? '-') ?></div>
                             </td>
-                            <td class="py-3 fw-semibold">&#8369;<?= number_format($payment['amount_paid'] ?? $payment['amount'] ?? 0, 2) ?></td>
-                            <td class="py-3 text-muted"><?= esc($payment['payment_date'] ?? $payment['created_at'] ?? '-') ?></td>
-                            <td class="py-3"><?= esc($payment['payment_method'] ?? '-') ?></td>
+                            <td class="py-3 fw-semibold">&#8369;<?= number_format($payment['amount_paid'] ?? 0, 2) ?></td>
+                            <td class="py-3 text-muted"><?= esc($payment['payment_date'] ?? '-') ?></td>
+                            <td class="py-3 text-muted small">—</td>
                             <td class="py-3">
                                 <?php $status = $payment['status'] ?? 'Pending'; ?>
                                 <span class="badge
@@ -86,18 +86,16 @@
                                 </span>
                             </td>
                             <td class="py-3 text-center">
-                                <?php if (($payment['status'] ?? 'Pending') === 'Pending'): ?>
+                                <?php if ($status === 'Pending'): ?>
                                     <div class="d-flex gap-1 justify-content-center">
-                                        <!-- Approve Form -->
-                                        <form action="<?= base_url('admin/payments/' . $payment['id'] . '/approve') ?>" method="post">
+                                        <form action="<?= base_url('admin/payments/approve/' . ($payment['id'] ?? 0)) ?>" method="post">
                                             <?= csrf_field() ?>
                                             <button type="submit" class="btn btn-sm btn-success"
                                                     onclick="return confirm('Approve this payment?')">
                                                 <i class="fa-solid fa-check me-1"></i>Approve
                                             </button>
                                         </form>
-                                        <!-- Reject Form -->
-                                        <form action="<?= base_url('admin/payments/' . $payment['id'] . '/reject') ?>" method="post">
+                                        <form action="<?= base_url('admin/payments/reject/' . ($payment['id'] ?? 0)) ?>" method="post">
                                             <?= csrf_field() ?>
                                             <button type="submit" class="btn btn-sm btn-danger"
                                                     onclick="return confirm('Reject this payment?')">
