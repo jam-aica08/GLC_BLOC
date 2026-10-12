@@ -1,6 +1,20 @@
 <?= $this->extend('layouts/member_main') ?>
 <?= $this->section('content') ?>
 
+<!-- Flash Messages -->
+<?php if (session()->getFlashdata('success')): ?>
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <i class="fa-solid fa-circle-check me-2"></i><?= esc(session()->getFlashdata('success')) ?>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+<?php endif; ?>
+<?php if (session()->getFlashdata('error')): ?>
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <i class="fa-solid fa-circle-exclamation me-2"></i><?= esc(session()->getFlashdata('error')) ?>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+<?php endif; ?>
+
 <div class="mb-4">
     <h4 class="fw-bold mb-1">Welcome, <?= esc(session()->get('username')) ?></h4>
     <p class="text-muted small mb-0">Your cooperative account summary.</p>

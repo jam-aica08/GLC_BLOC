@@ -20,6 +20,7 @@ $routes->group('admin', ['filter' => 'auth:admin'], function ($routes) {
     $routes->get('members', 'Admin::members');
     $routes->post('members/add', 'Admin::addMember');
     $routes->post('members/deactivate/(:num)', 'Admin::deactivateMember/$1');
+    $routes->post('members/reactivate/(:num)', 'Admin::reactivateMember/$1');
 
     // Contributions
     $routes->get('contributions', 'Admin::contributions');

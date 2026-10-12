@@ -8,6 +8,17 @@ use CodeIgniter\Session\Handlers\FileHandler;
 
 class Session extends BaseConfig
 {
+    public function __construct()
+    {
+        parent::__construct();
+
+        // Serverless instances don't share /tmp, so sessions must live in the DB.
+        if (getenv('VERCEL') !== false) {
+            $this->driver   = \CodeIgniter\Session\Handlers\DatabaseHandler::class;
+            $this->savePath = 'ci_sessions';
+        }
+    }
+
     /**
      * --------------------------------------------------------------------------
      * Session Driver

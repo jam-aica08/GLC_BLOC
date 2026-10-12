@@ -223,9 +223,35 @@ class Admin extends BaseController
         }
 
         $memberModel = model(MemberModel::class);
-        $memberModel->update($id, ['membership_status' => 'Inactive']);
+        if (! $memberModel->find($id)) {
+            session()->setFlashdata('error', 'Member not found.');
+            return redirect()->to('/admin/members');
+        }
 
+        $memberModel->update($id, ['membership_status' => 'Inactive']);
         session()->setFlashdata('success', 'Member deactivated.');
+        return redirect()->to('/admin/members');
+    }
+
+    /**
+     * POST: re-activate a previously deactivated member.
+     */
+    public function reactivateMember(int $id)
+    {
+        $this->requireAdmin();
+
+        if (! $this->request->is('post')) {
+            return redirect()->to('/admin/members');
+        }
+
+        $memberModel = model(MemberModel::class);
+        if (! $memberModel->find($id)) {
+            session()->setFlashdata('error', 'Member not found.');
+            return redirect()->to('/admin/members');
+        }
+
+        $memberModel->update($id, ['membership_status' => 'Active']);
+        session()->setFlashdata('success', 'Member reactivated.');
         return redirect()->to('/admin/members');
     }
 
@@ -1025,20 +1051,7 @@ class Admin extends BaseController
         $insertedFrIds = [];
 
         foreach ($accounts as $account) {
-            $db->table('dividends')->insert([
-                'account_id'             => $account['account_id'],
-                'distribution_year'      => $distributionYear,
-                'profit_pool'            => $profitPool,
-                'eligible_account_count' => $eligibleCount,
-                'dividend_per_account'   => $dividendPerAccount,
-                'dividend_amount'        => $dividendPerAccount,
-                'distribution_date'      => $distributionDate,
-                'dividend_status'        => 'Distributed',
-                'created_at'             => $now,
-                'updated_at'             => $now,
-            ]);
-
-            // Create a financial_record for this dividend so it enters the ledger
+            // Create financial_record first so we can link it to the dividend row
             $db->table('financial_records')->insert([
                 'account_id'          => $account['account_id'],
                 'record_type'         => 'Dividend',
@@ -1054,8 +1067,24 @@ class Admin extends BaseController
                 'updated_at'          => $now,
             ]);
 
+            $frId = (int) $db->insertID();
+
+            $db->table('dividends')->insert([
+                'account_id'             => $account['account_id'],
+                'distribution_year'      => $distributionYear,
+                'profit_pool'            => $profitPool,
+                'eligible_account_count' => $eligibleCount,
+                'dividend_per_account'   => $dividendPerAccount,
+                'dividend_amount'        => $dividendPerAccount,
+                'distribution_date'      => $distributionDate,
+                'dividend_status'        => 'Distributed',
+                'financial_record_id'    => $frId,
+                'created_at'             => $now,
+                'updated_at'             => $now,
+            ]);
+
             $insertedFrIds[] = [
-                'fr_id'      => (int) $db->insertID(),
+                'fr_id'      => $frId,
                 'account_id' => (int) $account['account_id'],
             ];
         }

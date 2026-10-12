@@ -268,7 +268,7 @@
             </div>
             <span class="user-name">
                 <strong><?= esc(session()->get('username') ?? 'Member') ?></strong>
-                <br><small class="text-muted"><?= esc(session()->get('account_type') ?? 'Member') ?></small>
+                <br><small class="text-muted"><?= esc(ucfirst(strtolower(session()->get('role') ?? 'Member'))) ?> Account</small>
             </span>
             <form action="<?= base_url('logout') ?>" method="post" class="d-inline">
                 <?= csrf_field() ?>
