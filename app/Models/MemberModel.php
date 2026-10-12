@@ -80,6 +80,7 @@ class MemberModel extends Model
     {
         $row = $this->db->table($this->table)
                         ->select("MAX(CAST(SUBSTRING(member_number, 5) AS UNSIGNED)) AS max_num")
+                        ->where("member_number REGEXP '^MEM-[0-9]+$'")
                         ->get()
                         ->getRow();
 

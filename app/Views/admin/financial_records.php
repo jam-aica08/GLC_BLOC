@@ -127,7 +127,7 @@
                             <!-- Actions -->
                             <td class="py-3 text-center">
                                 <?php if ($canApprove1st): ?>
-                                    <form action="<?= base_url('admin/financial-records/' . $record['id'] . '/approve') ?>" method="post">
+                                    <form action="<?= base_url('admin/financial-records/approve/' . $record['id']) ?>" method="post">
                                         <?= csrf_field() ?>
                                         <input type="hidden" name="approval_level" value="1">
                                         <button type="submit" class="btn btn-sm btn-outline-success"
@@ -136,7 +136,7 @@
                                         </button>
                                     </form>
                                 <?php elseif ($canApprove2nd): ?>
-                                    <form action="<?= base_url('admin/financial-records/' . $record['id'] . '/approve') ?>" method="post">
+                                    <form action="<?= base_url('admin/financial-records/approve/' . $record['id']) ?>" method="post">
                                         <?= csrf_field() ?>
                                         <input type="hidden" name="approval_level" value="2">
                                         <button type="submit" class="btn btn-sm btn-success"
