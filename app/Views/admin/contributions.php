@@ -75,44 +75,54 @@
                     <?php if (!empty($contributions)): ?>
                         <?php foreach ($contributions as $contribution): ?>
                         <tr>
-                            <td class="px-4 py-3"><code>#<?= esc($contribution['id']) ?></code></td>
+                            <td class="px-4 py-3"><code>#<?= esc($contribution['id'] ?? '-') ?></code></td>
                             <td class="py-3"><code><?= esc($contribution['account_number'] ?? '-') ?></code></td>
                             <td class="py-3">
                                 <div class="fw-semibold"><?= esc($contribution['member_name'] ?? '-') ?></div>
+                                <small class="text-muted"><?= esc($contribution['member_number'] ?? '') ?></small>
                             </td>
-                            <td class="py-3 text-muted"><?= esc($contribution['contribution_period'] ?? $contribution['period'] ?? '-') ?></td>
+                            <td class="py-3 text-muted"><?= esc($contribution['contribution_period'] ?? '-') ?></td>
                             <td class="py-3 fw-semibold">&#8369;<?= number_format($contribution['amount'] ?? 0, 2) ?></td>
                             <td class="py-3">
-                                <?php $payStatus = $contribution['payment_status'] ?? 'Unpaid'; ?>
-                                <span class="badge <?= ($payStatus === 'Paid') ? 'bg-success' : (($payStatus === 'Partial') ? 'bg-warning text-dark' : 'bg-secondary') ?>">
+                                <?php $payStatus = $contribution['payment_status'] ?? 'Pending'; ?>
+                                <span class="badge <?= ($payStatus === 'Approved') ? 'bg-success' : (($payStatus === 'Rejected') ? 'bg-danger' : 'bg-warning text-dark') ?>">
                                     <?= esc($payStatus) ?>
                                 </span>
                             </td>
                             <td class="py-3">
-                                <?php $appStatus = $contribution['approval_status'] ?? 'Pending'; ?>
-                                <span class="badge <?= ($appStatus === 'Approved') ? 'bg-success' : (($appStatus === 'Rejected') ? 'bg-danger' : 'bg-warning text-dark') ?>">
-                                    <?= esc($appStatus) ?>
-                                </span>
+                                <?php
+                                    $appStatus = $contribution['approval_status'] ?? 'Pending';
+                                    $approver1 = $contribution['first_approved_by'] ?? null;
+                                    $approver2 = $contribution['second_approved_by'] ?? null;
+                                    if ($appStatus === 'Approved'): ?>
+                                    <span class="badge bg-success">Approved</span>
+                                <?php elseif ($appStatus === 'Rejected'): ?>
+                                    <span class="badge bg-danger">Rejected</span>
+                                <?php elseif ($approver1): ?>
+                                    <span class="badge bg-warning text-dark">1st Approved</span>
+                                <?php else: ?>
+                                    <span class="badge bg-secondary">Pending</span>
+                                <?php endif; ?>
                             </td>
                             <td class="py-3 text-center">
-                                <?php if (($contribution['approval_status'] ?? 'Pending') === 'Pending'): ?>
+                                <?php if (in_array($appStatus, ['Pending']) && !$approver2): ?>
                                     <div class="d-flex gap-1 justify-content-center">
-                                        <!-- Approve Form -->
-                                        <form action="<?= base_url('admin/contributions/' . $contribution['id'] . '/approve') ?>" method="post">
+                                        <form action="<?= base_url('admin/contributions/approve/' . ($contribution['id'] ?? 0)) ?>" method="post">
                                             <?= csrf_field() ?>
                                             <button type="submit" class="btn btn-sm btn-success" title="Approve"
                                                     onclick="return confirm('Approve this contribution?')">
-                                                <i class="fa-solid fa-check me-1"></i>Approve
+                                                <i class="fa-solid fa-check me-1"></i><?= $approver1 ? '2nd Approve' : 'Approve' ?>
                                             </button>
                                         </form>
-                                        <!-- Reject Form -->
-                                        <form action="<?= base_url('admin/contributions/' . $contribution['id'] . '/reject') ?>" method="post">
+                                        <?php if (!$approver1): ?>
+                                        <form action="<?= base_url('admin/contributions/reject/' . ($contribution['id'] ?? 0)) ?>" method="post">
                                             <?= csrf_field() ?>
                                             <button type="submit" class="btn btn-sm btn-danger" title="Reject"
                                                     onclick="return confirm('Reject this contribution?')">
                                                 <i class="fa-solid fa-xmark me-1"></i>Reject
                                             </button>
                                         </form>
+                                        <?php endif; ?>
                                     </div>
                                 <?php else: ?>
                                     <span class="text-muted small">—</span>

@@ -142,27 +142,6 @@
                                    value="<?= esc(old('amount')) ?>">
                         </div>
                     </div>
-                    <div class="mb-3">
-                        <label for="payment_method" class="form-label fw-semibold small">Payment Method <span class="text-danger">*</span></label>
-                        <select class="form-select" id="payment_method" name="payment_method" required>
-                            <option value="" disabled selected>Select payment method</option>
-                            <option value="Cash" <?= (old('payment_method') === 'Cash') ? 'selected' : '' ?>>Cash</option>
-                            <option value="Bank Transfer" <?= (old('payment_method') === 'Bank Transfer') ? 'selected' : '' ?>>Bank Transfer</option>
-                            <option value="GCash" <?= (old('payment_method') === 'GCash') ? 'selected' : '' ?>>GCash</option>
-                            <option value="Maya" <?= (old('payment_method') === 'Maya') ? 'selected' : '' ?>>Maya</option>
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label for="reference_number" class="form-label fw-semibold small">Reference Number</label>
-                        <input type="text" class="form-control" id="reference_number"
-                               name="reference_number" placeholder="Transaction / reference number (optional)"
-                               value="<?= esc(old('reference_number')) ?>">
-                    </div>
-                    <div class="mb-3">
-                        <label for="notes" class="form-label fw-semibold small">Notes</label>
-                        <textarea class="form-control" id="notes" name="notes" rows="2"
-                                  placeholder="Additional notes (optional)"><?= esc(old('notes')) ?></textarea>
-                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>

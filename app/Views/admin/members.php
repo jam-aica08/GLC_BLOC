@@ -53,7 +53,7 @@
                         <?php foreach ($members as $member): ?>
                         <tr>
                             <td class="px-4 py-3">
-                                <code>#<?= esc($member['member_number'] ?? $member['id'] ?? '-') ?></code>
+                                <code>#<?= esc($member['member_number'] ?? '-') ?></code>
                             </td>
                             <td class="py-3">
                                 <div class="d-flex align-items-center gap-2">
@@ -70,8 +70,8 @@
                             <td class="py-3"><?= esc($member['email'] ?? '-') ?></td>
                             <td class="py-3 text-muted"><?= esc($member['membership_date'] ?? $member['created_at'] ?? '-') ?></td>
                             <td class="py-3">
-                                <?php $status = $member['status'] ?? 'Active'; ?>
-                                <span class="badge <?= ($status === 'Active') ? 'bg-success' : (($status === 'Inactive') ? 'bg-secondary' : 'bg-warning text-dark') ?>">
+                                <?php $status = $member['status'] ?? $member['membership_status'] ?? 'Active'; ?>
+                                <span class="badge <?= ($status === 'Active') ? 'bg-success' : 'bg-secondary' ?>">
                                     <?= esc($status) ?>
                                 </span>
                             </td>
@@ -83,16 +83,17 @@
                                 </span>
                             </td>
                             <td class="py-3 text-center">
-                                <div class="btn-group btn-group-sm">
-                                    <a href="<?= base_url('admin/members/' . $member['id']) ?>"
-                                       class="btn btn-outline-secondary" title="View">
-                                        <i class="fa-solid fa-eye"></i>
-                                    </a>
-                                    <a href="<?= base_url('admin/members/' . $member['id'] . '/edit') ?>"
-                                       class="btn btn-outline-primary" title="Edit">
-                                        <i class="fa-solid fa-pen"></i>
-                                    </a>
-                                </div>
+                                <?php if (($member['status'] ?? 'Active') === 'Active'): ?>
+                                    <form action="<?= base_url('admin/members/deactivate/' . $member['id']) ?>" method="post"
+                                          onsubmit="return confirm('Deactivate member <?= esc($member['first_name']) ?>?')">
+                                        <?= csrf_field() ?>
+                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Deactivate">
+                                            <i class="fa-solid fa-user-slash me-1"></i>Deactivate
+                                        </button>
+                                    </form>
+                                <?php else: ?>
+                                    <span class="badge bg-secondary">Inactive</span>
+                                <?php endif; ?>
                             </td>
                         </tr>
                         <?php endforeach; ?>
