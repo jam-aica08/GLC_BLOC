@@ -88,7 +88,7 @@
                             <td class="py-3 text-muted small"><?= esc($loan['applied_date'] ?? $loan['created_at'] ?? '-') ?></td>
                             <td class="py-3 text-center">
                                 <?php if (in_array($loan['status'] ?? '', ['Approved', 'Active'])): ?>
-                                    <a href="<?= base_url('member/installments?loan_id=' . $loan['id']) ?>"
+                                    <a href="<?= base_url('member/loans/' . $loan['id'] . '/installments') ?>"
                                        class="btn btn-sm btn-outline-primary">
                                         <i class="fa-solid fa-calendar-days me-1"></i>Installments
                                     </a>
@@ -130,6 +130,19 @@
                         Loan applications are subject to approval by the cooperative administrators.
                         Interest rates and terms are determined by the cooperative's policies.
                     </div>
+                    <?php if (count($accounts ?? []) > 1): ?>
+                    <div class="mb-3">
+                        <label for="loan_account_id" class="form-label fw-semibold small">Account <span class="text-danger">*</span></label>
+                        <select class="form-select" id="loan_account_id" name="account_id" required>
+                            <?php foreach ($accounts as $acc): ?>
+                                <option value="<?= esc($acc['account_id']) ?>"><?= esc($acc['account_number']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <?php else: ?>
+                        <input type="hidden" name="account_id" value="<?= esc($accounts[0]['account_id'] ?? '') ?>">
+                    <?php endif; ?>
+                    <input type="hidden" name="interest_rate" value="1.00">
                     <div class="row g-3">
                         <div class="col-md-6">
                             <label for="loan_amount" class="form-label fw-semibold small">Loan Amount (&#8369;) <span class="text-danger">*</span></label>
@@ -141,14 +154,14 @@
                             </div>
                         </div>
                         <div class="col-md-6">
-                            <label for="term_months" class="form-label fw-semibold small">Desired Term (months) <span class="text-danger">*</span></label>
-                            <select class="form-select" id="term_months" name="term_months" required>
+                            <label for="loan_term_months" class="form-label fw-semibold small">Desired Term (months) <span class="text-danger">*</span></label>
+                            <select class="form-select" id="loan_term_months" name="loan_term_months" required>
                                 <option value="" disabled selected>Select term</option>
-                                <option value="3" <?= (old('term_months') == '3') ? 'selected' : '' ?>>3 months</option>
-                                <option value="6" <?= (old('term_months') == '6') ? 'selected' : '' ?>>6 months</option>
-                                <option value="12" <?= (old('term_months') == '12') ? 'selected' : '' ?>>12 months</option>
-                                <option value="18" <?= (old('term_months') == '18') ? 'selected' : '' ?>>18 months</option>
-                                <option value="24" <?= (old('term_months') == '24') ? 'selected' : '' ?>>24 months</option>
+                                <option value="3" <?= (old('loan_term_months') == '3') ? 'selected' : '' ?>>3 months</option>
+                                <option value="6" <?= (old('loan_term_months') == '6') ? 'selected' : '' ?>>6 months</option>
+                                <option value="12" <?= (old('loan_term_months') == '12') ? 'selected' : '' ?>>12 months</option>
+                                <option value="18" <?= (old('loan_term_months') == '18') ? 'selected' : '' ?>>18 months</option>
+                                <option value="24" <?= (old('loan_term_months') == '24') ? 'selected' : '' ?>>24 months</option>
                             </select>
                         </div>
                     </div>
