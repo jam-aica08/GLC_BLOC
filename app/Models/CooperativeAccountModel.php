@@ -6,6 +6,12 @@ use CodeIgniter\Model;
 
 class CooperativeAccountModel extends Model
 {
+    /** Fixed monthly contribution per account type (PHP). */
+    public const MONTHLY_CONTRIBUTION = ['Pioneer' => 500.00, 'Basic' => 300.00];
+
+    /** Loan interest rate (%) per account type. */
+    public const LOAN_INTEREST_RATE = ['Pioneer' => 2.00, 'Basic' => 5.00];
+
     protected $table            = 'cooperative_accounts';
     protected $primaryKey       = 'account_id';
     protected $useAutoIncrement = true;

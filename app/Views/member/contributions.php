@@ -117,18 +117,18 @@
             <form action="<?= base_url('member/contributions/submit') ?>" method="post">
                 <?= csrf_field() ?>
                 <div class="modal-body p-4">
-                    <?php if (count($accounts ?? []) > 1): ?>
+                    <?php $monthly = \App\Models\CooperativeAccountModel::MONTHLY_CONTRIBUTION; ?>
                     <div class="mb-3">
                         <label for="account_id" class="form-label fw-semibold small">Account <span class="text-danger">*</span></label>
                         <select class="form-select" id="account_id" name="account_id" required>
-                            <?php foreach ($accounts as $acc): ?>
-                                <option value="<?= esc($acc['account_id']) ?>"><?= esc($acc['account_number']) ?></option>
+                            <?php foreach (($accounts ?? []) as $acc): ?>
+                                <option value="<?= esc($acc['account_id']) ?>"
+                                        data-amount="<?= esc(number_format($monthly[$acc['account_type']] ?? (float) $acc['monthly_contribution'], 2, '.', '')) ?>">
+                                    <?= esc($acc['account_number']) ?> (<?= esc($acc['account_type']) ?>)
+                                </option>
                             <?php endforeach; ?>
                         </select>
                     </div>
-                    <?php else: ?>
-                        <input type="hidden" name="account_id" value="<?= esc($accounts[0]['account_id'] ?? '') ?>">
-                    <?php endif; ?>
                     <div class="mb-3">
                         <label for="contribution_period" class="form-label fw-semibold small">Contribution Period <span class="text-danger">*</span></label>
                         <input type="month" class="form-control" id="contribution_period"
@@ -140,10 +140,10 @@
                         <label for="amount" class="form-label fw-semibold small">Amount (&#8369;) <span class="text-danger">*</span></label>
                         <div class="input-group">
                             <span class="input-group-text">&#8369;</span>
-                            <input type="number" class="form-control" id="amount" name="amount"
-                                   placeholder="0.00" min="1" step="0.01" required
-                                   value="<?= esc(old('amount')) ?>">
+                            <input type="text" class="form-control bg-light" id="amount" readonly
+                                   value="<?= esc(number_format(isset($accounts[0]) ? ($monthly[$accounts[0]['account_type']] ?? (float) $accounts[0]['monthly_contribution']) : 0, 2, '.', '')) ?>">
                         </div>
+                        <div class="form-text">Set automatically by your account type (Pioneer ₱500, Basic ₱300).</div>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -156,5 +156,11 @@
         </div>
     </div>
 </div>
+
+<script>
+document.getElementById('account_id').addEventListener('change', function () {
+    document.getElementById('amount').value = this.selectedOptions[0].dataset.amount;
+});
+</script>
 
 <?= $this->endSection() ?>
