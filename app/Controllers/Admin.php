@@ -990,14 +990,14 @@ class Admin extends BaseController
         $this->requireAdmin();
 
         $db      = db_connect();
-        $entries = $db->table('blockchain_ledger bl')
-                      ->select('bl.*, fr.record_type, fr.amount, fr.approval_status')
+        $ledgerEntries = $db->table('blockchain_ledger bl')
+                      ->select('bl.ledger_id, bl.financial_record_id, bl.ledger_sequence AS sequence, bl.transaction_hash AS hash, bl.previous_hash, bl.recorded_at, bl.verification_status AS status, fr.record_type, fr.amount, fr.approval_status')
                       ->join('financial_records fr', 'fr.financial_record_id = bl.financial_record_id', 'left')
                       ->orderBy('bl.ledger_sequence', 'ASC')
                       ->get()
                       ->getResultArray();
 
-        return view('admin/ledger', ['entries' => $entries]);
+        return view('admin/ledger', ['ledgerEntries' => $ledgerEntries]);
     }
 
     /**
@@ -1024,7 +1024,16 @@ class Admin extends BaseController
                  . "{$result['valid']} valid, {$result['tampered']} tampered "
                  . "out of {$result['checked']} checked.";
 
-        session()->setFlashdata($result['result'] === 'PASS' ? 'success' : 'error', $message);
+        $tamperedIds = [];
+        if (!empty($result['first_failure'])) {
+            $tamperedIds = [$result['first_failure']['sequence'] ?? '?'];
+        }
+
+        session()->setFlashdata('verification_result', [
+            'status'      => $result['result'] === 'PASS' ? 'valid' : 'tampered',
+            'message'     => $message,
+            'tampered_ids' => $tamperedIds,
+        ]);
         return redirect()->to('/admin/ledger');
     }
 
@@ -1052,10 +1061,39 @@ class Admin extends BaseController
         $historical = $analyticsService->getEquityGrowthData($months);
         $forecast   = $analyticsService->predictNextMonths($historical, $forecastMonths);
 
+        $labels         = array_column($historical, 'label');
+        $actual         = array_map('floatval', array_column($historical, 'total'));
+        $forecastLabels = array_column($forecast, 'label');
+        $forecastValues = array_map('floatval', array_column($forecast, 'total'));
+
+        $db = db_connect();
+        $totalMembers       = $db->table('members')->countAllResults();
+        $totalContributions = (float) ($db->table('financial_records')
+            ->where('record_type', 'Contribution')
+            ->where('approval_status', 'Approved')
+            ->selectSum('amount')->get()->getRowArray()['amount'] ?? 0);
+        $activeLoans        = $db->table('financial_records')
+            ->where('record_type', 'Loan')
+            ->where('approval_status', 'Approved')
+            ->countAllResults();
+        $currentEquity      = (float) ($db->table('financial_records')
+            ->whereIn('record_type', ['Contribution', 'Dividend'])
+            ->where('approval_status', 'Approved')
+            ->selectSum('amount')->get()->getRowArray()['amount'] ?? 0);
+
         return $this->response->setJSON([
-            'historical' => $historical,
-            'forecast'   => $forecast,
-            'note'       => 'Forecast values are ESTIMATES / PREDICTIONS based on historical trends.',
+            'labels'             => $labels,
+            'actual'             => $actual,
+            'forecast'           => $forecastValues,
+            'forecastLabels'     => $forecastLabels,
+            'forecastStartIndex' => count($actual),
+            'stats'              => [
+                'total_members'       => $totalMembers,
+                'total_contributions' => $totalContributions,
+                'active_loans'        => $activeLoans,
+                'current_equity'      => $currentEquity,
+            ],
+            'note' => 'Forecast values are ESTIMATES / PREDICTIONS based on historical trends.',
         ]);
     }
 }
