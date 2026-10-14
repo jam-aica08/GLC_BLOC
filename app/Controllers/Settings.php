@@ -2,6 +2,7 @@
 
 namespace App\Controllers;
 
+use App\Libraries\DatabaseUpdates;
 use App\Models\UserModel;
 use CodeIgniter\HTTP\RedirectResponse;
 
@@ -27,7 +28,25 @@ class Settings extends BaseController
             'layout'  => $this->role() === 'admin' ? 'layouts/main' : 'layouts/member_main',
             'isAdmin' => $this->role() === 'admin',
             'user'    => model(UserModel::class)->find((int) session()->get('user_id')),
+            'pendingUpdates' => $this->role() === 'admin' ? DatabaseUpdates::pending() : [],
         ]);
+    }
+
+    /**
+     * POST (admin): apply pending database updates (migrations).
+     */
+    public function applyUpdates(): RedirectResponse
+    {
+        if ($this->role() !== 'admin') {
+            return redirect()->to('/login');
+        }
+
+        $error = DatabaseUpdates::apply();
+        if ($error !== null) {
+            return redirect()->to($this->home())->with('error', 'Database update failed: ' . $error);
+        }
+
+        return redirect()->to($this->home())->with('success', 'Database is up to date.');
     }
 
     public function changePassword(): RedirectResponse

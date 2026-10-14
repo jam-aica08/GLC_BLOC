@@ -347,7 +347,7 @@ class Member extends BaseController
         }
 
         if ($account['account_status'] !== 'Active') {
-            session()->setFlashdata('error', 'This account has not completed its contributions from January yet, so it cannot apply for a loan.');
+            session()->setFlashdata('error', 'This account is not active yet, so it cannot apply for a loan.');
             return redirect()->to('/member/loans');
         }
 
@@ -419,12 +419,7 @@ class Member extends BaseController
                            ->get()
                            ->getResultArray();
 
-        $pendingIds = array_map('intval', array_column($db->table('loan_payment_installments lpi')
-            ->select('lpi.installment_id')
-            ->join('loan_payments lp', 'lp.payment_id = lpi.payment_id')
-            ->where('lp.loan_id', $loanId)
-            ->where('lp.payment_status', 'Pending')
-            ->get()->getResultArray(), 'installment_id'));
+        $pendingIds = $this->pendingInstallmentIds($loanId);
 
         $totalPayable = array_sum(array_column($installments, 'amount_due'));
         $totalPaid    = array_sum(array_column($installments, 'amount_paid'));
@@ -436,6 +431,17 @@ class Member extends BaseController
             'totalPayable' => $totalPayable,
             'totalPaid'    => $totalPaid,
         ]);
+    }
+
+    /** Installments already covered by a payment that is waiting for approval. */
+    private function pendingInstallmentIds(int $loanId): array
+    {
+        return array_map('intval', array_column(db_connect()->table('loan_payment_installments lpi')
+            ->select('lpi.installment_id')
+            ->join('loan_payments lp', 'lp.payment_id = lpi.payment_id')
+            ->where('lp.loan_id', $loanId)
+            ->where('lp.payment_status', 'Pending')
+            ->get()->getResultArray(), 'installment_id'));
     }
 
     /**
@@ -469,7 +475,7 @@ class Member extends BaseController
             return redirect()->to('/member/loans');
         }
 
-        $amountPaid = (float) $this->request->getPost('amount_paid');
+        $amountPaid = round((float) $this->request->getPost('amount_paid'), 2);
         if ($amountPaid <= 0) {
             session()->setFlashdata('error', 'Payment amount must be greater than zero.');
             return redirect()->to('/member/loans/' . $loanId . '/installments');
@@ -490,20 +496,22 @@ class Member extends BaseController
             return redirect()->to('/member/loans/' . $loanId . '/installments');
         }
 
-        $alreadyPending = $db->table('loan_payment_installments lpi')
-                             ->join('loan_payments lp', 'lp.payment_id = lpi.payment_id')
-                             ->whereIn('lpi.installment_id', $installmentIds)
-                             ->where('lp.payment_status', 'Pending')
-                             ->countAllResults();
-        if ($alreadyPending > 0) {
-            session()->setFlashdata('error', 'One of the selected installments already has a payment waiting for approval.');
-            return redirect()->to('/member/loans/' . $loanId . '/installments');
-        }
-
         $now   = date('Y-m-d H:i:s');
         $today = date('Y-m-d');
 
         $db->transStart();
+
+        // Lock the loan so two quick submissions cannot both pass the checks below.
+        $db->query('SELECT loan_id FROM loans WHERE loan_id = ? FOR UPDATE', [$loanId]);
+
+        $pendingIds = $this->pendingInstallmentIds($loanId);
+        $allocation = (new LoanService())->processPayment($loanId, $amountPaid, $installmentIds, $pendingIds);
+
+        if (! $allocation['valid']) {
+            $db->transRollback();
+            session()->setFlashdata('error', $allocation['error']);
+            return redirect()->to('/member/loans/' . $loanId . '/installments');
+        }
 
         $frId = model(FinancialRecordModel::class)->insert([
             'account_id'      => $loan['account_id'],
@@ -515,37 +523,20 @@ class Member extends BaseController
             'reference_id'    => $loanId,
         ]);
 
-        // Create loan_payment record (Pending)
         $db->table('loan_payments')->insert([
-            'loan_id'        => $loanId,
-            'payment_date'   => $today,
-            'amount_paid'    => $amountPaid,
-            'payment_method' => $method,
+            'loan_id'             => $loanId,
+            'payment_date'        => $today,
+            'amount_paid'         => $amountPaid,
+            'payment_method'      => $method,
             'financial_record_id' => $frId ?: null,
-            'principal_amount'=> $amountPaid,
-            'interest_amount'=> 0.00,
-            'payment_status' => 'Pending',
-            'created_at'     => $now,
-            'updated_at'     => $now,
+            'principal_amount'    => $amountPaid,
+            'interest_amount'     => 0.00,
+            'payment_status'      => 'Pending',
+            'created_at'          => $now,
+            'updated_at'          => $now,
         ]);
 
         $paymentId = $db->insertID();
-
-        // Record installment allocations
-        $loanService = new LoanService();
-        $allocation  = $loanService->processPayment($loanId, $amountPaid, $installmentIds);
-
-        if (! $allocation['valid']) {
-            $db->transRollback();
-            session()->setFlashdata('error', $allocation['error']);
-            return redirect()->to('/member/loans/' . $loanId . '/installments');
-        }
-
-        if (round(array_sum(array_column($allocation['allocation'], 'amount_applied')), 2) < round($amountPaid, 2)) {
-            $db->transRollback();
-            session()->setFlashdata('error', 'The amount is more than the unpaid total of the selected installments.');
-            return redirect()->to('/member/loans/' . $loanId . '/installments');
-        }
 
         foreach ($allocation['allocation'] as $alloc) {
             $db->table('loan_payment_installments')->insert([
@@ -660,8 +651,8 @@ class Member extends BaseController
     }
 
     /**
-     * POST: the member opens another account. It joins once contributions
-     * from January of this year are complete.
+     * POST: the member opens another account. It becomes active once PHP 300
+     * has been contributed to it.
      */
     public function openAccount()
     {
@@ -684,9 +675,8 @@ class Member extends BaseController
         }
 
         $accountNumber = model(CooperativeAccountModel::class)->openAccount($memberId, $accountType);
-        $catchUp       = number_format((int) date('n') * CooperativeAccountModel::MONTHLY_CONTRIBUTION, 2);
 
-        session()->setFlashdata('success', "Account {$accountNumber} opened. Contribute PHP {$catchUp} (January to this month) to complete joining.");
+        session()->setFlashdata('success', "Account {$accountNumber} added. It becomes active once you contribute PHP 300 to it.");
         return redirect()->to('/member/profile');
     }
 
