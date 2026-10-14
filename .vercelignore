@@ -1,8 +1,8 @@
-.env
-env
-.github
-builds
-database
-tests
-writable
-phpunit.dist.xml
+/.env
+/env
+/.github
+/builds
+/database
+/tests
+/writable
+/phpunit.dist.xml
