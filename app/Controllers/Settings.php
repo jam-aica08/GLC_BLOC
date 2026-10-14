@@ -29,7 +29,29 @@ class Settings extends BaseController
             'isAdmin' => $this->role() === 'admin',
             'user'    => model(UserModel::class)->find((int) session()->get('user_id')),
             'dbStatus' => $this->role() === 'admin' ? DatabaseUpdates::status() : null,
+            'recentErrors' => $this->role() === 'admin' ? $this->recentErrors() : [],
         ]);
+    }
+
+    /**
+     * Last few critical errors from today's log, newest first, so an admin can
+     * see what went wrong behind a "Whoops" page.
+     */
+    private function recentErrors(int $limit = 10): array
+    {
+        $file = WRITEPATH . 'logs/log-' . date('Y-m-d') . '.log';
+        if (! is_file($file)) {
+            return [];
+        }
+
+        $errors = [];
+        foreach (file($file, FILE_IGNORE_NEW_LINES) ?: [] as $line) {
+            if (str_starts_with($line, 'CRITICAL') && ! str_contains($line, '[Caused by]')) {
+                $errors[] = mb_strimwidth($line, 0, 400, '…');
+            }
+        }
+
+        return array_slice(array_reverse(array_unique($errors)), 0, $limit);
     }
 
     /**

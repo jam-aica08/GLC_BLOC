@@ -16,6 +16,8 @@ class AccountJoiningAndPaymentMethod extends Migration
 {
     public function up(): void
     {
+        $this->db->resetDataCache();
+
         // Appending an ENUM value keeps existing rows valid (and is supported by TiDB).
         $this->db->query("ALTER TABLE cooperative_accounts MODIFY account_status ENUM('Active','Inactive','Closed','Pending') NOT NULL DEFAULT 'Active'");
         $this->db->query("UPDATE cooperative_accounts SET monthly_contribution = 300.00");
