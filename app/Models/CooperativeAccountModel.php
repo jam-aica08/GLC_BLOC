@@ -130,9 +130,11 @@ class CooperativeAccountModel extends Model
     }
 
     /**
-     * Contribution standing for an account. An account joins the cooperative
-     * only after paying every month from January of its start year up to and
-     * including its start month; after that it owes PHP 300 each month.
+     * Contribution standing for an account. A member's first account joins the
+     * cooperative only after paying every month from January of its start year
+     * up to and including its start month; any additional account is opened
+     * once PHP 300 has been paid on it. After that each account owes PHP 300
+     * a month.
      *
      * @return array{required_to_join: float, required_to_date: float, paid: float,
      *               join_balance: float, due_balance: float}
@@ -143,10 +145,19 @@ class CooperativeAccountModel extends Model
         $startYear  = (int) date('Y', $start);
         $startMonth = (int) date('n', $start);
 
-        $monthsToDate = ((int) date('Y') - $startYear) * 12 + (int) date('n');
-        $monthsToDate = max($monthsToDate, $startMonth);
+        $firstAccountId = (int) ($this->db->table($this->table)
+            ->selectMin('account_id')
+            ->where('member_id', $account['member_id'])
+            ->get()->getRowArray()['account_id'] ?? 0);
+        $isFirstAccount = $firstAccountId === (int) $account['account_id'];
 
-        $requiredToJoin = $startMonth * self::MONTHLY_CONTRIBUTION;
+        // First accounts owe from January of their start year; extra accounts from the month they were opened.
+        $monthsSinceJanuary = ((int) date('Y') - $startYear) * 12 + (int) date('n');
+        $monthsToDate       = $isFirstAccount
+            ? max($monthsSinceJanuary, $startMonth)
+            : max(1, $monthsSinceJanuary - $startMonth + 1);
+
+        $requiredToJoin = $isFirstAccount ? $startMonth * self::MONTHLY_CONTRIBUTION : self::MONTHLY_CONTRIBUTION;
         $requiredToDate = $monthsToDate * self::MONTHLY_CONTRIBUTION;
         $paid           = $this->getTotalContributions((int) $account['account_id']);
 
