@@ -21,19 +21,26 @@
 
 <?php $base = $isAdmin ? 'admin/settings' : 'member/settings'; ?>
 
-<?php if (! empty($pendingUpdates)): ?>
-    <div class="card shadow-sm border-warning mb-4">
-        <div class="card-header fw-semibold bg-warning-subtle"><i class="fa-solid fa-database me-2"></i>Database Updates Needed</div>
+<?php if ($isAdmin && $dbStatus !== null): ?>
+    <?php $needs = $dbStatus['pending'] || $dbStatus['problems'] || $dbStatus['error']; ?>
+    <div class="card shadow-sm mb-4 <?= $needs ? 'border-warning' : '' ?>">
+        <div class="card-header fw-semibold <?= $needs ? 'bg-warning-subtle' : 'bg-white' ?>">
+            <i class="fa-solid fa-database me-2"></i>Database
+        </div>
         <div class="card-body">
-            <p class="mb-2">The database needs <?= count($pendingUpdates) ?> update(s) for the latest features. Your data is kept.</p>
-            <ul class="small mb-3">
-                <?php foreach ($pendingUpdates as $name): ?>
-                    <li><?= esc($name) ?></li>
-                <?php endforeach; ?>
-            </ul>
+            <?php if (! $needs): ?>
+                <p class="mb-3 text-success"><i class="fa-solid fa-circle-check me-1"></i>The database is up to date.</p>
+            <?php else: ?>
+                <p class="mb-2">The database needs updating for the latest features. Your data is kept.</p>
+                <ul class="small mb-3">
+                    <?php foreach ($dbStatus['pending'] as $name): ?><li>Update: <?= esc($name) ?></li><?php endforeach; ?>
+                    <?php foreach ($dbStatus['problems'] as $p): ?><li>Fix: <?= esc($p) ?></li><?php endforeach; ?>
+                    <?php if ($dbStatus['error']): ?><li>Could not check: <?= esc($dbStatus['error']) ?></li><?php endif; ?>
+                </ul>
+            <?php endif; ?>
             <form method="post" action="<?= base_url($base . '/updates') ?>" onsubmit="this.querySelector('button').disabled = true;">
                 <?= csrf_field() ?>
-                <button type="submit" class="btn btn-warning">
+                <button type="submit" class="btn <?= $needs ? 'btn-warning' : 'btn-outline-secondary' ?>">
                     <i class="fa-solid fa-rotate me-2"></i>Apply Database Updates
                 </button>
             </form>

@@ -28,7 +28,7 @@ class Settings extends BaseController
             'layout'  => $this->role() === 'admin' ? 'layouts/main' : 'layouts/member_main',
             'isAdmin' => $this->role() === 'admin',
             'user'    => model(UserModel::class)->find((int) session()->get('user_id')),
-            'pendingUpdates' => $this->role() === 'admin' ? DatabaseUpdates::pending() : [],
+            'dbStatus' => $this->role() === 'admin' ? DatabaseUpdates::status() : null,
         ]);
     }
 
