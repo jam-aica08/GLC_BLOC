@@ -187,7 +187,7 @@
 
     <!-- Login Card -->
     <div class="login-card">
-        <h5><i class="fa-solid fa-lock me-2" style="color: var(--accent);"></i>Member Sign In</h5>
+        <h5><i class="fa-solid fa-lock me-2" style="color: var(--accent);"></i>GLC-BLOC</h5>
 
         <!-- Flash Error Message -->
         <?php if (session()->getFlashdata('error')): ?>

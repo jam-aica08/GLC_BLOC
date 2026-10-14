@@ -22,11 +22,8 @@ class LoanInstallmentModel extends Model
         'amount_due',
         'amount_paid',
         'remaining_balance',
-        'penalty_amount',
-        'penalty_paid',
         'payment_date',
         'payment_status',
-        'penalty_status',
         'financial_record_id',
     ];
 
@@ -46,11 +43,8 @@ class LoanInstallmentModel extends Model
         'amount_due'         => 'required|decimal|greater_than_equal_to[0]',
         'amount_paid'        => 'permit_empty|decimal|greater_than_equal_to[0]',
         'remaining_balance'  => 'permit_empty|decimal|greater_than_equal_to[0]',
-        'penalty_amount'     => 'permit_empty|decimal|greater_than_equal_to[0]',
-        'penalty_paid'       => 'permit_empty|decimal|greater_than_equal_to[0]',
         'payment_date'       => 'permit_empty|valid_date',
         'payment_status'     => 'permit_empty|in_list[Upcoming,Due,Late,Paid]',
-        'penalty_status'     => 'permit_empty|in_list[None,Due,Paid]',
         'financial_record_id'=> 'permit_empty|integer|greater_than[0]',
     ];
 
@@ -76,9 +70,6 @@ class LoanInstallmentModel extends Model
         ],
         'payment_status' => [
             'in_list' => 'Payment status must be one of: Upcoming, Due, Late, Paid.',
-        ],
-        'penalty_status' => [
-            'in_list' => 'Penalty status must be one of: None, Due, Paid.',
         ],
     ];
 

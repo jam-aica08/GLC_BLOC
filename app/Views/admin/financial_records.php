@@ -47,6 +47,7 @@
                     <tr>
                         <th class="px-4 py-3">Record ID</th>
                         <th class="py-3">Type</th>
+                        <th class="py-3">Member / Account</th>
                         <th class="py-3">Amount</th>
                         <th class="py-3">Date</th>
                         <th class="py-3">1st Approver</th>
@@ -63,7 +64,11 @@
                             $approver2 = $record['approver2_name'] ?? $record['second_approver'] ?? null;
                             $approvalCount = intval($record['approval_count'] ?? 0);
                             // Determine status label
-                            if ($approvalCount >= 2) {
+                            $isRejected = ($record['approval_status'] ?? '') === 'Rejected';
+                            if ($isRejected) {
+                                $statusLabel = 'Rejected';
+                                $statusClass = 'bg-danger';
+                            } elseif ($approvalCount >= 2) {
                                 $statusLabel = 'Fully Approved';
                                 $statusClass = 'bg-success';
                             } elseif ($approvalCount === 1) {
@@ -76,13 +81,17 @@
                             // Who can approve next
                             $currentUserRole = session()->get('role') ?? '';
                             $currentUserId = session()->get('user_id') ?? 0;
-                            $canApprove1st = ($approvalCount === 0);
-                            $canApprove2nd = ($approvalCount === 1 && intval($record['approver1_id'] ?? 0) !== intval($currentUserId));
+                            $canApprove1st = ! $isRejected && ($approvalCount === 0);
+                            $canApprove2nd = ! $isRejected && ($approvalCount === 1 && intval($record['approver1_id'] ?? 0) !== intval($currentUserId));
                         ?>
                         <tr>
                             <td class="px-4 py-3"><code>#<?= esc($record['id']) ?></code></td>
                             <td class="py-3">
                                 <span class="badge bg-light text-dark border"><?= esc($record['transaction_type'] ?? $record['type'] ?? '-') ?></span>
+                            </td>
+                            <td class="py-3">
+                                <div class="fw-semibold"><?= esc($record['member_name'] ?? '-') ?></div>
+                                <small class="text-muted"><?= esc($record['member_number'] ?? '') ?> · <?= esc($record['account_number'] ?? '') ?></small>
                             </td>
                             <td class="py-3 fw-semibold">&#8369;<?= number_format($record['amount'] ?? 0, 2) ?></td>
                             <td class="py-3 text-muted small"><?= esc($record['transaction_date'] ?? $record['created_at'] ?? '-') ?></td>
@@ -120,7 +129,9 @@
                             </td>
                             <!-- Actions -->
                             <td class="py-3 text-center">
-                                <?php if ($approvalCount >= 2): ?>
+                                <?php if ($isRejected): ?>
+                                    <span class="text-danger small"><i class="fa-solid fa-ban me-1"></i>Rejected</span>
+                                <?php elseif ($approvalCount >= 2): ?>
                                     <span class="text-success small">
                                         <i class="fa-solid fa-circle-check me-1"></i>Complete
                                     </span>
@@ -159,7 +170,7 @@
                         <?php endforeach; ?>
                     <?php else: ?>
                         <tr>
-                            <td colspan="8" class="text-center py-5 text-muted">
+                            <td colspan="9" class="text-center py-5 text-muted">
                                 <i class="fa-solid fa-file-invoice-dollar fa-2x mb-3 d-block opacity-25"></i>
                                 No financial records found.
                             </td>

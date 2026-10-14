@@ -19,7 +19,6 @@ class LoanPaymentModel extends Model
         'amount_paid',
         'principal_amount',
         'interest_amount',
-        'penalty_amount',
         'payment_status',
         'financial_record_id',
     ];
@@ -37,7 +36,6 @@ class LoanPaymentModel extends Model
         'amount_paid'        => 'required|decimal|greater_than[0]',
         'principal_amount'   => 'permit_empty|decimal|greater_than_equal_to[0]',
         'interest_amount'    => 'permit_empty|decimal|greater_than_equal_to[0]',
-        'penalty_amount'     => 'permit_empty|decimal|greater_than_equal_to[0]',
         'payment_status'     => 'permit_empty|in_list[Pending,Approved,Rejected]',
         'financial_record_id'=> 'permit_empty|integer|greater_than[0]',
     ];

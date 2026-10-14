@@ -18,6 +18,8 @@ use App\Services\LoanService;
  */
 class Member extends BaseController
 {
+    public const PAYMENT_METHODS = ['Cash', 'GCash', 'Bank Transfer'];
+
     // -------------------------------------------------------------------------
     // Auth guard
     // -------------------------------------------------------------------------
@@ -106,6 +108,12 @@ class Member extends BaseController
             $totalDividends = (float) ($row['dividend_amount'] ?? 0);
         }
 
+        $accountModel = model(CooperativeAccountModel::class);
+        foreach ($accounts as &$acc) {
+            $acc['standing'] = $accountModel->getStanding($acc);
+        }
+        unset($acc);
+
         return view('member/dashboard', [
             'accounts'           => $accounts,
             'recentRecords'      => $recentRecords,
@@ -148,6 +156,12 @@ class Member extends BaseController
         ));
         $pendingCount = count(array_filter($contributions, fn($c) => in_array($c['approval_status'] ?? 'Pending', ['Pending', ''])));
 
+        $accountModel = model(CooperativeAccountModel::class);
+        foreach ($accounts as &$acc) {
+            $acc['standing'] = $accountModel->getStanding($acc);
+        }
+        unset($acc);
+
         return view('member/contributions', [
             'contributions' => $contributions,
             'accounts'      => $accounts,
@@ -170,8 +184,8 @@ class Member extends BaseController
         }
 
         $accountId = (int) $this->request->getPost('account_id');
-        $amount    = (float) $this->request->getPost('amount');
         $period    = (string) $this->request->getPost('contribution_period');  // YYYY-MM
+        $amount    = round((float) $this->request->getPost('amount'), 2);
 
         if (! preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', $period)) {
             session()->setFlashdata('error', 'Invalid contribution period format.');
@@ -191,13 +205,8 @@ class Member extends BaseController
             return redirect()->to('/member/contributions');
         }
 
-        // Prevent duplicate contribution for the same period
-        $periodCheck = $db->table('contributions')
-                          ->where('account_id', $accountId)
-                          ->where('contribution_period', $period ?: date('Y-m'))
-                          ->get()->getRowArray();
-        if ($periodCheck) {
-            session()->setFlashdata('error', 'A contribution for this period already exists.');
+        if (! in_array($account['account_status'], ['Active', 'Pending'], true)) {
+            session()->setFlashdata('error', 'This account is not open for contributions.');
             return redirect()->to('/member/contributions');
         }
 
@@ -271,7 +280,7 @@ class Member extends BaseController
         $loans = [];
         if ($accountIds) {
             $loans = $db->table('loans l')
-                        ->select('l.loan_id AS id, l.loan_amount, l.interest_rate, l.loan_term_months AS term_months, l.application_date AS applied_date, l.loan_status AS status, l.account_id, ca.account_number')
+                        ->select('l.loan_id AS id, l.loan_amount, l.interest_rate, l.interest_amount, l.loan_term_months AS term_months, l.application_date AS applied_date, l.loan_status AS status, l.account_id, ca.account_number')
                         ->join('cooperative_accounts ca', 'ca.account_id = l.account_id', 'left')
                         ->whereIn('l.account_id', $accountIds)
                         ->orderBy('l.application_date', 'DESC')
@@ -280,10 +289,12 @@ class Member extends BaseController
 
             foreach ($loans as &$loan) {
                 $balRow = $db->table('loan_installments')
-                             ->selectSum('remaining_balance')
+                             ->select('COALESCE(SUM(amount_due - amount_paid), 0) AS balance, COUNT(*) AS n', false)
                              ->where('loan_id', $loan['id'])
                              ->get()->getRowArray();
-                $loan['outstanding_balance'] = (float)($balRow['remaining_balance'] ?? $loan['loan_amount']);
+                $loan['outstanding_balance'] = (int) $balRow['n'] > 0
+                    ? (float) $balRow['balance']
+                    : (float) $loan['loan_amount'] + (float) $loan['interest_amount'];
 
                 $firstInst = $db->table('loan_installments')
                                 ->where('loan_id', $loan['id'])
@@ -315,7 +326,6 @@ class Member extends BaseController
         $accountId    = (int) $this->request->getPost('account_id');
         $loanAmount   = (float) $this->request->getPost('loan_amount');
         $termMonths   = (int) $this->request->getPost('loan_term_months');
-        $interestRate = 1.00; // fixed cooperative rate — never accept from POST
 
         $allowedTerms = [3, 6, 12, 18, 24];
         if (! in_array($termMonths, $allowedTerms, true)) {
@@ -335,6 +345,14 @@ class Member extends BaseController
             session()->setFlashdata('error', 'Invalid account selection.');
             return redirect()->to('/member/loans');
         }
+
+        if ($account['account_status'] !== 'Active') {
+            session()->setFlashdata('error', 'This account has not completed its contributions from January yet, so it cannot apply for a loan.');
+            return redirect()->to('/member/loans');
+        }
+
+        // Rate is fixed by account type; never taken from the form.
+        $interestRate = CooperativeAccountModel::LOAN_INTEREST_RATE[$account['account_type']] ?? 5.00;
 
         if ($loanAmount <= 0) {
             session()->setFlashdata('error', 'Loan amount must be greater than zero.');
@@ -376,7 +394,7 @@ class Member extends BaseController
     // Loan installments
     // =========================================================================
 
-    public function loanInstallments(int $loanId): string
+    public function loanInstallments(int $loanId): string|\CodeIgniter\HTTP\RedirectResponse
     {
         $memberId = $this->requireMember();
         $db       = db_connect();
@@ -401,9 +419,22 @@ class Member extends BaseController
                            ->get()
                            ->getResultArray();
 
+        $pendingIds = array_map('intval', array_column($db->table('loan_payment_installments lpi')
+            ->select('lpi.installment_id')
+            ->join('loan_payments lp', 'lp.payment_id = lpi.payment_id')
+            ->where('lp.loan_id', $loanId)
+            ->where('lp.payment_status', 'Pending')
+            ->get()->getResultArray(), 'installment_id'));
+
+        $totalPayable = array_sum(array_column($installments, 'amount_due'));
+        $totalPaid    = array_sum(array_column($installments, 'amount_paid'));
+
         return view('member/loan_installments', [
             'loan'         => $loan,
             'installments' => $installments,
+            'pendingIds'   => $pendingIds,
+            'totalPayable' => $totalPayable,
+            'totalPaid'    => $totalPaid,
         ]);
     }
 
@@ -453,19 +484,46 @@ class Member extends BaseController
             return redirect()->to('/member/loans/' . $loanId . '/installments');
         }
 
+        $method = (string) $this->request->getPost('payment_method');
+        if (! in_array($method, self::PAYMENT_METHODS, true)) {
+            session()->setFlashdata('error', 'Please choose a payment method.');
+            return redirect()->to('/member/loans/' . $loanId . '/installments');
+        }
+
+        $alreadyPending = $db->table('loan_payment_installments lpi')
+                             ->join('loan_payments lp', 'lp.payment_id = lpi.payment_id')
+                             ->whereIn('lpi.installment_id', $installmentIds)
+                             ->where('lp.payment_status', 'Pending')
+                             ->countAllResults();
+        if ($alreadyPending > 0) {
+            session()->setFlashdata('error', 'One of the selected installments already has a payment waiting for approval.');
+            return redirect()->to('/member/loans/' . $loanId . '/installments');
+        }
+
         $now   = date('Y-m-d H:i:s');
         $today = date('Y-m-d');
 
         $db->transStart();
+
+        $frId = model(FinancialRecordModel::class)->insert([
+            'account_id'      => $loan['account_id'],
+            'record_type'     => 'Loan Payment',
+            'transaction_date'=> $today,
+            'amount'          => $amountPaid,
+            'approval_status' => 'Pending',
+            'processed_by'    => (int) session()->get('user_id'),
+            'reference_id'    => $loanId,
+        ]);
 
         // Create loan_payment record (Pending)
         $db->table('loan_payments')->insert([
             'loan_id'        => $loanId,
             'payment_date'   => $today,
             'amount_paid'    => $amountPaid,
+            'payment_method' => $method,
+            'financial_record_id' => $frId ?: null,
             'principal_amount'=> $amountPaid,
             'interest_amount'=> 0.00,
-            'penalty_amount' => 0.00,
             'payment_status' => 'Pending',
             'created_at'     => $now,
             'updated_at'     => $now,
@@ -483,12 +541,17 @@ class Member extends BaseController
             return redirect()->to('/member/loans/' . $loanId . '/installments');
         }
 
+        if (round(array_sum(array_column($allocation['allocation'], 'amount_applied')), 2) < round($amountPaid, 2)) {
+            $db->transRollback();
+            session()->setFlashdata('error', 'The amount is more than the unpaid total of the selected installments.');
+            return redirect()->to('/member/loans/' . $loanId . '/installments');
+        }
+
         foreach ($allocation['allocation'] as $alloc) {
             $db->table('loan_payment_installments')->insert([
                 'payment_id'     => $paymentId,
                 'installment_id' => $alloc['installment_id'],
                 'amount_applied' => $alloc['amount_applied'],
-                'penalty_amount' => 0.00,
             ]);
         }
 
@@ -580,12 +643,88 @@ class Member extends BaseController
 
         $accounts = $db->table('cooperative_accounts')
                        ->where('member_id', $memberId)
+                       ->orderBy('account_id', 'ASC')
                        ->get()
                        ->getResultArray();
+
+        $accountModel = model(CooperativeAccountModel::class);
+        foreach ($accounts as &$acc) {
+            $acc['standing'] = $accountModel->getStanding($acc);
+        }
+        unset($acc);
 
         return view('member/profile', [
             'member'   => $member,
             'accounts' => $accounts,
         ]);
+    }
+
+    /**
+     * POST: the member opens another account. It joins once contributions
+     * from January of this year are complete.
+     */
+    public function openAccount()
+    {
+        $memberId = $this->requireMember();
+
+        if (! $this->request->is('post')) {
+            return redirect()->to('/member/profile');
+        }
+
+        $accountType = $this->request->getPost('account_type');
+        if (! in_array($accountType, CooperativeAccountModel::ACCOUNT_TYPES, true)) {
+            session()->setFlashdata('error', 'Please choose a valid account type.');
+            return redirect()->to('/member/profile');
+        }
+
+        $member = model(MemberModel::class)->find($memberId);
+        if (($member['membership_status'] ?? '') !== 'Active') {
+            session()->setFlashdata('error', 'Your membership is not active.');
+            return redirect()->to('/member/profile');
+        }
+
+        $accountNumber = model(CooperativeAccountModel::class)->openAccount($memberId, $accountType);
+        $catchUp       = number_format((int) date('n') * CooperativeAccountModel::MONTHLY_CONTRIBUTION, 2);
+
+        session()->setFlashdata('success', "Account {$accountNumber} opened. Contribute PHP {$catchUp} (January to this month) to complete joining.");
+        return redirect()->to('/member/profile');
+    }
+
+    // =========================================================================
+    // Payments
+    // =========================================================================
+
+    public function payments(): string
+    {
+        $memberId = $this->requireMember();
+        $db       = db_connect();
+
+        $payments = $db->table('loan_payments lp')
+                       ->select('lp.payment_id AS id, lp.loan_id, lp.amount_paid, lp.payment_method, lp.payment_date, lp.payment_status AS status, l.loan_amount, l.loan_status, ca.account_number, (SELECT COALESCE(SUM(li.amount_paid), 0) FROM loan_installments li WHERE li.loan_id = l.loan_id) AS total_paid, (l.loan_amount + l.interest_amount) AS total_payable', false)
+                       ->join('loans l', 'l.loan_id = lp.loan_id')
+                       ->join('cooperative_accounts ca', 'ca.account_id = l.account_id')
+                       ->where('ca.member_id', $memberId)
+                       ->orderBy('lp.created_at', 'DESC')
+                       ->get()
+                       ->getResultArray();
+
+        return view('member/payments', ['payments' => $payments]);
+    }
+
+    // =========================================================================
+    // Analytics
+    // =========================================================================
+
+    public function analytics(): string
+    {
+        $this->requireMember();
+        return view('admin/analytics', ['layout' => 'layouts/member_main', 'dataUrl' => 'member/analytics/data']);
+    }
+
+    public function analyticsData()
+    {
+        $this->requireMember();
+
+        return $this->response->setJSON((new \App\Services\AnalyticsService())->chartPayload());
     }
 }

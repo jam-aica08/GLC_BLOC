@@ -230,20 +230,32 @@
             <i class="fa-solid fa-hand-holding-dollar"></i> My Loans
         </a>
 
+        <a href="<?= base_url('member/payments') ?>" class="nav-link <?= (strpos(uri_string(), 'member/payments') === 0) ? 'active' : '' ?>">
+            <i class="fa-solid fa-money-check-dollar"></i> My Payments
+        </a>
+
         <a href="<?= base_url('member/dividends') ?>" class="nav-link <?= (strpos(uri_string(), 'member/dividends') === 0) ? 'active' : '' ?>">
             <i class="fa-solid fa-percent"></i> My Dividends
         </a>
 
-        <div class="nav-section-title">Ledger</div>
+        <div class="nav-section-title">Ledger &amp; Reports</div>
 
         <a href="<?= base_url('member/ledger') ?>" class="nav-link <?= (strpos(uri_string(), 'member/ledger') === 0) ? 'active' : '' ?>">
             <i class="fa-solid fa-link"></i> Blockchain Ledger
+        </a>
+
+        <a href="<?= base_url('member/analytics') ?>" class="nav-link <?= (strpos(uri_string(), 'member/analytics') === 0) ? 'active' : '' ?>">
+            <i class="fa-solid fa-chart-line"></i> Analytics
         </a>
 
         <div class="nav-section-title">Account</div>
 
         <a href="<?= base_url('member/profile') ?>" class="nav-link <?= (strpos(uri_string(), 'member/profile') === 0) ? 'active' : '' ?>">
             <i class="fa-solid fa-circle-user"></i> Profile
+        </a>
+
+        <a href="<?= base_url('member/settings') ?>" class="nav-link <?= (strpos(uri_string(), 'member/settings') === 0) ? 'active' : '' ?>">
+            <i class="fa-solid fa-gear"></i> Settings
         </a>
     </nav>
 
@@ -287,6 +299,8 @@
 
 <!-- Bootstrap 5 JS Bundle -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<?= view('partials/table_search') ?>
+<?= view('partials/amount_toggle') ?>
 <script>
     const sidebarToggle = document.getElementById('sidebar-toggle');
     if (sidebarToggle) {

@@ -21,6 +21,7 @@ $routes->group('admin', ['filter' => 'auth:admin'], function ($routes) {
     $routes->post('members/add', 'Admin::addMember');
     $routes->post('members/deactivate/(:num)', 'Admin::deactivateMember/$1');
     $routes->post('members/reactivate/(:num)', 'Admin::reactivateMember/$1');
+    $routes->post('members/(:num)/accounts/add', 'Admin::addAccount/$1');
 
     // Contributions
     $routes->get('contributions', 'Admin::contributions');
@@ -56,6 +57,11 @@ $routes->group('admin', ['filter' => 'auth:admin'], function ($routes) {
 
     // Reports
     $routes->get('reports', 'Admin::reports');
+
+    // Settings
+    $routes->get('settings', 'Settings::index');
+    $routes->post('settings/password', 'Settings::changePassword');
+    $routes->post('settings/admins', 'Settings::addAdmin');
 });
 
 // Member routes (protected by auth filter)
@@ -70,4 +76,10 @@ $routes->group('member', ['filter' => 'auth:member'], function ($routes) {
     $routes->get('dividends', 'Member::dividends');
     $routes->get('ledger', 'Member::ledger');
     $routes->get('profile', 'Member::profile');
+    $routes->post('profile/accounts/add', 'Member::openAccount');
+    $routes->get('payments', 'Member::payments');
+    $routes->get('analytics', 'Member::analytics');
+    $routes->get('analytics/data', 'Member::analyticsData');
+    $routes->get('settings', 'Settings::index');
+    $routes->post('settings/password', 'Settings::changePassword');
 });

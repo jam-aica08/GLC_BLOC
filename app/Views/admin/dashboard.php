@@ -27,6 +27,16 @@
     </span>
 </div>
 
+<!-- Member Search -->
+<form method="get" action="<?= base_url('admin/members') ?>" class="mb-4" role="search">
+    <div class="input-group">
+        <span class="input-group-text bg-white"><i class="fa-solid fa-magnifying-glass"></i></span>
+        <input type="search" name="q" class="form-control" aria-label="Search member accounts"
+               placeholder="Search members by name, member #, account #, username or email">
+        <button class="btn text-white" style="background:#1a1a2e;" type="submit">Search</button>
+    </div>
+</form>
+
 <!-- Summary Cards Row -->
 <div class="row g-3 mb-4">
     <!-- Total Members -->
@@ -54,8 +64,8 @@
                     <i class="fa-solid fa-piggy-bank fa-lg text-success"></i>
                 </div>
                 <div>
-                    <div class="text-muted small">Total Contributions</div>
-                    <div class="fw-bold fs-4">&#8369;<?= number_format($totalContributions ?? 0, 2) ?></div>
+                    <div class="text-muted small">Total Contributions <button type="button" class="btn btn-sm btn-link p-0 ms-1 text-muted js-amount-toggle" title="Hide amount" aria-label="Hide amount"><i class="fa-solid fa-eye-slash"></i></button></div>
+                    <div class="fw-bold fs-4 js-amount">&#8369;<?= number_format($totalContributions ?? 0, 2) ?></div>
                 </div>
             </div>
         </div>

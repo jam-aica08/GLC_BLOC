@@ -130,26 +130,36 @@
                         Loan applications are subject to approval by the cooperative administrators.
                         Interest rates and terms are determined by the cooperative's policies.
                     </div>
-                    <?php if (count($accounts ?? []) > 1): ?>
-                    <div class="mb-3">
-                        <label for="loan_account_id" class="form-label fw-semibold small">Account <span class="text-danger">*</span></label>
-                        <select class="form-select" id="loan_account_id" name="account_id" required>
-                            <?php foreach ($accounts as $acc): ?>
-                                <option value="<?= esc($acc['account_id']) ?>"><?= esc($acc['account_number']) ?></option>
-                            <?php endforeach; ?>
-                        </select>
+                    <?php $rates = \App\Models\CooperativeAccountModel::LOAN_INTEREST_RATE; ?>
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-8">
+                            <label for="loan_account_id" class="form-label fw-semibold small">Account <span class="text-danger">*</span></label>
+                            <select class="form-select" id="loan_account_id" name="account_id" required>
+                                <?php foreach (($accounts ?? []) as $acc): if ($acc['account_status'] !== 'Active') continue; ?>
+                                    <option value="<?= esc($acc['account_id']) ?>"
+                                            data-rate="<?= esc(number_format($rates[$acc['account_type']] ?? 5, 2)) ?>">
+                                        <?= esc($acc['account_number']) ?> (<?= esc($acc['account_type']) ?>)
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="loan_rate" class="form-label fw-semibold small">Interest Rate</label>
+                            <div class="input-group">
+                                <input type="text" class="form-control bg-light" id="loan_rate" readonly
+                                       value="<?php $firstActive = current(array_filter($accounts ?? [], fn($a) => $a['account_status'] === 'Active')); ?><?= esc(number_format($rates[$firstActive['account_type'] ?? 'Basic'] ?? 5, 2)) ?>">
+                                <span class="input-group-text">%</span>
+                            </div>
+                        </div>
+                        <div class="col-12 form-text mt-1">Basic accounts: 5% interest. Pioneer accounts: 2% interest. Only accounts that have completed their contributions from January can borrow.</div>
                     </div>
-                    <?php else: ?>
-                        <input type="hidden" name="account_id" value="<?= esc($accounts[0]['account_id'] ?? '') ?>">
-                    <?php endif; ?>
-                    <input type="hidden" name="interest_rate" value="1.00">
                     <div class="row g-3">
                         <div class="col-md-6">
                             <label for="loan_amount" class="form-label fw-semibold small">Loan Amount (&#8369;) <span class="text-danger">*</span></label>
                             <div class="input-group">
                                 <span class="input-group-text">&#8369;</span>
                                 <input type="number" class="form-control" id="loan_amount" name="loan_amount"
-                                       placeholder="e.g. 10000.00" min="1000" step="0.01" required
+                                       placeholder="e.g. 10000.00" min="1" step="0.01" required
                                        value="<?= esc(old('loan_amount')) ?>">
                             </div>
                         </div>
@@ -176,5 +186,11 @@
         </div>
     </div>
 </div>
+
+<script>
+document.getElementById('loan_account_id').addEventListener('change', function () {
+    document.getElementById('loan_rate').value = this.selectedOptions[0].dataset.rate;
+});
+</script>
 
 <?= $this->endSection() ?>
