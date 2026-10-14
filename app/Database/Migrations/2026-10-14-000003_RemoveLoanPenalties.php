@@ -18,6 +18,8 @@ class RemoveLoanPenalties extends Migration
 
     public function up(): void
     {
+        $this->db->resetDataCache();
+
         foreach (self::COLUMNS as $table => $columns) {
             foreach ($columns as $column) {
                 if ($this->db->fieldExists($column, $table)) {

@@ -208,7 +208,6 @@ class Database extends Config
             $this->default['username'] = (string) getenv('DB_USERNAME');
             $this->default['password'] = (string) getenv('DB_PASSWORD');
             $this->default['database'] = (string) getenv('DB_DATABASE');
-            $this->default['DBDebug']  = ENVIRONMENT !== 'production';
 
             if (filter_var(getenv('DB_SSL'), FILTER_VALIDATE_BOOLEAN)) {
                 $this->default['encrypt'] = [

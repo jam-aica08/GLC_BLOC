@@ -44,6 +44,40 @@ class DatabaseUpdates
         return $status;
     }
 
+    /**
+     * Bring the tables in line with the current code: no penalty columns,
+     * 'Pending' account status, PHP 300 monthly contribution, payment_method.
+     * Safe to run any number of times.
+     */
+    public static function repairSchema($db, $forge): void
+    {
+        $db->resetDataCache();
+
+        $penaltyColumns = [
+            'loan_installments'         => ['penalty_amount', 'penalty_paid', 'penalty_status'],
+            'loan_payments'             => ['penalty_amount'],
+            'loan_payment_installments' => ['penalty_amount'],
+        ];
+        foreach ($penaltyColumns as $table => $columns) {
+            foreach ($columns as $column) {
+                if ($db->fieldExists($column, $table)) {
+                    $forge->dropColumn($table, $column);
+                }
+            }
+        }
+
+        $db->query("ALTER TABLE cooperative_accounts MODIFY account_status ENUM('Active','Inactive','Closed','Pending') NOT NULL DEFAULT 'Active'");
+        $db->query("UPDATE cooperative_accounts SET monthly_contribution = 300.00");
+
+        if (! $db->fieldExists('payment_method', 'loan_payments')) {
+            $forge->addColumn('loan_payments', [
+                'payment_method' => ['type' => 'VARCHAR', 'constraint' => 30, 'null' => true, 'after' => 'amount_paid'],
+            ]);
+        }
+
+        $db->resetDataCache();
+    }
+
     public static function needsUpdate(): bool
     {
         $s = self::status();
@@ -57,6 +91,8 @@ class DatabaseUpdates
     {
         try {
             service('migrations')->latest();
+            // Also repair directly, in case migration files are missing from the deployment.
+            self::repairSchema(db_connect(), \Config\Database::forge());
         } catch (\Throwable $e) {
             log_message('error', 'DatabaseUpdates::apply failed: ' . $e->getMessage());
             return $e->getMessage();
