@@ -94,6 +94,7 @@ class Admin extends BaseController
         ], array_slice($recentFinancialRecords, 0, 6));
 
         return view('admin/dashboard', [
+            'pendingUpdates'         => \App\Libraries\DatabaseUpdates::pending(),
             'totalMembers'           => $totalMembers,
             'totalContributions'     => $totalContributions,
             'activeLoans'            => $activeLoans,
@@ -260,9 +261,8 @@ class Admin extends BaseController
         }
 
         $accountNumber = model(CooperativeAccountModel::class)->openAccount($memberId, $accountType);
-        $catchUp       = number_format((int) date('n') * CooperativeAccountModel::MONTHLY_CONTRIBUTION, 2);
 
-        session()->setFlashdata('success', "{$accountType} account {$accountNumber} opened for {$member['first_name']} {$member['last_name']}. It joins once PHP {$catchUp} (January to this month) is contributed.");
+        session()->setFlashdata('success', "{$accountType} account {$accountNumber} added for {$member['first_name']} {$member['last_name']}. It becomes active once PHP 300 is contributed to it.");
         return redirect()->to('/admin/members');
     }
 
@@ -838,9 +838,10 @@ class Admin extends BaseController
     }
 
     /**
-     * Apply an approved payment to its installments. An installment that is
-     * underpaid is closed at the amount received and the shortfall is added to
-     * the next unpaid installment. The loan becomes Paid when nothing is left.
+     * Apply an approved payment to its installments, oldest first. Installment
+     * amounts never change: amount_paid and remaining_balance are updated, and
+     * an installment becomes Paid only when nothing is left on it. Any unpaid
+     * part stays on that installment and is paid before the next one.
      */
     private function applyLoanPayment(array $payment): void
     {
@@ -851,45 +852,27 @@ class Admin extends BaseController
            ->where('payment_id', $payment['payment_id'])
            ->update(['payment_status' => 'Approved', 'updated_at' => $now]);
 
-        $allocations = $db->table('loan_payment_installments')
-                          ->where('payment_id', $payment['payment_id'])
+        $allocations = $db->table('loan_payment_installments lpi')
+                          ->select('lpi.amount_applied, li.*')
+                          ->join('loan_installments li', 'li.installment_id = lpi.installment_id')
+                          ->where('lpi.payment_id', $payment['payment_id'])
+                          ->orderBy('li.installment_number', 'ASC')
                           ->get()
                           ->getResultArray();
 
-        foreach ($allocations as $alloc) {
-            $inst = $db->table('loan_installments')
-                       ->where('installment_id', $alloc['installment_id'])
-                       ->get()->getRowArray();
-            if (! $inst) {
-                continue;
-            }
+        foreach ($allocations as $inst) {
+            $due       = (float) $inst['amount_due'];
+            $paid      = round(min($due, (float) $inst['amount_paid'] + (float) $inst['amount_applied']), 2);
+            $remaining = round($due - $paid, 2);
 
-            $paid      = round((float) $inst['amount_paid'] + (float) $alloc['amount_applied'], 2);
-            $shortfall = round((float) $inst['amount_due'] - $paid, 2);
-            $update    = ['amount_paid' => $paid, 'payment_date' => $payment['payment_date'], 'updated_at' => $now];
-
-            if ($shortfall <= 0) {
+            $update = [
+                'amount_paid'       => $paid,
+                'remaining_balance' => $remaining,
+                'payment_date'      => $payment['payment_date'],
+                'updated_at'        => $now,
+            ];
+            if ($remaining <= 0) {
                 $update['payment_status'] = 'Paid';
-            } else {
-                $next = $db->table('loan_installments')
-                           ->where('loan_id', $inst['loan_id'])
-                           ->where('installment_number >', $inst['installment_number'])
-                           ->where('payment_status !=', 'Paid')
-                           ->orderBy('installment_number', 'ASC')
-                           ->limit(1)->get()->getRowArray();
-
-                if ($next) {
-                    $db->table('loan_installments')
-                       ->where('installment_id', $next['installment_id'])
-                       ->update([
-                           'amount_due' => round((float) $next['amount_due'] + $shortfall, 2),
-                           'updated_at' => $now,
-                       ]);
-                    $update['amount_due']     = $paid;
-                    $update['payment_status'] = 'Paid';
-                } else {
-                    $update['payment_status'] = 'Due';
-                }
             }
 
             $db->table('loan_installments')

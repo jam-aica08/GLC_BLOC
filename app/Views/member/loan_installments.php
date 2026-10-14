@@ -45,16 +45,19 @@
                             <th style="width:48px;"><span class="visually-hidden">Select</span></th>
                             <th>#</th>
                             <th>Due Date</th>
-                            <th>Amount Due</th>
+                            <th>Installment</th>
                             <th>Paid</th>
-                            <th>Unpaid</th>
+                            <th>Remaining</th>
+                            <th>Carried Over</th>
+                            <th>Total Due Now</th>
                             <th>Status</th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php if (empty($installments)): ?>
-                            <tr><td colspan="7" class="text-center py-4 text-muted">No installments found.</td></tr>
+                            <tr><td colspan="9" class="text-center py-4 text-muted">No installments found.</td></tr>
                         <?php endif; ?>
+                        <?php $carried = 0.0; ?>
                         <?php foreach ($installments as $inst): ?>
                             <?php
                                 $unpaid    = max(0, round($inst['amount_due'] - $inst['amount_paid'], 2));
@@ -75,6 +78,8 @@
                                 <td>₱<?= number_format($inst['amount_due'], 2) ?></td>
                                 <td>₱<?= number_format($inst['amount_paid'], 2) ?></td>
                                 <td>₱<?= number_format($unpaid, 2) ?></td>
+                                <td class="<?= ($carried > 0 && $unpaid > 0) ? 'text-danger' : 'text-muted' ?>"><?= ($carried > 0 && $unpaid > 0) ? '₱' . number_format($carried, 2) : '—' ?></td>
+                                <td class="fw-semibold"><?= $unpaid > 0 ? '₱' . number_format($carried + $unpaid, 2) : '—' ?></td>
                                 <td>
                                     <?php if ($isPending): ?>
                                         <span class="badge bg-info text-dark">Payment pending approval</span>
@@ -83,6 +88,7 @@
                                     <?php endif; ?>
                                 </td>
                             </tr>
+                            <?php if (! $isPending) { $carried = round($carried + $unpaid, 2); } ?>
                         <?php endforeach; ?>
                     </tbody>
                 </table>
@@ -98,7 +104,7 @@
                 <div class="col-md-5">
                     <label for="payAmount" class="form-label fw-semibold small">Amount (₱)</label>
                     <input type="number" name="amount_paid" id="payAmount" step="0.01" min="0.01" class="form-control" required disabled>
-                    <div class="form-text">Filled in from the installments you tick. If you pay less, the unpaid part is added to your next installment.</div>
+                    <div class="form-text">Filled in from the installments you tick; you can pay less. The oldest installment is paid first, and any unpaid part carries over to the next one.</div>
                 </div>
                 <div class="col-md-7">
                     <span class="form-label fw-semibold small d-block mb-2">Payment Method</span>
@@ -121,9 +127,10 @@
 
 <script>
 (function () {
-    const boxes = document.querySelectorAll('.js-inst');
+    const boxes = Array.from(document.querySelectorAll('.js-inst'));
     const amount = document.getElementById('payAmount');
     const submit = document.getElementById('paySubmit');
+    const form = document.getElementById('payForm');
     if (!amount) return;
     function update() {
         let total = 0, any = false;
@@ -133,7 +140,20 @@
         amount.max = any ? total.toFixed(2) : '';
         amount.value = any ? total.toFixed(2) : '';
     }
-    boxes.forEach(function (b) { b.addEventListener('change', update); });
+    // Older unpaid installments must be paid first, so ticking one ticks the earlier ones.
+    boxes.forEach(function (b, i) {
+        b.addEventListener('change', function () {
+            boxes.forEach(function (other, j) {
+                if (b.checked && j < i) other.checked = true;
+                if (!b.checked && j > i) other.checked = false;
+            });
+            update();
+        });
+    });
+    form.addEventListener('submit', function () {
+        submit.disabled = true;
+        submit.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Submitting…';
+    });
 })();
 </script>
 

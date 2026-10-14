@@ -25,7 +25,7 @@ class LoanService
      * }
      * @return array  Array of installment rows:
      *   [installment_number, due_date, principal_amount, interest_amount,
-     *    amount_due, remaining_balance]
+     *    amount_due, remaining_balance (= unpaid part, initially amount_due)]
      */
     public function calculateInstallments(array $loan): array
     {
@@ -46,7 +46,6 @@ class LoanService
         $roundingAdj    = round($loanAmount - $totalPrincipal, 2);
 
         $installments     = [];
-        $remainingBalance = $loanAmount;
         $baseDateTs       = strtotime($releaseDate);
 
         for ($i = 1; $i <= $termMonths; $i++) {
@@ -62,7 +61,6 @@ class LoanService
             $interest = ($i === 1) ? $interestAmount : 0.00;
 
             $amountDue        = round($principal + $interest, 2);
-            $remainingBalance = round($remainingBalance - $principal, 2);
 
             $installments[] = [
                 'installment_number' => $i,
@@ -70,7 +68,7 @@ class LoanService
                 'principal_amount'   => $principal,
                 'interest_amount'    => $interest,
                 'amount_due'         => $amountDue,
-                'remaining_balance'  => max(0.00, $remainingBalance),
+                'remaining_balance'  => $amountDue,
             ];
         }
 
@@ -82,83 +80,84 @@ class LoanService
     // -------------------------------------------------------------------------
 
     /**
-     * Process a loan payment: validate, then allocate the paid amount across the
-     * specified installments in order (oldest first).
+     * Validate a payment and split it across the selected installments,
+     * oldest first. Installment amounts are never changed: an underpaid
+     * installment stays open, and its unpaid part must be paid before any
+     * later installment (that is how the balance carries over).
      *
-     * @param  int   $loanId         Loan being paid
-     * @param  float $amountPaid     Total payment amount
-     * @param  array $installmentIds Ordered list of installment_id values to cover
-     * @return array {
-     *   valid      : bool,
-     *   error      : string|null,
-     *   allocation : array  [{ installment_id, amount_applied, fully_paid }]
-     * }
+     * @param  int[] $installmentIds Installments the member ticked
+     * @param  int[] $pendingIds     Installments already covered by a payment awaiting approval
+     * @return array{valid: bool, error: ?string, allocation: array<int, array{installment_id: int, amount_applied: float, fully_paid: bool}>}
      */
-    public function processPayment(int $loanId, float $amountPaid, array $installmentIds): array
+    public function processPayment(int $loanId, float $amountPaid, array $installmentIds, array $pendingIds = []): array
     {
-        // --- Validation ------------------------------------------------------
+        $fail = fn(string $error) => ['valid' => false, 'error' => $error, 'allocation' => []];
+
+        $amountPaid     = round($amountPaid, 2);
+        $installmentIds = array_values(array_unique(array_map('intval', $installmentIds)));
+
         if ($amountPaid <= 0) {
-            return [
-                'valid'      => false,
-                'error'      => 'Payment amount must be greater than zero.',
-                'allocation' => [],
-            ];
+            return $fail('Payment amount must be greater than zero.');
         }
-
         if (empty($installmentIds)) {
-            return [
-                'valid'      => false,
-                'error'      => 'At least one installment must be selected.',
-                'allocation' => [],
-            ];
+            return $fail('At least one installment must be selected.');
         }
 
-        $db           = db_connect();
-        $placeholders = implode(',', array_fill(0, count($installmentIds), '?'));
+        $rows = db_connect()->table('loan_installments')
+                            ->where('loan_id', $loanId)
+                            ->orderBy('installment_number', 'ASC')
+                            ->get()->getResultArray();
 
-        // Verify all installments belong to this loan
-        $rows = $db->query(
-            "SELECT installment_id, amount_due, amount_paid
-               FROM loan_installments
-              WHERE loan_id = ?
-                AND installment_id IN ({$placeholders})
-              ORDER BY installment_number ASC",
-            array_merge([$loanId], $installmentIds)
-        )->getResultArray();
-
-        if (count($rows) !== count($installmentIds)) {
-            return [
-                'valid'      => false,
-                'error'      => 'One or more installments do not belong to this loan.',
-                'allocation' => [],
-            ];
+        $selected = array_values(array_filter($rows, fn($r) => in_array((int) $r['installment_id'], $installmentIds, true)));
+        if (count($selected) !== count($installmentIds)) {
+            return $fail('One or more installments do not belong to this loan.');
         }
 
-        // --- Allocation (greedy, oldest-first) --------------------------------
+        $unpaid = fn(array $r) => round((float) $r['amount_due'] - (float) $r['amount_paid'], 2);
+
+        foreach ($selected as $row) {
+            if ($unpaid($row) <= 0) {
+                return $fail("Installment #{$row['installment_number']} is already fully paid.");
+            }
+            if (in_array((int) $row['installment_id'], $pendingIds, true)) {
+                return $fail("Installment #{$row['installment_number']} already has a payment waiting for approval.");
+            }
+        }
+
+        // Older unpaid installments must be included so balances carry over in order.
+        $latest = max(array_map(fn($r) => (int) $r['installment_number'], $selected));
+        foreach ($rows as $row) {
+            if ((int) $row['installment_number'] >= $latest) {
+                break;
+            }
+            $id = (int) $row['installment_id'];
+            if ($unpaid($row) > 0 && ! in_array($id, $installmentIds, true) && ! in_array($id, $pendingIds, true)) {
+                return $fail("Please include installment #{$row['installment_number']} first; it still has an unpaid balance.");
+            }
+        }
+
+        $totalUnpaid = round(array_sum(array_map($unpaid, $selected)), 2);
+        if ($amountPaid > $totalUnpaid) {
+            return $fail('The amount is more than the unpaid total of the selected installments (PHP ' . number_format($totalUnpaid, 2) . ').');
+        }
+
         $remaining  = $amountPaid;
         $allocation = [];
-
-        foreach ($rows as $row) {
+        foreach ($selected as $row) {
             if ($remaining <= 0) {
                 break;
             }
-
-            $outstanding   = round((float) $row['amount_due'] - (float) $row['amount_paid'], 2);
-            $applied       = min($outstanding, $remaining);
-            $remaining     = round($remaining - $applied, 2);
+            $applied   = min($unpaid($row), $remaining);
+            $remaining = round($remaining - $applied, 2);
 
             $allocation[] = [
                 'installment_id' => (int) $row['installment_id'],
                 'amount_applied' => $applied,
-                'fully_paid'     => ($applied >= $outstanding),
+                'fully_paid'     => $applied >= $unpaid($row),
             ];
         }
 
-        return [
-            'valid'      => true,
-            'error'      => null,
-            'allocation' => $allocation,
-        ];
+        return ['valid' => true, 'error' => null, 'allocation' => $allocation];
     }
 
     // -------------------------------------------------------------------------

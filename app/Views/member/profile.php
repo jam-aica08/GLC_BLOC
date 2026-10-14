@@ -124,17 +124,12 @@
             <form method="post" action="<?= base_url('member/profile/accounts/add') ?>">
                 <?= csrf_field() ?>
                 <div class="modal-body p-4">
-                    <?php $catchUp = (int) date('n') * \App\Models\CooperativeAccountModel::MONTHLY_CONTRIBUTION; ?>
-                    <div class="alert alert-info small">
-                        Every account contributes ₱<?= number_format(\App\Models\CooperativeAccountModel::MONTHLY_CONTRIBUTION, 2) ?> per month.
-                        A new account joins the cooperative after contributing from January:
-                        <strong>₱<?= number_format($catchUp, 2) ?></strong> for this year so far.
-                    </div>
+                    <p class="small text-muted">The new account becomes active once you contribute ₱300 to it.</p>
                     <label for="open_account_type" class="form-label fw-semibold small">Account Type <span class="text-danger">*</span></label>
                     <select class="form-select" id="open_account_type" name="account_type" required>
                         <option value="" disabled selected>Select account type</option>
-                        <option value="Basic">Basic — 5% loan interest</option>
-                        <option value="Pioneer">Pioneer — 2% loan interest, +2% dividend share</option>
+                        <option value="Pioneer">Pioneer</option>
+                        <option value="Basic">Basic</option>
                     </select>
                 </div>
                 <div class="modal-footer">

@@ -89,23 +89,28 @@
                                 </span>
                             </td>
                             <td class="py-3">
-                                <?php if (empty($member['accounts'])): ?>
-                                    <span class="text-muted small">No account</span>
+                                <?php
+                                    $accRows = array_map(fn($a) => [
+                                        'number' => $a['account_number'],
+                                        'type'   => $a['account_type'],
+                                        'opened' => $a['account_start_date'],
+                                        'status' => $a['account_status'] === 'Pending'
+                                            ? 'Pending — ₱' . number_format($a['standing']['join_balance'], 2) . ' to activate'
+                                            : $a['account_status'],
+                                        'paid'   => '₱' . number_format($a['standing']['paid'], 2),
+                                        'due'    => '₱' . number_format($a['standing']['due_balance'], 2),
+                                    ], $member['accounts']);
+                                    $pendingAcc = count(array_filter($member['accounts'], fn($a) => $a['account_status'] === 'Pending'));
+                                ?>
+                                <button type="button" class="btn btn-sm btn-outline-secondary"
+                                        data-bs-toggle="modal" data-bs-target="#viewAccountsModal"
+                                        data-member-name="<?= esc(($member['first_name'] ?? '') . ' ' . ($member['last_name'] ?? '')) ?>"
+                                        data-accounts="<?= esc(json_encode($accRows)) ?>">
+                                    <i class="fa-solid fa-wallet me-1"></i>View Accounts (<?= count($member['accounts']) ?>)
+                                </button>
+                                <?php if ($pendingAcc): ?>
+                                    <span class="badge bg-warning text-dark ms-1"><?= $pendingAcc ?> pending</span>
                                 <?php endif; ?>
-                                <?php foreach ($member['accounts'] as $acc): ?>
-                                    <div class="d-flex align-items-center gap-1 mb-1">
-                                        <span class="badge <?= ($acc['account_type'] === 'Pioneer') ? 'text-white' : 'bg-light text-dark border' ?>"
-                                              <?= ($acc['account_type'] === 'Pioneer') ? 'style="background:#1a1a2e;"' : '' ?>>
-                                            <?= esc($acc['account_type']) ?>
-                                        </span>
-                                        <code class="small"><?= esc($acc['account_number']) ?></code>
-                                        <?php if ($acc['account_status'] === 'Pending'): ?>
-                                            <span class="badge bg-warning text-dark" title="Contributions from January not yet complete">Joining — ₱<?= number_format($acc['standing']['join_balance'], 2) ?> left</span>
-                                        <?php elseif ($acc['account_status'] !== 'Active'): ?>
-                                            <span class="badge bg-secondary"><?= esc($acc['account_status']) ?></span>
-                                        <?php endif; ?>
-                                    </div>
-                                <?php endforeach; ?>
                             </td>
                             <td class="py-3 text-center">
                                 <?php if (($member['status'] ?? 'Active') === 'Active'): ?>
@@ -224,13 +229,12 @@
             <form id="addAccountForm" method="post" action="">
                 <?= csrf_field() ?>
                 <div class="modal-body p-4">
-                    <p class="mb-2">Open a new cooperative account for <strong id="addAccountMemberName"></strong>.</p>
-                    <p class="small text-muted mb-3">Every account contributes ₱300 per month. A new account joins after contributing from January: ₱<?= number_format((int) date('n') * \App\Models\CooperativeAccountModel::MONTHLY_CONTRIBUTION, 2) ?> this year.</p>
+                    <p class="mb-3">Add an account for <strong id="addAccountMemberName"></strong>.</p>
                     <label for="new_account_type" class="form-label fw-semibold small">Account Type <span class="text-danger">*</span></label>
                     <select class="form-select" id="new_account_type" name="account_type" required>
                         <option value="" disabled selected>Select account type</option>
-                        <option value="Basic">Basic — 5% loan interest</option>
-                        <option value="Pioneer">Pioneer — 2% loan interest, +2% dividend share</option>
+                        <option value="Pioneer">Pioneer</option>
+                        <option value="Basic">Basic</option>
                     </select>
                 </div>
                 <div class="modal-footer">
@@ -244,7 +248,61 @@
     </div>
 </div>
 
+<!-- View Accounts Modal -->
+<div class="modal fade" id="viewAccountsModal" tabindex="-1" aria-labelledby="viewAccountsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header" style="background:#1a1a2e;">
+                <h5 class="modal-title text-white" id="viewAccountsModalLabel">
+                    <i class="fa-solid fa-wallet me-2" style="color:#f0a500;"></i><span id="viewAccountsName"></span> — Accounts
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-0">
+                <div class="table-responsive">
+                    <table class="table align-middle mb-0" style="font-size:0.875rem;">
+                        <thead style="background:#f8f9fa;">
+                            <tr>
+                                <th class="px-4 py-3">Account #</th>
+                                <th class="py-3">Type</th>
+                                <th class="py-3">Opened</th>
+                                <th class="py-3">Status</th>
+                                <th class="py-3">Paid</th>
+                                <th class="py-3">Balance Due</th>
+                            </tr>
+                        </thead>
+                        <tbody id="viewAccountsBody"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
+document.getElementById('viewAccountsModal').addEventListener('show.bs.modal', function (e) {
+    const btn = e.relatedTarget;
+    document.getElementById('viewAccountsName').textContent = btn.dataset.memberName;
+    const body = document.getElementById('viewAccountsBody');
+    body.replaceChildren();
+    const rows = JSON.parse(btn.dataset.accounts || '[]');
+    if (!rows.length) {
+        const tr = body.insertRow(), td = tr.insertCell();
+        td.colSpan = 6; td.className = 'text-center text-muted py-4'; td.textContent = 'No accounts yet.';
+        return;
+    }
+    rows.forEach(function (r) {
+        const tr = body.insertRow();
+        [r.number, r.type, r.opened, r.status, r.paid, r.due].forEach(function (v, i) {
+            const td = tr.insertCell();
+            td.className = i === 0 ? 'px-4 py-3' : 'py-3';
+            td.textContent = v;
+        });
+    });
+});
 document.getElementById('addAccountModal').addEventListener('show.bs.modal', function (e) {
     const btn = e.relatedTarget;
     document.getElementById('addAccountForm').action =
