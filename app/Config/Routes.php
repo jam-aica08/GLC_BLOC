@@ -62,6 +62,7 @@ $routes->group('admin', ['filter' => 'auth:admin'], function ($routes) {
     $routes->get('settings', 'Settings::index');
     $routes->post('settings/password', 'Settings::changePassword');
     $routes->post('settings/admins', 'Settings::addAdmin');
+    $routes->post('settings/updates', 'Settings::applyUpdates');
 });
 
 // Member routes (protected by auth filter)

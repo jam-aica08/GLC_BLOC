@@ -27,6 +27,14 @@
     </span>
 </div>
 
+<?php if (! empty($pendingUpdates)): ?>
+    <div class="alert alert-warning d-flex align-items-center gap-2" role="alert">
+        <i class="fa-solid fa-database"></i>
+        <div>The database needs updating for the latest features.
+            <a href="<?= base_url('admin/settings') ?>" class="alert-link">Open Settings → Apply Database Updates</a>.</div>
+    </div>
+<?php endif; ?>
+
 <!-- Member Search -->
 <form method="get" action="<?= base_url('admin/members') ?>" class="mb-4" role="search">
     <div class="input-group">

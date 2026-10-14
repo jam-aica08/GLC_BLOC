@@ -21,6 +21,26 @@
 
 <?php $base = $isAdmin ? 'admin/settings' : 'member/settings'; ?>
 
+<?php if (! empty($pendingUpdates)): ?>
+    <div class="card shadow-sm border-warning mb-4">
+        <div class="card-header fw-semibold bg-warning-subtle"><i class="fa-solid fa-database me-2"></i>Database Updates Needed</div>
+        <div class="card-body">
+            <p class="mb-2">The database needs <?= count($pendingUpdates) ?> update(s) for the latest features. Your data is kept.</p>
+            <ul class="small mb-3">
+                <?php foreach ($pendingUpdates as $name): ?>
+                    <li><?= esc($name) ?></li>
+                <?php endforeach; ?>
+            </ul>
+            <form method="post" action="<?= base_url($base . '/updates') ?>" onsubmit="this.querySelector('button').disabled = true;">
+                <?= csrf_field() ?>
+                <button type="submit" class="btn btn-warning">
+                    <i class="fa-solid fa-rotate me-2"></i>Apply Database Updates
+                </button>
+            </form>
+        </div>
+    </div>
+<?php endif; ?>
+
 <div class="row g-4">
     <div class="col-lg-6">
         <div class="card shadow-sm">

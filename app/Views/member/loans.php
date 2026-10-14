@@ -151,7 +151,7 @@
                                 <span class="input-group-text">%</span>
                             </div>
                         </div>
-                        <div class="col-12 form-text mt-1">Basic accounts: 5% interest. Pioneer accounts: 2% interest. Only accounts that have completed their contributions from January can borrow.</div>
+                        <div class="col-12 form-text mt-1">Basic accounts: 5% interest. Pioneer accounts: 2% interest. Only active accounts can borrow.</div>
                     </div>
                     <div class="row g-3">
                         <div class="col-md-6">
