@@ -94,7 +94,7 @@ class Admin extends BaseController
         ], array_slice($recentFinancialRecords, 0, 6));
 
         return view('admin/dashboard', [
-            'pendingUpdates'         => \App\Libraries\DatabaseUpdates::pending(),
+            'needsDbUpdate'          => \App\Libraries\DatabaseUpdates::needsUpdate(),
             'totalMembers'           => $totalMembers,
             'totalContributions'     => $totalContributions,
             'activeLoans'            => $activeLoans,
