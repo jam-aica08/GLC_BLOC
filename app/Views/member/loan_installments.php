@@ -6,7 +6,7 @@
         <h4 class="fw-bold mb-1"><i class="fas fa-calendar-alt me-2 text-warning"></i>Loan Installments</h4>
         <p class="text-muted small mb-0">
             Loan #<?= esc($loan['loan_id'] ?? '') ?> —
-            ₱<?= number_format($loan['loan_amount'] ?? 0, 2) ?> |
+            ₱<?= number_format($loan['loan_amount'] ?? 0, 2) ?> at <?= esc($loan['interest_rate'] ?? '') ?>% |
             <?= esc($loan['loan_term_months'] ?? '') ?> months
         </p>
     </div>
@@ -15,106 +15,126 @@
     </a>
 </div>
 
-<?php if (session()->getFlashdata('success')): ?>
-    <div class="alert alert-success alert-dismissible fade show">
-        <?= esc(session()->getFlashdata('success')) ?>
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    </div>
-<?php endif; ?>
-<?php if (session()->getFlashdata('error')): ?>
-    <div class="alert alert-danger alert-dismissible fade show">
-        <?= esc(session()->getFlashdata('error')) ?>
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    </div>
-<?php endif; ?>
+<?= view('partials/flash') ?>
 
-<div class="card shadow-sm mb-4">
-    <div class="card-body p-0">
-        <div class="table-responsive">
-            <table class="table table-hover mb-0">
-                <thead class="table-dark">
-                    <tr>
-                        <th>#</th>
-                        <th>Due Date</th>
-                        <th>Principal</th>
-                        <th>Interest</th>
-                        <th>Amount Due</th>
-                        <th>Paid</th>
-                        <th>Balance</th>
-                        <th>Status</th>
-                        <th>Action</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php if (empty($installments)): ?>
-                        <tr><td colspan="9" class="text-center py-4 text-muted">No installments found.</td></tr>
-                    <?php else: ?>
+<?php $balance = max(0, $totalPayable - $totalPaid); ?>
+<div class="row g-3 mb-4">
+    <div class="col-sm-4"><div class="card text-center"><div class="card-body py-3">
+        <div class="text-muted small">Total Payable</div>
+        <div class="fw-bold fs-5">₱<?= number_format($totalPayable, 2) ?></div>
+    </div></div></div>
+    <div class="col-sm-4"><div class="card text-center"><div class="card-body py-3">
+        <div class="text-muted small">Total Paid</div>
+        <div class="fw-bold fs-5 text-success">₱<?= number_format($totalPaid, 2) ?></div>
+    </div></div></div>
+    <div class="col-sm-4"><div class="card text-center"><div class="card-body py-3">
+        <div class="text-muted small">Remaining Balance</div>
+        <div class="fw-bold fs-5 <?= $balance > 0 ? 'text-danger' : 'text-success' ?>">₱<?= number_format($balance, 2) ?></div>
+    </div></div></div>
+</div>
+
+<?php $canPay = in_array($loan['loan_status'] ?? '', ['Active', 'Approved'], true); ?>
+<form method="post" action="<?= base_url('member/loans/' . (int) ($loan['loan_id'] ?? 0) . '/pay') ?>" id="payForm">
+    <?= csrf_field() ?>
+    <div class="card shadow-sm mb-4">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-dark">
+                        <tr>
+                            <th style="width:48px;"><span class="visually-hidden">Select</span></th>
+                            <th>#</th>
+                            <th>Due Date</th>
+                            <th>Amount Due</th>
+                            <th>Paid</th>
+                            <th>Unpaid</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if (empty($installments)): ?>
+                            <tr><td colspan="7" class="text-center py-4 text-muted">No installments found.</td></tr>
+                        <?php endif; ?>
                         <?php foreach ($installments as $inst): ?>
+                            <?php
+                                $unpaid    = max(0, round($inst['amount_due'] - $inst['amount_paid'], 2));
+                                $isPending = in_array((int) $inst['installment_id'], $pendingIds, true);
+                                $selectable = $canPay && $inst['payment_status'] !== 'Paid' && $unpaid > 0 && ! $isPending;
+                                $c = ['Upcoming' => 'secondary', 'Due' => 'warning', 'Late' => 'danger', 'Paid' => 'success'][$inst['payment_status']] ?? 'secondary';
+                            ?>
                             <tr>
+                                <td>
+                                    <?php if ($selectable): ?>
+                                        <input class="form-check-input js-inst" type="checkbox" name="installment_ids[]"
+                                               value="<?= (int) $inst['installment_id'] ?>" data-unpaid="<?= esc(number_format($unpaid, 2, '.', '')) ?>"
+                                               aria-label="Pay installment <?= esc($inst['installment_number']) ?>">
+                                    <?php endif; ?>
+                                </td>
                                 <td><?= esc($inst['installment_number']) ?></td>
                                 <td><?= esc($inst['due_date']) ?></td>
-                                <td>₱<?= number_format($inst['principal_amount'], 2) ?></td>
-                                <td>₱<?= number_format($inst['interest_amount'], 2) ?></td>
                                 <td>₱<?= number_format($inst['amount_due'], 2) ?></td>
                                 <td>₱<?= number_format($inst['amount_paid'], 2) ?></td>
-                                <td>₱<?= number_format($inst['remaining_balance'], 2) ?></td>
+                                <td>₱<?= number_format($unpaid, 2) ?></td>
                                 <td>
-                                    <?php $c = ['Upcoming'=>'secondary','Due'=>'warning','Late'=>'danger','Paid'=>'success'][$inst['payment_status']] ?? 'secondary'; ?>
-                                    <span class="badge bg-<?= $c ?>"><?= esc($inst['payment_status']) ?></span>
-                                </td>
-                                <td>
-                                    <?php if ($inst['payment_status'] !== 'Paid' && $inst['remaining_balance'] > 0): ?>
-                                        <button class="btn btn-warning btn-sm"
-                                                data-bs-toggle="modal"
-                                                data-bs-target="#payModal"
-                                                data-installment="<?= $inst['installment_id'] ?>"
-                                                data-amount="<?= $inst['remaining_balance'] ?>">
-                                            Pay
-                                        </button>
+                                    <?php if ($isPending): ?>
+                                        <span class="badge bg-info text-dark">Payment pending approval</span>
+                                    <?php else: ?>
+                                        <span class="badge bg-<?= $c ?>"><?= esc($inst['payment_status']) ?></span>
                                     <?php endif; ?>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
-                    <?php endif; ?>
-                </tbody>
-            </table>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
-</div>
 
-<!-- Pay Modal -->
-<div class="modal fade" id="payModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <form method="post" action="<?= base_url('member/loans/' . esc($loan['loan_id'] ?? '0') . '/pay') ?>">
-                <?= csrf_field() ?>
-                <input type="hidden" name="installment_ids[]" id="payInstallmentId">
-                <div class="modal-header">
-                    <h5 class="modal-title"><i class="fas fa-money-bill me-2"></i>Submit Payment</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+    <?php if ($canPay): ?>
+    <div class="card shadow-sm">
+        <div class="card-header bg-white fw-semibold"><i class="fas fa-money-bill me-2"></i>Pay Selected Installments</div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-5">
+                    <label for="payAmount" class="form-label fw-semibold small">Amount (₱)</label>
+                    <input type="number" name="amount_paid" id="payAmount" step="0.01" min="0.01" class="form-control" required disabled>
+                    <div class="form-text">Filled in from the installments you tick. If you pay less, the unpaid part is added to your next installment.</div>
                 </div>
-                <div class="modal-body">
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold">Amount (₱)</label>
-                        <input type="number" name="amount_paid" id="payAmount" step="0.01" min="0.01"
-                               class="form-control" required>
-                    </div>
+                <div class="col-md-7">
+                    <span class="form-label fw-semibold small d-block mb-2">Payment Method</span>
+                    <?php foreach (\App\Controllers\Member::PAYMENT_METHODS as $i => $method): ?>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="radio" name="payment_method" id="method<?= $i ?>"
+                                   value="<?= esc($method) ?>" required <?= $i === 0 ? 'checked' : '' ?>>
+                            <label class="form-check-label" for="method<?= $i ?>"><?= esc($method) ?></label>
+                        </div>
+                    <?php endforeach; ?>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-warning btn-sm">Submit Payment</button>
-                </div>
-            </form>
+            </div>
+            <button type="submit" class="btn btn-warning mt-3" id="paySubmit" disabled>
+                <i class="fas fa-paper-plane me-1"></i>Submit Payment
+            </button>
         </div>
     </div>
-</div>
+    <?php endif; ?>
+</form>
 
 <script>
-document.getElementById('payModal').addEventListener('show.bs.modal', function (e) {
-    const btn = e.relatedTarget;
-    document.getElementById('payInstallmentId').value = btn.dataset.installment;
-    document.getElementById('payAmount').value = btn.dataset.amount;
-});
+(function () {
+    const boxes = document.querySelectorAll('.js-inst');
+    const amount = document.getElementById('payAmount');
+    const submit = document.getElementById('paySubmit');
+    if (!amount) return;
+    function update() {
+        let total = 0, any = false;
+        boxes.forEach(function (b) { if (b.checked) { total += parseFloat(b.dataset.unpaid); any = true; } });
+        amount.disabled = !any;
+        submit.disabled = !any;
+        amount.max = any ? total.toFixed(2) : '';
+        amount.value = any ? total.toFixed(2) : '';
+    }
+    boxes.forEach(function (b) { b.addEventListener('change', update); });
+})();
 </script>
 
 <?= $this->endSection() ?>

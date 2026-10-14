@@ -135,7 +135,7 @@
                         <div class="col-md-8">
                             <label for="loan_account_id" class="form-label fw-semibold small">Account <span class="text-danger">*</span></label>
                             <select class="form-select" id="loan_account_id" name="account_id" required>
-                                <?php foreach (($accounts ?? []) as $acc): ?>
+                                <?php foreach (($accounts ?? []) as $acc): if ($acc['account_status'] !== 'Active') continue; ?>
                                     <option value="<?= esc($acc['account_id']) ?>"
                                             data-rate="<?= esc(number_format($rates[$acc['account_type']] ?? 5, 2)) ?>">
                                         <?= esc($acc['account_number']) ?> (<?= esc($acc['account_type']) ?>)
@@ -147,11 +147,11 @@
                             <label for="loan_rate" class="form-label fw-semibold small">Interest Rate</label>
                             <div class="input-group">
                                 <input type="text" class="form-control bg-light" id="loan_rate" readonly
-                                       value="<?= esc(number_format($rates[$accounts[0]['account_type'] ?? 'Basic'] ?? 5, 2)) ?>">
+                                       value="<?php $firstActive = current(array_filter($accounts ?? [], fn($a) => $a['account_status'] === 'Active')); ?><?= esc(number_format($rates[$firstActive['account_type'] ?? 'Basic'] ?? 5, 2)) ?>">
                                 <span class="input-group-text">%</span>
                             </div>
                         </div>
-                        <div class="col-12 form-text mt-1">Basic accounts: 5% interest. Pioneer accounts: 2% interest.</div>
+                        <div class="col-12 form-text mt-1">Basic accounts: 5% interest. Pioneer accounts: 2% interest. Only accounts that have completed their contributions from January can borrow.</div>
                     </div>
                     <div class="row g-3">
                         <div class="col-md-6">

@@ -63,6 +63,9 @@
                         <th class="py-3">Amount</th>
                         <th class="py-3">Interest Rate</th>
                         <th class="py-3">Term</th>
+                        <th class="py-3">Total Payable</th>
+                        <th class="py-3">Paid</th>
+                        <th class="py-3">Balance</th>
                         <th class="py-3">Status</th>
                         <th class="py-3">Applied Date</th>
                         <th class="py-3 text-center">Actions</th>
@@ -81,6 +84,10 @@
                             <td class="py-3 fw-semibold">&#8369;<?= number_format($loan['loan_amount'] ?? 0, 2) ?></td>
                             <td class="py-3"><?= esc($loan['interest_rate'] ?? '0') ?>%</td>
                             <td class="py-3"><?= esc($loan['term_months'] ?? '-') ?> mo.</td>
+                            <?php $loanBalance = max(0, (float) $loan['total_payable'] - (float) $loan['total_paid']); ?>
+                            <td class="py-3">&#8369;<?= number_format($loan['total_payable'] ?? 0, 2) ?></td>
+                            <td class="py-3 text-success">&#8369;<?= number_format($loan['total_paid'] ?? 0, 2) ?></td>
+                            <td class="py-3 fw-semibold <?= $loanBalance > 0 ? 'text-danger' : 'text-success' ?>">&#8369;<?= number_format($loanBalance, 2) ?></td>
                             <td class="py-3">
                                 <?php $status = $loan['status'] ?? 'Pending'; ?>
                                 <span class="badge
@@ -122,7 +129,7 @@
                         <?php endforeach; ?>
                     <?php else: ?>
                         <tr>
-                            <td colspan="9" class="text-center py-5 text-muted">
+                            <td colspan="12" class="text-center py-5 text-muted">
                                 <i class="fa-solid fa-hand-holding-dollar fa-2x mb-3 d-block opacity-25"></i>
                                 No loan applications found for the selected filter.
                             </td>

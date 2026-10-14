@@ -33,8 +33,8 @@
     <div class="col-sm-4">
         <div class="card text-center">
             <div class="card-body py-3">
-                <div class="text-muted small">Total Paid</div>
-                <div class="fw-bold fs-5 text-success">&#8369;<?= number_format($totalPaid ?? 0, 2) ?></div>
+                <div class="text-muted small">Total Paid <button type="button" class="btn btn-sm btn-link p-0 ms-1 text-muted js-amount-toggle" title="Hide amount" aria-label="Hide amount"><i class="fa-solid fa-eye-slash"></i></button></div>
+                <div class="fw-bold fs-5 text-success js-amount">&#8369;<?= number_format($totalPaid ?? 0, 2) ?></div>
             </div>
         </div>
     </div>
@@ -52,6 +52,45 @@
                 <div class="text-muted small">Total Records</div>
                 <div class="fw-bold fs-5"><?= count($contributions ?? []) ?></div>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- Account Standing -->
+<div class="card mb-4">
+    <div class="card-header">
+        <span><i class="fa-solid fa-scale-balanced me-2" style="color:#f0a500;"></i>Account Standing (₱<?= number_format(\App\Models\CooperativeAccountModel::MONTHLY_CONTRIBUTION, 2) ?> per month)</span>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table align-middle mb-0" style="font-size:0.875rem;">
+                <thead style="background:#f8f9fa;">
+                    <tr>
+                        <th class="px-4 py-3">Account</th>
+                        <th class="py-3">Status</th>
+                        <th class="py-3">Required to Date</th>
+                        <th class="py-3">Paid (Approved)</th>
+                        <th class="py-3">Balance</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach (($accounts ?? []) as $acc): $st = $acc['standing']; ?>
+                    <tr>
+                        <td class="px-4 py-3"><code><?= esc($acc['account_number']) ?></code> <span class="text-muted small">(<?= esc($acc['account_type']) ?>)</span></td>
+                        <td class="py-3">
+                            <?php if ($acc['account_status'] === 'Pending'): ?>
+                                <span class="badge bg-warning text-dark">Joining — ₱<?= number_format($st['join_balance'], 2) ?> left</span>
+                            <?php else: ?>
+                                <span class="badge <?= $acc['account_status'] === 'Active' ? 'bg-success' : 'bg-secondary' ?>"><?= esc($acc['account_status']) ?></span>
+                            <?php endif; ?>
+                        </td>
+                        <td class="py-3">₱<?= number_format($st['required_to_date'], 2) ?></td>
+                        <td class="py-3">₱<?= number_format($st['paid'], 2) ?></td>
+                        <td class="py-3 fw-semibold <?= $st['due_balance'] > 0 ? 'text-danger' : 'text-success' ?>">₱<?= number_format($st['due_balance'], 2) ?></td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
         </div>
     </div>
 </div>
@@ -121,10 +160,9 @@
                     <div class="mb-3">
                         <label for="account_id" class="form-label fw-semibold small">Account <span class="text-danger">*</span></label>
                         <select class="form-select" id="account_id" name="account_id" required>
-                            <?php foreach (($accounts ?? []) as $acc): ?>
-                                <option value="<?= esc($acc['account_id']) ?>"
-                                        data-amount="<?= esc(number_format($monthly[$acc['account_type']] ?? (float) $acc['monthly_contribution'], 2, '.', '')) ?>">
-                                    <?= esc($acc['account_number']) ?> (<?= esc($acc['account_type']) ?>)
+                            <?php foreach (($accounts ?? []) as $acc): if (! in_array($acc['account_status'], ['Active', 'Pending'], true)) continue; ?>
+                                <option value="<?= esc($acc['account_id']) ?>">
+                                    <?= esc($acc['account_number']) ?> (<?= esc($acc['account_type']) ?><?= $acc['account_status'] === 'Pending' ? ' — joining, ₱' . number_format($acc['standing']['join_balance'], 2) . ' left' : '' ?>)
                                 </option>
                             <?php endforeach; ?>
                         </select>
@@ -140,10 +178,11 @@
                         <label for="amount" class="form-label fw-semibold small">Amount (&#8369;) <span class="text-danger">*</span></label>
                         <div class="input-group">
                             <span class="input-group-text">&#8369;</span>
-                            <input type="text" class="form-control bg-light" id="amount" readonly
-                                   value="<?= esc(number_format(isset($accounts[0]) ? ($monthly[$accounts[0]['account_type']] ?? (float) $accounts[0]['monthly_contribution']) : 0, 2, '.', '')) ?>">
+                            <input type="number" class="form-control" id="amount" name="amount"
+                                   step="0.01" min="0.01" required
+                                   value="<?= esc(number_format($monthly, 2, '.', '')) ?>">
                         </div>
-                        <div class="form-text">Set automatically by your account type (Pioneer ₱500, Basic ₱300).</div>
+                        <div class="form-text">The required contribution is ₱<?= number_format($monthly, 2) ?> per month. You can pay any amount, for example several months at once.</div>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -156,11 +195,5 @@
         </div>
     </div>
 </div>
-
-<script>
-document.getElementById('account_id').addEventListener('change', function () {
-    document.getElementById('amount').value = this.selectedOptions[0].dataset.amount;
-});
-</script>
 
 <?= $this->endSection() ?>
