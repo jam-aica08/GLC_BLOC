@@ -27,7 +27,7 @@
     </span>
 </div>
 
-<?php if (! empty($pendingUpdates)): ?>
+<?php if (! empty($needsDbUpdate)): ?>
     <div class="alert alert-warning d-flex align-items-center gap-2" role="alert">
         <i class="fa-solid fa-database"></i>
         <div>The database needs updating for the latest features.
