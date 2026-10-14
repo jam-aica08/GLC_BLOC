@@ -48,6 +48,18 @@
     </div>
 <?php endif; ?>
 
+<?php if ($isAdmin && ! empty($recentErrors)): ?>
+    <div class="card shadow-sm mb-4">
+        <div class="card-header fw-semibold bg-white"><i class="fa-solid fa-triangle-exclamation me-2 text-danger"></i>Recent Errors (today)</div>
+        <div class="card-body">
+            <p class="small text-muted">If a page shows "Whoops", the reason appears here. Send a screenshot of this box when reporting a problem.</p>
+            <ul class="small mb-0" style="word-break: break-word;">
+                <?php foreach ($recentErrors as $line): ?><li><code><?= esc($line) ?></code></li><?php endforeach; ?>
+            </ul>
+        </div>
+    </div>
+<?php endif; ?>
+
 <div class="row g-4">
     <div class="col-lg-6">
         <div class="card shadow-sm">

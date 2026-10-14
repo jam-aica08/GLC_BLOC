@@ -8,6 +8,20 @@ use CodeIgniter\Log\Handlers\HandlerInterface;
 
 class Logger extends BaseConfig
 {
+    public function __construct()
+    {
+        parent::__construct();
+
+        // On Vercel the log files live in /tmp and are not visible, so also
+        // send errors to PHP's error log, which appears in Vercel's Logs tab.
+        if (getenv('VERCEL') !== false) {
+            $this->handlers['CodeIgniter\Log\Handlers\ErrorlogHandler'] = [
+                'handles'     => ['critical', 'alert', 'emergency', 'error'],
+                'messageType' => 0,
+            ];
+        }
+    }
+
     /**
      * --------------------------------------------------------------------------
      * Error Logging Threshold
