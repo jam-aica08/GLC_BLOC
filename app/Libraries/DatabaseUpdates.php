@@ -9,29 +9,45 @@ namespace App\Libraries;
 class DatabaseUpdates
 {
     /**
-     * @return list<string> Names of migrations that have not been applied.
+     * @return array{pending: list<string>, problems: list<string>, error: ?string}
      */
-    public static function pending(): array
+    public static function status(): array
     {
+        $status = ['pending' => [], 'problems' => [], 'error' => null];
+
         try {
             $runner  = service('migrations');
             $applied = [];
             foreach ($runner->getHistory() as $row) {
                 $applied[$row->version . '|' . $row->class] = true;
             }
-
-            $pending = [];
             foreach ($runner->findMigrations() as $migration) {
                 if (! isset($applied[$migration->version . '|' . $migration->class])) {
-                    $pending[] = $migration->name;
+                    $status['pending'][] = $migration->name;
                 }
             }
 
-            return $pending;
+            // Check the tables themselves, not just the migration records.
+            $db = db_connect();
+            $db->resetDataCache();
+            if (! $db->fieldExists('payment_method', 'loan_payments')) {
+                $status['problems'][] = 'loan_payments.payment_method is missing';
+            }
+            if ($db->fieldExists('penalty_amount', 'loan_installments')) {
+                $status['problems'][] = 'old penalty columns are still present';
+            }
         } catch (\Throwable $e) {
-            log_message('error', 'DatabaseUpdates::pending failed: ' . $e->getMessage());
-            return [];
+            log_message('error', 'DatabaseUpdates::status failed: ' . $e->getMessage());
+            $status['error'] = $e->getMessage();
         }
+
+        return $status;
+    }
+
+    public static function needsUpdate(): bool
+    {
+        $s = self::status();
+        return $s['pending'] !== [] || $s['problems'] !== [] || $s['error'] !== null;
     }
 
     /**
@@ -41,10 +57,16 @@ class DatabaseUpdates
     {
         try {
             service('migrations')->latest();
-            return null;
         } catch (\Throwable $e) {
             log_message('error', 'DatabaseUpdates::apply failed: ' . $e->getMessage());
             return $e->getMessage();
         }
+
+        $after = self::status();
+        if ($after['problems'] !== []) {
+            return 'Updates ran, but: ' . implode('; ', $after['problems']);
+        }
+
+        return null;
     }
 }
