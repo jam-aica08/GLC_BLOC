@@ -114,21 +114,36 @@ class Admin extends BaseController
     {
         $this->requireAdmin();
 
-        $db = db_connect();
-        $members = $db->table('members m')
-                      ->select('m.member_id AS id, m.member_number, m.first_name, m.last_name, m.membership_date, m.membership_status AS status, u.username, u.email, u.account_status AS user_status')
-                      ->join('users u', 'u.user_id = m.user_id', 'left')
-                      ->orderBy('m.member_id', 'ASC')
-                      ->get()
-                      ->getResultArray();
+        $db     = db_connect();
+        $search = trim((string) $this->request->getGet('q'));
 
+        $query = $db->table('members m')
+                    ->select('m.member_id AS id, m.member_number, m.first_name, m.last_name, m.membership_date, m.membership_status AS status, u.username, u.email, u.account_status AS user_status')
+                    ->join('users u', 'u.user_id = m.user_id', 'left')
+                    ->orderBy('m.member_id', 'ASC');
+
+        if ($search !== '') {
+            $like = $db->escape('%' . $db->escapeLikeString($search) . '%') . " ESCAPE '!'";
+            $query->groupStart()
+                  ->where("m.member_number LIKE {$like}", null, false)
+                  ->orWhere("CAST(m.member_id AS CHAR) = " . $db->escape($search), null, false)
+                  ->orWhere("CONCAT(m.first_name, ' ', m.last_name) LIKE {$like}", null, false)
+                  ->orWhere("u.username LIKE {$like}", null, false)
+                  ->orWhere("u.email LIKE {$like}", null, false)
+                  ->orWhere("m.member_id IN (SELECT member_id FROM cooperative_accounts WHERE account_number LIKE {$like})", null, false)
+                  ->groupEnd();
+        }
+
+        $members = $query->get()->getResultArray();
+
+        $accountModel     = model(CooperativeAccountModel::class);
         $accountsByMember = [];
         $accounts = $db->table('cooperative_accounts')
-                       ->select('member_id, account_number, account_type, account_status, monthly_contribution')
                        ->orderBy('account_id', 'ASC')
                        ->get()
                        ->getResultArray();
         foreach ($accounts as $acc) {
+            $acc['standing'] = $accountModel->getStanding($acc);
             $accountsByMember[$acc['member_id']][] = $acc;
         }
         foreach ($members as &$member) {
@@ -136,7 +151,7 @@ class Admin extends BaseController
         }
         unset($member);
 
-        return view('admin/members', ['members' => $members]);
+        return view('admin/members', ['members' => $members, 'search' => $search]);
     }
 
     /**
@@ -197,10 +212,10 @@ class Admin extends BaseController
 
             // 3. Create cooperative_account
             $accountType = $this->request->getPost('account_type');
-            if (! isset(CooperativeAccountModel::MONTHLY_CONTRIBUTION[$accountType])) {
+            if (! in_array($accountType, CooperativeAccountModel::ACCOUNT_TYPES, true)) {
                 $accountType = 'Basic';
             }
-            $this->insertAccount($db, (int) $memberId, $accountType);
+            model(CooperativeAccountModel::class)->openAccount((int) $memberId, $accountType);
 
             $db->transComplete();
 
@@ -239,31 +254,16 @@ class Admin extends BaseController
         }
 
         $accountType = $this->request->getPost('account_type');
-        if (! isset(CooperativeAccountModel::MONTHLY_CONTRIBUTION[$accountType])) {
+        if (! in_array($accountType, CooperativeAccountModel::ACCOUNT_TYPES, true)) {
             session()->setFlashdata('error', 'Please choose a valid account type.');
             return redirect()->to('/admin/members');
         }
 
-        $accountNumber = $this->insertAccount(db_connect(), $memberId, $accountType);
+        $accountNumber = model(CooperativeAccountModel::class)->openAccount($memberId, $accountType);
+        $catchUp       = number_format((int) date('n') * CooperativeAccountModel::MONTHLY_CONTRIBUTION, 2);
 
-        session()->setFlashdata('success', "{$accountType} account {$accountNumber} opened for {$member['first_name']} {$member['last_name']}.");
+        session()->setFlashdata('success', "{$accountType} account {$accountNumber} opened for {$member['first_name']} {$member['last_name']}. It joins once PHP {$catchUp} (January to this month) is contributed.");
         return redirect()->to('/admin/members');
-    }
-
-    private function insertAccount($db, int $memberId, string $accountType): string
-    {
-        $accountNumber = model(CooperativeAccountModel::class)->getNextAccountNumber();
-
-        $db->table('cooperative_accounts')->insert([
-            'member_id'            => $memberId,
-            'account_number'       => $accountNumber,
-            'account_type'         => $accountType,
-            'account_start_date'   => date('Y-m-d'),
-            'monthly_contribution' => CooperativeAccountModel::MONTHLY_CONTRIBUTION[$accountType],
-            'account_status'       => 'Active',
-        ]);
-
-        return $accountNumber;
     }
 
     /**
@@ -437,10 +437,7 @@ class Admin extends BaseController
                 return redirect()->to('/admin/contributions');
             }
 
-            // Update contribution status
-            $db->table('contributions')
-               ->where('contribution_id', $id)
-               ->update(['payment_status' => 'Approved', 'updated_at' => $now]);
+            $this->applyApprovedRecord($fr);
 
             $db->transComplete();
 
@@ -520,7 +517,7 @@ class Admin extends BaseController
         $db    = db_connect();
 
         $query = $db->table('loans l')
-                    ->select("l.loan_id AS id, l.loan_amount, l.interest_rate, l.loan_term_months AS term_months, l.loan_status AS status, l.application_date AS applied_date, l.approval_date, l.release_date, l.account_id, ca.account_number, ca.account_type, m.member_number, CONCAT(m.first_name, ' ', m.last_name) AS member_name")
+                    ->select("l.loan_id AS id, l.loan_amount, l.interest_rate, l.interest_amount, l.loan_term_months AS term_months, l.loan_status AS status, l.application_date AS applied_date, l.approval_date, l.release_date, l.account_id, ca.account_number, ca.account_type, m.member_number, CONCAT(m.first_name, ' ', m.last_name) AS member_name, (SELECT COALESCE(SUM(li.amount_paid), 0) FROM loan_installments li WHERE li.loan_id = l.loan_id) AS total_paid, (l.loan_amount + l.interest_amount) AS total_payable", false)
                     ->join('cooperative_accounts ca', 'ca.account_id = l.account_id', 'left')
                     ->join('members m', 'm.member_id = ca.member_id', 'left')
                     ->orderBy('l.application_date', 'DESC');
@@ -665,7 +662,9 @@ class Admin extends BaseController
         $db       = db_connect();
 
         $query = $db->table('loan_payments lp')
-                    ->select("lp.payment_id AS id, lp.loan_id, lp.amount_paid, lp.payment_date, lp.payment_status AS status, l.loan_amount, ca.account_number, CONCAT(m.first_name, ' ', m.last_name) AS member_name")
+                    ->select("lp.payment_id AS id, lp.loan_id, lp.amount_paid, lp.payment_method, lp.payment_date, lp.payment_status AS status, lp.financial_record_id, l.loan_amount, l.loan_status, m.member_number, ca.account_number, CONCAT(m.first_name, ' ', m.last_name) AS member_name, (SELECT COALESCE(SUM(li.amount_paid), 0) FROM loan_installments li WHERE li.loan_id = l.loan_id) AS total_paid, (l.loan_amount + l.interest_amount) AS total_payable, fr.first_approved_by, u1.username AS approver1_name", false)
+                    ->join('financial_records fr', 'fr.financial_record_id = lp.financial_record_id', 'left')
+                    ->join('users u1', 'u1.user_id = fr.first_approved_by', 'left')
                     ->join('loans l', 'l.loan_id = lp.loan_id', 'left')
                     ->join('cooperative_accounts ca', 'ca.account_id = l.account_id', 'left')
                     ->join('members m', 'm.member_id = ca.member_id', 'left')
@@ -793,39 +792,7 @@ class Admin extends BaseController
             return redirect()->to('/admin/payments');
         }
 
-        // Mark payment Approved
-        $db->table('loan_payments')
-           ->where('payment_id', $id)
-           ->update(['payment_status' => 'Approved', 'updated_at' => $now]);
-
-        // Mark allocated installments as Paid
-        $allocatedInstallments = $db->table('loan_payment_installments')
-                                    ->where('payment_id', $id)
-                                    ->get()
-                                    ->getResultArray();
-
-        foreach ($allocatedInstallments as $lpi) {
-            $db->table('loan_installments')
-               ->where('installment_id', $lpi['installment_id'])
-               ->update([
-                   'amount_paid'    => $lpi['amount_applied'],
-                   'payment_status' => 'Paid',
-                   'payment_date'   => $payment['payment_date'],
-                   'updated_at'     => $now,
-               ]);
-        }
-
-        // Check if all installments for the loan are now Paid
-        $unpaidCount = $db->table('loan_installments')
-                          ->where('loan_id', $payment['loan_id'])
-                          ->where('payment_status !=', 'Paid')
-                          ->countAllResults();
-
-        if ($unpaidCount === 0) {
-            $db->table('loans')
-               ->where('loan_id', $payment['loan_id'])
-               ->update(['loan_status' => 'Paid', 'updated_at' => $now]);
-        }
+        $this->applyLoanPayment($payment);
 
         $db->transComplete();
 
@@ -845,6 +812,101 @@ class Admin extends BaseController
 
         session()->setFlashdata('success', 'Payment fully approved and ledger entry created.');
         return redirect()->to('/admin/payments');
+    }
+
+    /**
+     * Once a financial record has both approvals, bring its source row in line:
+     * contributions become Approved (and may complete an account's joining),
+     * loan payments are applied to their installments.
+     */
+    private function applyApprovedRecord(array $fr): void
+    {
+        $db    = db_connect();
+        $frId  = (int) $fr['financial_record_id'];
+
+        if ($fr['record_type'] === 'Contribution') {
+            $db->table('contributions')
+               ->where('financial_record_id', $frId)
+               ->update(['payment_status' => 'Approved', 'updated_at' => date('Y-m-d H:i:s')]);
+            model(CooperativeAccountModel::class)->activateIfComplete((int) $fr['account_id']);
+        } elseif ($fr['record_type'] === 'Loan Payment') {
+            $payment = $db->table('loan_payments')->where('financial_record_id', $frId)->get()->getRowArray();
+            if ($payment && $payment['payment_status'] === 'Pending') {
+                $this->applyLoanPayment($payment);
+            }
+        }
+    }
+
+    /**
+     * Apply an approved payment to its installments. An installment that is
+     * underpaid is closed at the amount received and the shortfall is added to
+     * the next unpaid installment. The loan becomes Paid when nothing is left.
+     */
+    private function applyLoanPayment(array $payment): void
+    {
+        $db  = db_connect();
+        $now = date('Y-m-d H:i:s');
+
+        $db->table('loan_payments')
+           ->where('payment_id', $payment['payment_id'])
+           ->update(['payment_status' => 'Approved', 'updated_at' => $now]);
+
+        $allocations = $db->table('loan_payment_installments')
+                          ->where('payment_id', $payment['payment_id'])
+                          ->get()
+                          ->getResultArray();
+
+        foreach ($allocations as $alloc) {
+            $inst = $db->table('loan_installments')
+                       ->where('installment_id', $alloc['installment_id'])
+                       ->get()->getRowArray();
+            if (! $inst) {
+                continue;
+            }
+
+            $paid      = round((float) $inst['amount_paid'] + (float) $alloc['amount_applied'], 2);
+            $shortfall = round((float) $inst['amount_due'] - $paid, 2);
+            $update    = ['amount_paid' => $paid, 'payment_date' => $payment['payment_date'], 'updated_at' => $now];
+
+            if ($shortfall <= 0) {
+                $update['payment_status'] = 'Paid';
+            } else {
+                $next = $db->table('loan_installments')
+                           ->where('loan_id', $inst['loan_id'])
+                           ->where('installment_number >', $inst['installment_number'])
+                           ->where('payment_status !=', 'Paid')
+                           ->orderBy('installment_number', 'ASC')
+                           ->limit(1)->get()->getRowArray();
+
+                if ($next) {
+                    $db->table('loan_installments')
+                       ->where('installment_id', $next['installment_id'])
+                       ->update([
+                           'amount_due' => round((float) $next['amount_due'] + $shortfall, 2),
+                           'updated_at' => $now,
+                       ]);
+                    $update['amount_due']     = $paid;
+                    $update['payment_status'] = 'Paid';
+                } else {
+                    $update['payment_status'] = 'Due';
+                }
+            }
+
+            $db->table('loan_installments')
+               ->where('installment_id', $inst['installment_id'])
+               ->update($update);
+        }
+
+        $unpaid = $db->table('loan_installments')
+                     ->where('loan_id', $payment['loan_id'])
+                     ->where('payment_status !=', 'Paid')
+                     ->countAllResults();
+
+        if ($unpaid === 0) {
+            $db->table('loans')
+               ->where('loan_id', $payment['loan_id'])
+               ->update(['loan_status' => 'Paid', 'updated_at' => $now]);
+        }
     }
 
     /**
@@ -890,7 +952,7 @@ class Admin extends BaseController
 
         $db      = db_connect();
         $records = $db->table('financial_records fr')
-                      ->select("fr.financial_record_id AS id, fr.record_type AS transaction_type, fr.amount, fr.transaction_date, fr.approval_status, fr.created_at, fr.first_approved_by AS approver1_id, fr.first_approval_date AS approved_at_1, fr.second_approved_by, fr.second_approval_date AS approved_at_2, ca.account_number, CONCAT(m.first_name, ' ', m.last_name) AS member_name, u1.username AS approver1_name, u2.username AS approver2_name, (CASE WHEN fr.second_approved_by IS NOT NULL THEN 2 WHEN fr.first_approved_by IS NOT NULL THEN 1 ELSE 0 END) AS approval_count")
+                      ->select("fr.financial_record_id AS id, fr.record_type AS transaction_type, fr.amount, fr.transaction_date, fr.approval_status, fr.created_at, fr.first_approved_by AS approver1_id, fr.first_approval_date AS approved_at_1, fr.second_approved_by, fr.second_approval_date AS approved_at_2, ca.account_number, m.member_number, CONCAT(m.first_name, ' ', m.last_name) AS member_name, u1.username AS approver1_name, u2.username AS approver2_name, (CASE WHEN fr.second_approved_by IS NOT NULL THEN 2 WHEN fr.first_approved_by IS NOT NULL THEN 1 ELSE 0 END) AS approval_count")
                       ->join('cooperative_accounts ca', 'ca.account_id = fr.account_id', 'left')
                       ->join('members m', 'm.member_id = ca.member_id', 'left')
                       ->join('users u1', 'u1.user_id = fr.first_approved_by', 'left')
@@ -985,6 +1047,8 @@ class Admin extends BaseController
             return redirect()->to('/admin/financial-records');
         }
 
+        $this->applyApprovedRecord($fr);
+
         $db->transComplete();
 
         if (! $db->transStatus()) {
@@ -1024,7 +1088,16 @@ class Admin extends BaseController
             return redirect()->to('/admin/financial-records');
         }
 
-        $frModel->update($id, ['approval_status' => 'Rejected', 'updated_at' => date('Y-m-d H:i:s')]);
+        $now = date('Y-m-d H:i:s');
+        $frModel->update($id, ['approval_status' => 'Rejected', 'updated_at' => $now]);
+
+        $source = ['Contribution' => 'contributions', 'Loan Payment' => 'loan_payments'][$fr['record_type']] ?? null;
+        if ($source) {
+            db_connect()->table($source)
+                        ->where('financial_record_id', $id)
+                        ->where('payment_status', 'Pending')
+                        ->update(['payment_status' => 'Rejected', 'updated_at' => $now]);
+        }
 
         session()->setFlashdata('success', 'Financial record rejected.');
         return redirect()->to('/admin/financial-records');
@@ -1048,7 +1121,50 @@ class Admin extends BaseController
                         ->get()
                         ->getResultArray();
 
-        return view('admin/dividends', ['dividends' => $dividends]);
+        $year = (int) ($this->request->getGet('year') ?: date('Y'));
+
+        return view('admin/dividends', [
+            'dividends' => $dividends,
+            'year'      => $year,
+            'plan'      => $this->planDividends($year),
+        ]);
+    }
+
+    /**
+     * Profit pool = interest earned on loans approved in the year. Every Active
+     * account gets an equal share, Pioneer accounts get PIONEER_DIVIDEND_BONUS %
+     * more than a Basic share, and the shares add up to the whole pool.
+     */
+    private function planDividends(int $year): array
+    {
+        $db = db_connect();
+
+        $profitPool = (float) ($db->table('loans')
+            ->selectSum('interest_amount')
+            ->whereIn('loan_status', ['Active', 'Paid'])
+            ->where('YEAR(approval_date)', $year)
+            ->get()->getRowArray()['interest_amount'] ?? 0);
+
+        $accounts = $db->table('cooperative_accounts')
+                       ->where('account_status', 'Active')
+                       ->get()->getResultArray();
+
+        $pioneerWeight = 1 + CooperativeAccountModel::PIONEER_DIVIDEND_BONUS / 100;
+        $pioneers      = count(array_filter($accounts, fn($a) => $a['account_type'] === 'Pioneer'));
+        $basics        = count($accounts) - $pioneers;
+        $totalWeight   = $basics + $pioneers * $pioneerWeight;
+
+        $basicShare   = $totalWeight > 0 ? round($profitPool / $totalWeight, 2) : 0.0;
+        $pioneerShare = round($basicShare * $pioneerWeight, 2);
+
+        return [
+            'profit_pool'   => round($profitPool, 2),
+            'accounts'      => $accounts,
+            'basic_count'   => $basics,
+            'pioneer_count' => $pioneers,
+            'basic_share'   => $basicShare,
+            'pioneer_share' => $pioneerShare,
+        ];
     }
 
     /**
@@ -1062,13 +1178,20 @@ class Admin extends BaseController
             return redirect()->to('/admin/dividends');
         }
 
-        $profitPool       = (float) $this->request->getPost('profit_pool');
-        $distributionYear = (int)   $this->request->getPost('distribution_year');
+        $distributionYear = (int) $this->request->getPost('distribution_year');
         $distributionDate = $this->request->getPost('distribution_date') ?: date('Y-m-d');
 
-        if ($profitPool <= 0 || $distributionYear < 2000) {
-            session()->setFlashdata('error', 'Invalid profit pool or year.');
+        if ($distributionYear < 2000) {
+            session()->setFlashdata('error', 'Invalid year.');
             return redirect()->to('/admin/dividends');
+        }
+
+        $plan       = $this->planDividends($distributionYear);
+        $profitPool = $plan['profit_pool'];
+
+        if ($profitPool <= 0) {
+            session()->setFlashdata('error', "There is no loan interest earned in {$distributionYear} to distribute.");
+            return redirect()->to('/admin/dividends?year=' . $distributionYear);
         }
 
         $db = db_connect();
@@ -1082,19 +1205,14 @@ class Admin extends BaseController
             return redirect()->to('/admin/dividends');
         }
 
-        // Get eligible (Active) accounts
-        $accounts = $db->table('cooperative_accounts')
-                       ->where('account_status', 'Active')
-                       ->get()
-                       ->getResultArray();
-
+        $accounts      = $plan['accounts'];
         $eligibleCount = count($accounts);
         if ($eligibleCount === 0) {
             session()->setFlashdata('error', 'No eligible accounts found.');
             return redirect()->to('/admin/dividends');
         }
 
-        $dividendPerAccount = round($profitPool / $eligibleCount, 2);
+        $dividendPerAccount = $plan['basic_share'];
         $now                = date('Y-m-d H:i:s');
         $currentUserId      = (int) session()->get('user_id');
 
@@ -1103,12 +1221,14 @@ class Admin extends BaseController
         $insertedFrIds = [];
 
         foreach ($accounts as $account) {
+            $amount = $account['account_type'] === 'Pioneer' ? $plan['pioneer_share'] : $plan['basic_share'];
+
             // Create financial_record first so we can link it to the dividend row
             $db->table('financial_records')->insert([
                 'account_id'          => $account['account_id'],
                 'record_type'         => 'Dividend',
                 'transaction_date'    => $distributionDate,
-                'amount'              => $dividendPerAccount,
+                'amount'              => $amount,
                 'approval_status'     => 'Approved',
                 'processed_by'        => $currentUserId,
                 'first_approved_by'   => $currentUserId,
@@ -1127,7 +1247,7 @@ class Admin extends BaseController
                 'profit_pool'            => $profitPool,
                 'eligible_account_count' => $eligibleCount,
                 'dividend_per_account'   => $dividendPerAccount,
-                'dividend_amount'        => $dividendPerAccount,
+                'dividend_amount'        => $amount,
                 'distribution_date'      => $distributionDate,
                 'dividend_status'        => 'Distributed',
                 'financial_record_id'    => $frId,
@@ -1163,7 +1283,7 @@ class Admin extends BaseController
             }
         }
 
-        session()->setFlashdata('success', "Dividends distributed: {$eligibleCount} accounts × PHP {$dividendPerAccount}.");
+        session()->setFlashdata('success', "Dividends of PHP " . number_format($profitPool, 2) . " distributed to {$eligibleCount} accounts (Basic PHP {$plan['basic_share']}, Pioneer PHP {$plan['pioneer_share']}).");
         return redirect()->to('/admin/dividends');
     }
 
@@ -1285,42 +1405,6 @@ class Admin extends BaseController
         $months           = (int) ($this->request->getGet('months') ?: 12);
         $forecastMonths   = (int) ($this->request->getGet('forecast') ?: 3);
 
-        $historical = $analyticsService->getEquityGrowthData($months);
-        $forecast   = $analyticsService->predictNextMonths($historical, $forecastMonths);
-
-        $labels         = array_column($historical, 'label');
-        $actual         = array_map('floatval', array_column($historical, 'total'));
-        $forecastLabels = array_column($forecast, 'label');
-        $forecastValues = array_map('floatval', array_column($forecast, 'predicted'));
-
-        $db = db_connect();
-        $totalMembers       = $db->table('members')->countAllResults();
-        $totalContributions = (float) ($db->table('financial_records')
-            ->where('record_type', 'Contribution')
-            ->where('approval_status', 'Approved')
-            ->selectSum('amount')->get()->getRowArray()['amount'] ?? 0);
-        $activeLoans        = $db->table('financial_records')
-            ->where('record_type', 'Loan Disbursement')
-            ->where('approval_status', 'Approved')
-            ->countAllResults();
-        $currentEquity      = (float) ($db->table('financial_records')
-            ->whereIn('record_type', ['Contribution', 'Dividend'])
-            ->where('approval_status', 'Approved')
-            ->selectSum('amount')->get()->getRowArray()['amount'] ?? 0);
-
-        return $this->response->setJSON([
-            'labels'             => $labels,
-            'actual'             => $actual,
-            'forecast'           => $forecastValues,
-            'forecastLabels'     => $forecastLabels,
-            'forecastStartIndex' => count($actual),
-            'stats'              => [
-                'total_members'       => $totalMembers,
-                'total_contributions' => $totalContributions,
-                'active_loans'        => $activeLoans,
-                'current_equity'      => $currentEquity,
-            ],
-            'note' => 'Forecast values are ESTIMATES / PREDICTIONS based on historical trends.',
-        ]);
+        return $this->response->setJSON($analyticsService->chartPayload($months, $forecastMonths));
     }
 }

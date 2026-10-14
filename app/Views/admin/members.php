@@ -28,6 +28,19 @@
     </div>
 <?php endif; ?>
 
+<!-- Server-side search -->
+<form method="get" action="<?= base_url('admin/members') ?>" class="mb-3" role="search">
+    <div class="input-group">
+        <span class="input-group-text bg-white"><i class="fa-solid fa-magnifying-glass"></i></span>
+        <input type="search" name="q" class="form-control" value="<?= esc($search ?? '') ?>" aria-label="Search members"
+               placeholder="Search by member ID, member #, name, account #, username or email">
+        <button class="btn text-white" style="background:#1a1a2e;" type="submit">Search</button>
+        <?php if (! empty($search)): ?>
+            <a href="<?= base_url('admin/members') ?>" class="btn btn-outline-secondary">Clear</a>
+        <?php endif; ?>
+    </div>
+</form>
+
 <!-- Members Table Card -->
 <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center">
@@ -86,6 +99,11 @@
                                             <?= esc($acc['account_type']) ?>
                                         </span>
                                         <code class="small"><?= esc($acc['account_number']) ?></code>
+                                        <?php if ($acc['account_status'] === 'Pending'): ?>
+                                            <span class="badge bg-warning text-dark" title="Contributions from January not yet complete">Joining — ₱<?= number_format($acc['standing']['join_balance'], 2) ?> left</span>
+                                        <?php elseif ($acc['account_status'] !== 'Active'): ?>
+                                            <span class="badge bg-secondary"><?= esc($acc['account_status']) ?></span>
+                                        <?php endif; ?>
                                     </div>
                                 <?php endforeach; ?>
                             </td>
@@ -206,12 +224,13 @@
             <form id="addAccountForm" method="post" action="">
                 <?= csrf_field() ?>
                 <div class="modal-body p-4">
-                    <p class="mb-3">Open a new cooperative account for <strong id="addAccountMemberName"></strong>.</p>
+                    <p class="mb-2">Open a new cooperative account for <strong id="addAccountMemberName"></strong>.</p>
+                    <p class="small text-muted mb-3">Every account contributes ₱300 per month. A new account joins after contributing from January: ₱<?= number_format((int) date('n') * \App\Models\CooperativeAccountModel::MONTHLY_CONTRIBUTION, 2) ?> this year.</p>
                     <label for="new_account_type" class="form-label fw-semibold small">Account Type <span class="text-danger">*</span></label>
                     <select class="form-select" id="new_account_type" name="account_type" required>
                         <option value="" disabled selected>Select account type</option>
-                        <option value="Pioneer">Pioneer — ₱500/month, 2% loan interest</option>
-                        <option value="Basic">Basic — ₱300/month, 5% loan interest</option>
+                        <option value="Basic">Basic — 5% loan interest</option>
+                        <option value="Pioneer">Pioneer — 2% loan interest, +2% dividend share</option>
                     </select>
                 </div>
                 <div class="modal-footer">

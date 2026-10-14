@@ -81,7 +81,7 @@ class GlcBlocSeeder extends Seeder
             'account_number'      => 'ACC-2026-001',
             'account_type'        => 'Pioneer',
             'account_start_date'  => '2026-01-01',
-            'monthly_contribution'=> 500.00,
+            'monthly_contribution'=> 300.00,
             'account_status'      => 'Active',
         ]);
 

@@ -259,6 +259,12 @@
         <a href="<?= base_url('admin/reports') ?>" class="nav-link <?= (strpos(uri_string(), 'admin/reports') === 0) ? 'active' : '' ?>">
             <i class="fa-solid fa-file-chart-column"></i> Reports
         </a>
+
+        <div class="nav-section-title">Account</div>
+
+        <a href="<?= base_url('admin/settings') ?>" class="nav-link <?= (strpos(uri_string(), 'admin/settings') === 0) ? 'active' : '' ?>">
+            <i class="fa-solid fa-gear"></i> Settings
+        </a>
     </nav>
 
     <div class="p-3 border-top" style="border-color: rgba(255,255,255,0.1) !important;">
@@ -302,6 +308,7 @@
 <!-- Bootstrap 5 JS Bundle -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <?= view('partials/table_search') ?>
+<?= view('partials/amount_toggle') ?>
 <script>
     // Sidebar toggle for mobile
     const sidebarToggle = document.getElementById('sidebar-toggle');
