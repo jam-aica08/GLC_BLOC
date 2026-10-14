@@ -20,6 +20,19 @@
     <p class="text-muted small mb-0">Your cooperative account summary.</p>
 </div>
 
+<?php foreach (($accounts ?? []) as $acc): ?>
+    <?php if (($acc['account_status'] ?? '') === 'Pending'): ?>
+        <div class="alert alert-warning d-flex align-items-center gap-2" role="status">
+            <i class="fa-solid fa-hourglass-half"></i>
+            <div>
+                Account <strong><?= esc($acc['account_number']) ?></strong> joins the cooperative once contributions from January are complete.
+                Remaining: <strong>₱<?= number_format($acc['standing']['join_balance'] ?? 0, 2) ?></strong>.
+                <a href="<?= base_url('member/contributions') ?>" class="alert-link">Contribute now</a>
+            </div>
+        </div>
+    <?php endif; ?>
+<?php endforeach; ?>
+
 <div class="row g-3 mb-4">
     <div class="col-sm-6 col-lg-3">
         <div class="card shadow-sm text-center">
@@ -32,8 +45,8 @@
     <div class="col-sm-6 col-lg-3">
         <div class="card shadow-sm text-center">
             <div class="card-body py-3">
-                <div class="text-muted small mb-1"><i class="fas fa-hand-holding-usd me-1"></i>Total Contributions</div>
-                <div class="fw-bold fs-4 text-success">₱<?= number_format($totalContributions ?? 0, 2) ?></div>
+                <div class="text-muted small mb-1"><i class="fas fa-hand-holding-usd me-1"></i>Total Contributions <button type="button" class="btn btn-sm btn-link p-0 ms-1 text-muted js-amount-toggle" title="Hide amount" aria-label="Hide amount"><i class="fa-solid fa-eye-slash"></i></button></div>
+                <div class="fw-bold fs-4 text-success js-amount">₱<?= number_format($totalContributions ?? 0, 2) ?></div>
             </div>
         </div>
     </div>

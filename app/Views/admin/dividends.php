@@ -21,6 +21,34 @@
     </div>
 <?php endif; ?>
 
+<div class="card shadow-sm mb-4">
+    <div class="card-body">
+        <form method="get" class="d-flex flex-wrap align-items-end gap-3 mb-3">
+            <div>
+                <label class="form-label small fw-semibold mb-1">Year</label>
+                <input type="number" name="year" class="form-control form-control-sm" style="width:110px"
+                       value="<?= esc($year) ?>" min="2020" max="2100">
+            </div>
+            <button class="btn btn-outline-secondary btn-sm">Calculate</button>
+        </form>
+        <div class="row g-3 text-center">
+            <div class="col-sm-4">
+                <div class="text-muted small">Profit Pool <?= esc($year) ?> (auto)</div>
+                <div class="fw-bold fs-5">₱<?= number_format($plan['profit_pool'], 2) ?></div>
+                <div class="text-muted small">Interest earned on loans approved this year</div>
+            </div>
+            <div class="col-sm-4">
+                <div class="text-muted small">Basic share (<?= $plan['basic_count'] ?> accounts)</div>
+                <div class="fw-bold fs-5">₱<?= number_format($plan['basic_share'], 2) ?></div>
+            </div>
+            <div class="col-sm-4">
+                <div class="text-muted small">Pioneer share (<?= $plan['pioneer_count'] ?> accounts, +2%)</div>
+                <div class="fw-bold fs-5">₱<?= number_format($plan['pioneer_share'], 2) ?></div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="card shadow-sm">
     <div class="card-body p-0">
         <div class="table-responsive">
@@ -31,7 +59,7 @@
                         <th>Account</th>
                         <th>Year</th>
                         <th>Profit Pool</th>
-                        <th>Per Account</th>
+                        <th>Basic Share</th>
                         <th>Amount</th>
                         <th>Distribution Date</th>
                         <th>Status</th>
@@ -72,30 +100,25 @@
         <div class="modal-content">
             <form method="post" action="<?= base_url('admin/dividends/distribute') ?>">
                 <?= csrf_field() ?>
+                <input type="hidden" name="distribution_year" value="<?= esc($year) ?>">
                 <div class="modal-header">
-                    <h5 class="modal-title"><i class="fas fa-coins me-2"></i>Distribute Dividends</h5>
+                    <h5 class="modal-title"><i class="fas fa-coins me-2"></i>Distribute <?= esc($year) ?> Dividends</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold">Distribution Year</label>
-                        <input type="number" name="distribution_year" class="form-control"
-                               value="<?= date('Y') ?>" min="2020" max="2100" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold">Total Profit Pool (₱)</label>
-                        <input type="number" name="profit_pool" step="0.01" min="0.01"
-                               class="form-control" placeholder="e.g. 50000.00" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold">Distribution Date</label>
-                        <input type="date" name="distribution_date" class="form-control"
-                               value="<?= date('Y-m-d') ?>" required>
-                    </div>
+                    <p class="mb-2">The profit pool, ₱<?= number_format($plan['profit_pool'], 2) ?>, will be divided among
+                       <?= $plan['basic_count'] + $plan['pioneer_count'] ?> active accounts.</p>
+                    <ul class="small mb-3">
+                        <li><?= $plan['basic_count'] ?> Basic × ₱<?= number_format($plan['basic_share'], 2) ?></li>
+                        <li><?= $plan['pioneer_count'] ?> Pioneer × ₱<?= number_format($plan['pioneer_share'], 2) ?> (2% more)</li>
+                    </ul>
+                    <label class="form-label fw-semibold">Distribution Date</label>
+                    <input type="date" name="distribution_date" class="form-control"
+                           value="<?= date('Y-m-d') ?>" required>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-warning btn-sm">
+                    <button type="submit" class="btn btn-warning btn-sm" <?= $plan['profit_pool'] > 0 ? '' : 'disabled' ?>>
                         <i class="fas fa-coins me-1"></i>Distribute
                     </button>
                 </div>

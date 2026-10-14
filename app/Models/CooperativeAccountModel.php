@@ -6,6 +6,17 @@ use CodeIgniter\Model;
 
 class CooperativeAccountModel extends Model
 {
+    public const ACCOUNT_TYPES = ['Pioneer', 'Basic'];
+
+    /** Required contribution per account per month (PHP), for every account type. */
+    public const MONTHLY_CONTRIBUTION = 300.00;
+
+    /** Loan interest rate (%) per account type. */
+    public const LOAN_INTEREST_RATE = ['Pioneer' => 2.00, 'Basic' => 5.00];
+
+    /** Pioneer accounts receive this much more (%) than a Basic share of dividends. */
+    public const PIONEER_DIVIDEND_BONUS = 2.00;
+
     protected $table            = 'cooperative_accounts';
     protected $primaryKey       = 'account_id';
     protected $useAutoIncrement = true;
@@ -32,7 +43,7 @@ class CooperativeAccountModel extends Model
         'account_type'        => 'required|in_list[Pioneer,Basic]',
         'account_start_date'  => 'required|valid_date',
         'monthly_contribution'=> 'permit_empty|decimal|greater_than_equal_to[0]',
-        'account_status'      => 'permit_empty|in_list[Active,Inactive,Closed]',
+        'account_status'      => 'permit_empty|in_list[Active,Inactive,Closed,Pending]',
     ];
 
     protected $validationMessages = [
@@ -116,6 +127,76 @@ class CooperativeAccountModel extends Model
                         ->getRow();
 
         return $row && $row->total !== null ? (float) $row->total : 0.0;
+    }
+
+    /**
+     * Contribution standing for an account. An account joins the cooperative
+     * only after paying every month from January of its start year up to and
+     * including its start month; after that it owes PHP 300 each month.
+     *
+     * @return array{required_to_join: float, required_to_date: float, paid: float,
+     *               join_balance: float, due_balance: float}
+     */
+    public function getStanding(array $account): array
+    {
+        $start = strtotime($account['account_start_date'] ?: 'now');
+        $startYear  = (int) date('Y', $start);
+        $startMonth = (int) date('n', $start);
+
+        $monthsToDate = ((int) date('Y') - $startYear) * 12 + (int) date('n');
+        $monthsToDate = max($monthsToDate, $startMonth);
+
+        $requiredToJoin = $startMonth * self::MONTHLY_CONTRIBUTION;
+        $requiredToDate = $monthsToDate * self::MONTHLY_CONTRIBUTION;
+        $paid           = $this->getTotalContributions((int) $account['account_id']);
+
+        return [
+            'required_to_join' => $requiredToJoin,
+            'required_to_date' => $requiredToDate,
+            'paid'             => $paid,
+            'join_balance'     => max(0.0, round($requiredToJoin - $paid, 2)),
+            'due_balance'      => max(0.0, round($requiredToDate - $paid, 2)),
+        ];
+    }
+
+    /**
+     * Move a Pending account to Active once its January catch-up is fully paid.
+     */
+    public function activateIfComplete(int $accountId): bool
+    {
+        $account = $this->find($accountId);
+        if (! $account || $account['account_status'] !== 'Pending') {
+            return false;
+        }
+        if ($this->getStanding($account)['join_balance'] > 0) {
+            return false;
+        }
+
+        $this->db->table($this->table)
+                 ->where('account_id', $accountId)
+                 ->update(['account_status' => 'Active']);
+
+        return true;
+    }
+
+    /**
+     * Open a new account. It stays Pending until contributions are complete
+     * from January of the current year.
+     */
+    public function openAccount(int $memberId, string $accountType): string
+    {
+        $accountNumber = $this->getNextAccountNumber();
+
+        $this->db->table($this->table)->insert([
+            'member_id'            => $memberId,
+            'account_number'       => $accountNumber,
+            'account_type'         => $accountType,
+            'account_start_date'   => date('Y-m-d'),
+            'monthly_contribution' => self::MONTHLY_CONTRIBUTION,
+            'account_status'       => 'Pending',
+        ]);
+
+        return $accountNumber;
     }
 
     /**

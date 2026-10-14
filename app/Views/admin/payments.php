@@ -35,7 +35,7 @@
             <a href="<?= base_url('admin/payments?status=Pending') ?>"
                class="btn btn-sm <?= (($filterStatus ?? '') === 'Pending') ? 'btn-warning' : 'btn-outline-warning' ?>">Pending</a>
             <a href="<?= base_url('admin/payments?status=Approved') ?>"
-               class="btn btn-sm <?= (($filterStatus ?? '') === 'Approved') ? 'btn-success' : 'btn-outline-success' ?>">Approved</a>
+               class="btn btn-sm <?= (($filterStatus ?? '') === 'Approved') ? 'btn-success' : 'btn-outline-success' ?>">Paid</a>
             <a href="<?= base_url('admin/payments?status=Rejected') ?>"
                class="btn btn-sm <?= (($filterStatus ?? '') === 'Rejected') ? 'btn-danger' : 'btn-outline-danger' ?>">Rejected</a>
         </div>
@@ -58,7 +58,11 @@
                         <th class="py-3">Account #</th>
                         <th class="py-3">Member</th>
                         <th class="py-3">Amount Paid</th>
+                        <th class="py-3">Method</th>
                         <th class="py-3">Payment Date</th>
+                        <th class="py-3">Loan Total</th>
+                        <th class="py-3">Total Paid</th>
+                        <th class="py-3">Balance</th>
                         <th class="py-3">Status</th>
                         <th class="py-3 text-center">Actions</th>
                     </tr>
@@ -72,16 +76,32 @@
                             <td class="py-3"><code><?= esc($payment['account_number'] ?? '-') ?></code></td>
                             <td class="py-3">
                                 <div class="fw-semibold"><?= esc($payment['member_name'] ?? '-') ?></div>
+                                <small class="text-muted"><?= esc($payment['member_number'] ?? '') ?></small>
                             </td>
                             <td class="py-3 fw-semibold">&#8369;<?= number_format($payment['amount_paid'] ?? 0, 2) ?></td>
+                            <td class="py-3"><?= esc($payment['payment_method'] ?? '—') ?></td>
                             <td class="py-3 text-muted"><?= esc($payment['payment_date'] ?? '-') ?></td>
+                            <?php $payBalance = max(0, (float) $payment['total_payable'] - (float) $payment['total_paid']); ?>
+                            <td class="py-3">&#8369;<?= number_format($payment['total_payable'] ?? 0, 2) ?></td>
+                            <td class="py-3 text-success">&#8369;<?= number_format($payment['total_paid'] ?? 0, 2) ?></td>
+                            <td class="py-3 fw-semibold <?= $payBalance > 0 ? 'text-danger' : 'text-success' ?>">&#8369;<?= number_format($payBalance, 2) ?></td>
                             <td class="py-3">
-                                <?php $status = $payment['status'] ?? 'Pending'; ?>
-                                <span class="badge
-                                    <?= ($status === 'Approved') ? 'bg-success' :
-                                        (($status === 'Rejected') ? 'bg-danger' : 'bg-warning text-dark') ?>">
-                                    <?= esc($status) ?>
-                                </span>
+                                <?php
+                                    $status = $payment['status'] ?? 'Pending';
+                                    if ($status === 'Approved') {
+                                        $label = 'Paid'; $badge = 'bg-success';
+                                    } elseif ($status === 'Rejected') {
+                                        $label = 'Rejected'; $badge = 'bg-danger';
+                                    } elseif (! empty($payment['first_approved_by'])) {
+                                        $label = 'Needs 2nd Approval'; $badge = 'bg-info text-dark';
+                                    } else {
+                                        $label = 'Pending'; $badge = 'bg-warning text-dark';
+                                    }
+                                ?>
+                                <span class="badge <?= $badge ?>"><?= esc($label) ?></span>
+                                <?php if (! empty($payment['approver1_name']) && $status === 'Pending'): ?>
+                                    <div class="small text-muted">1st: <?= esc($payment['approver1_name']) ?></div>
+                                <?php endif; ?>
                             </td>
                             <td class="py-3 text-center">
                                 <?php if ($status === 'Pending'): ?>
@@ -90,7 +110,7 @@
                                             <?= csrf_field() ?>
                                             <button type="submit" class="btn btn-sm btn-success"
                                                     onclick="return confirm('Approve this payment?')">
-                                                <i class="fa-solid fa-check me-1"></i>Approve
+                                                <i class="fa-solid fa-check me-1"></i><?= empty($payment['first_approved_by']) ? 'Approve' : 'Final Approve' ?>
                                             </button>
                                         </form>
                                         <form action="<?= base_url('admin/payments/reject/' . ($payment['id'] ?? 0)) ?>" method="post">
@@ -109,7 +129,7 @@
                         <?php endforeach; ?>
                     <?php else: ?>
                         <tr>
-                            <td colspan="8" class="text-center py-5 text-muted">
+                            <td colspan="12" class="text-center py-5 text-muted">
                                 <i class="fa-solid fa-money-bill-wave fa-2x mb-3 d-block opacity-25"></i>
                                 No payment records found for the selected filter.
                             </td>

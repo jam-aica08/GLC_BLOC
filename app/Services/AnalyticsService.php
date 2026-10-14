@@ -212,4 +212,38 @@ class AnalyticsService
                ]);
         }
     }
+
+    /**
+     * Chart.js payload for the equity growth chart plus headline stats.
+     */
+    public function chartPayload(int $months = 12, int $forecastMonths = 3): array
+    {
+        $historical = $this->getEquityGrowthData($months);
+        $forecast   = $this->predictNextMonths($historical, $forecastMonths);
+        $actual     = array_map('floatval', array_column($historical, 'total'));
+
+        $db  = db_connect();
+        $sum = fn(array $types) => (float) ($db->table('financial_records')
+            ->whereIn('record_type', $types)
+            ->where('approval_status', 'Approved')
+            ->selectSum('amount')->get()->getRowArray()['amount'] ?? 0);
+
+        return [
+            'labels'             => array_column($historical, 'label'),
+            'actual'             => $actual,
+            'forecast'           => array_map('floatval', array_column($forecast, 'predicted')),
+            'forecastLabels'     => array_column($forecast, 'label'),
+            'forecastStartIndex' => count($actual),
+            'stats'              => [
+                'total_members'       => $db->table('members')->countAllResults(),
+                'total_contributions' => $sum(['Contribution']),
+                'active_loans'        => $db->table('financial_records')
+                    ->where('record_type', 'Loan Disbursement')
+                    ->where('approval_status', 'Approved')
+                    ->countAllResults(),
+                'current_equity'      => $sum(['Contribution', 'Dividend']),
+            ],
+            'note' => 'Forecast values are ESTIMATES / PREDICTIONS based on historical trends.',
+        ];
+    }
 }

@@ -1,4 +1,4 @@
-<?= $this->extend('layouts/main') ?>
+<?= $this->extend($layout ?? 'layouts/main') ?>
 
 <?= $this->section('content') ?>
 
@@ -90,7 +90,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const ctx = document.getElementById('equityChart');
 
     // Fetch analytics data from the API endpoint
-    fetch('<?= base_url('admin/analytics/data') ?>', {
+    fetch('<?= base_url($dataUrl ?? 'admin/analytics/data') ?>', {
         headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
     })
     .then(response => {
