@@ -586,10 +586,7 @@ class Admin extends BaseController
             $installmentModel->insert(array_merge($inst, [
                 'loan_id'        => $id,
                 'amount_paid'    => 0.00,
-                'penalty_amount' => 0.00,
-                'penalty_paid'   => 0.00,
                 'payment_status' => 'Upcoming',
-                'penalty_status' => 'None',
             ]));
         }
 

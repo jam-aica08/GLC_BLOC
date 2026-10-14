@@ -469,7 +469,6 @@ class Member extends BaseController
             'amount_paid'    => $amountPaid,
             'principal_amount'=> $amountPaid,
             'interest_amount'=> 0.00,
-            'penalty_amount' => 0.00,
             'payment_status' => 'Pending',
             'created_at'     => $now,
             'updated_at'     => $now,
@@ -492,7 +491,6 @@ class Member extends BaseController
                 'payment_id'     => $paymentId,
                 'installment_id' => $alloc['installment_id'],
                 'amount_applied' => $alloc['amount_applied'],
-                'penalty_amount' => 0.00,
             ]);
         }
 
