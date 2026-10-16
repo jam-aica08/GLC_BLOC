@@ -119,4 +119,41 @@
     <?php endif; ?>
 </div>
 
+<?php if ($isAdmin): ?>
+    <div class="card shadow-sm mt-4 border-danger">
+        <div class="card-header fw-semibold bg-danger-subtle text-danger"><i class="fa-solid fa-trash-can me-2"></i>Reset Data</div>
+        <div class="card-body">
+            <p class="small mb-3">Permanently deletes all <strong>loans, installments, loan payments, contributions, dividends, financial records and blockchain ledger entries</strong>.
+                Administrator logins are always kept. This cannot be undone.</p>
+            <form method="post" action="<?= base_url($base . '/reset') ?>" autocomplete="off"
+                  onsubmit="return confirm('Delete the selected data permanently? This cannot be undone.') && !(this.querySelector('button').disabled = true);">
+                <?= csrf_field() ?>
+                <div class="mb-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="scope" id="scope_tx" value="transactions" checked>
+                        <label class="form-check-label small" for="scope_tx">Transactions only — keep members and their accounts</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="scope" id="scope_all" value="all">
+                        <label class="form-check-label small" for="scope_all">Everything — also delete members, their accounts and member logins</label>
+                    </div>
+                </div>
+                <div class="row g-2">
+                    <div class="col-md-4">
+                        <label for="reset_confirm" class="form-label small fw-semibold">Type RESET to confirm</label>
+                        <input type="text" class="form-control" id="reset_confirm" name="confirm" pattern="RESET" required>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="reset_password" class="form-label small fw-semibold">Your Password</label>
+                        <input type="password" class="form-control" id="reset_password" name="password" required autocomplete="current-password">
+                    </div>
+                    <div class="col-md-4 d-flex align-items-end">
+                        <button type="submit" class="btn btn-danger w-100"><i class="fa-solid fa-trash-can me-1"></i>Reset Data</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+<?php endif; ?>
+
 <?= $this->endSection() ?>
