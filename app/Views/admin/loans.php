@@ -117,10 +117,10 @@
                                             </button>
                                         </form>
                                     </div>
-                                <?php elseif ($status === 'Active'): ?>
-                                    <span class="text-success small"><i class="fa-solid fa-circle-check me-1"></i>Active</span>
-                                <?php elseif ($status === 'Paid'): ?>
-                                    <span class="text-muted small"><i class="fa-solid fa-check-double me-1"></i>Paid Off</span>
+                                <?php elseif ($status === 'Active' || $status === 'Paid'): ?>
+                                    <a href="<?= base_url('admin/loans/' . (int) $loan['id'] . '/schedule') ?>" class="btn btn-sm btn-outline-primary">
+                                        <i class="fa-solid fa-calendar-days me-1"></i>Schedule
+                                    </a>
                                 <?php else: ?>
                                     <span class="text-muted small">—</span>
                                 <?php endif; ?>

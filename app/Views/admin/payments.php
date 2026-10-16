@@ -72,7 +72,7 @@
                         <?php foreach ($payments as $payment): ?>
                         <tr>
                             <td class="px-4 py-3"><code>#<?= esc($payment['id'] ?? '-') ?></code></td>
-                            <td class="py-3"><code>#<?= esc($payment['loan_id'] ?? '-') ?></code></td>
+                            <td class="py-3"><a href="<?= base_url('admin/loans/' . (int) ($payment['loan_id'] ?? 0) . '/schedule') ?>"><code>#<?= esc($payment['loan_id'] ?? '-') ?></code></a></td>
                             <td class="py-3"><code><?= esc($payment['account_number'] ?? '-') ?></code></td>
                             <td class="py-3">
                                 <div class="fw-semibold"><?= esc($payment['member_name'] ?? '-') ?></div>

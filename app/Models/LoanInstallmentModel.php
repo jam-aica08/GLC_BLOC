@@ -20,6 +20,7 @@ class LoanInstallmentModel extends Model
         'principal_amount',
         'interest_amount',
         'amount_due',
+        'carried_over',
         'amount_paid',
         'remaining_balance',
         'payment_date',
@@ -44,7 +45,7 @@ class LoanInstallmentModel extends Model
         'amount_paid'        => 'permit_empty|decimal|greater_than_equal_to[0]',
         'remaining_balance'  => 'permit_empty|decimal|greater_than_equal_to[0]',
         'payment_date'       => 'permit_empty|valid_date',
-        'payment_status'     => 'permit_empty|in_list[Upcoming,Due,Late,Paid]',
+        'payment_status'     => 'permit_empty|in_list[Upcoming,Due,Late,Paid,Partial]',
         'financial_record_id'=> 'permit_empty|integer|greater_than[0]',
     ];
 
@@ -69,7 +70,7 @@ class LoanInstallmentModel extends Model
             'required' => 'Amount due is required.',
         ],
         'payment_status' => [
-            'in_list' => 'Payment status must be one of: Upcoming, Due, Late, Paid.',
+            'in_list' => 'Payment status must be one of: Upcoming, Due, Late, Paid, Partial.',
         ],
     ];
 

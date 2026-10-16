@@ -33,6 +33,9 @@ class DatabaseUpdates
             if (! $db->fieldExists('payment_method', 'loan_payments')) {
                 $status['problems'][] = 'loan_payments.payment_method is missing';
             }
+            if (! $db->fieldExists('carried_over', 'loan_installments')) {
+                $status['problems'][] = 'loan_installments.carried_over is missing';
+            }
             if ($db->fieldExists('penalty_amount', 'loan_installments')) {
                 $status['problems'][] = 'old penalty columns are still present';
             }
@@ -46,7 +49,8 @@ class DatabaseUpdates
 
     /**
      * Bring the tables in line with the current code: no penalty columns,
-     * 'Pending' account status, PHP 300 monthly contribution, payment_method.
+     * 'Pending' account status, PHP 300 monthly contribution, payment_method,
+     * installment carry-over (carried_over column, 'Partial' status).
      * Safe to run any number of times.
      */
     public static function repairSchema($db, $forge): void
@@ -74,6 +78,13 @@ class DatabaseUpdates
                 'payment_method' => ['type' => 'VARCHAR', 'constraint' => 30, 'null' => true, 'after' => 'amount_paid'],
             ]);
         }
+
+        if (! $db->fieldExists('carried_over', 'loan_installments')) {
+            $forge->addColumn('loan_installments', [
+                'carried_over' => ['type' => 'DECIMAL', 'constraint' => '15,2', 'default' => 0.00, 'null' => false, 'after' => 'amount_due'],
+            ]);
+        }
+        $db->query("ALTER TABLE loan_installments MODIFY payment_status ENUM('Upcoming','Due','Late','Paid','Partial') NOT NULL DEFAULT 'Upcoming'");
 
         $db->resetDataCache();
     }

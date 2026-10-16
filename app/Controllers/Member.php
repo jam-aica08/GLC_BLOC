@@ -413,35 +413,10 @@ class Member extends BaseController
             return redirect()->to('/member/loans');
         }
 
-        $installments = $db->table('loan_installments')
-                           ->where('loan_id', $loanId)
-                           ->orderBy('installment_number', 'ASC')
-                           ->get()
-                           ->getResultArray();
-
-        $pendingIds = $this->pendingInstallmentIds($loanId);
-
-        $totalPayable = array_sum(array_column($installments, 'amount_due'));
-        $totalPaid    = array_sum(array_column($installments, 'amount_paid'));
-
         return view('member/loan_installments', [
-            'loan'         => $loan,
-            'installments' => $installments,
-            'pendingIds'   => $pendingIds,
-            'totalPayable' => $totalPayable,
-            'totalPaid'    => $totalPaid,
+            'loan'     => $loan,
+            'schedule' => (new LoanService())->schedule($loanId),
         ]);
-    }
-
-    /** Installments already covered by a payment that is waiting for approval. */
-    private function pendingInstallmentIds(int $loanId): array
-    {
-        return array_map('intval', array_column(db_connect()->table('loan_payment_installments lpi')
-            ->select('lpi.installment_id')
-            ->join('loan_payments lp', 'lp.payment_id = lpi.payment_id')
-            ->where('lp.loan_id', $loanId)
-            ->where('lp.payment_status', 'Pending')
-            ->get()->getResultArray(), 'installment_id'));
     }
 
     /**
@@ -481,12 +456,9 @@ class Member extends BaseController
             return redirect()->to('/member/loans/' . $loanId . '/installments');
         }
 
-        $installmentIds = (array) $this->request->getPost('installment_ids');
-        $installmentIds = array_map('intval', $installmentIds);
-        $installmentIds = array_filter($installmentIds, fn($v) => $v > 0);
-
-        if (empty($installmentIds)) {
-            session()->setFlashdata('error', 'Please select at least one installment to pay.');
+        $installmentId = (int) $this->request->getPost('installment_id');
+        if ($installmentId < 1) {
+            session()->setFlashdata('error', 'Please tick the month you are paying.');
             return redirect()->to('/member/loans/' . $loanId . '/installments');
         }
 
@@ -504,12 +476,10 @@ class Member extends BaseController
         // Lock the loan so two quick submissions cannot both pass the checks below.
         $db->query('SELECT loan_id FROM loans WHERE loan_id = ? FOR UPDATE', [$loanId]);
 
-        $pendingIds = $this->pendingInstallmentIds($loanId);
-        $allocation = (new LoanService())->processPayment($loanId, $amountPaid, $installmentIds, $pendingIds);
-
-        if (! $allocation['valid']) {
+        $error = (new LoanService())->validatePayment($loanId, $amountPaid, $installmentId);
+        if ($error !== null) {
             $db->transRollback();
-            session()->setFlashdata('error', $allocation['error']);
+            session()->setFlashdata('error', $error);
             return redirect()->to('/member/loans/' . $loanId . '/installments');
         }
 
@@ -538,13 +508,11 @@ class Member extends BaseController
 
         $paymentId = $db->insertID();
 
-        foreach ($allocation['allocation'] as $alloc) {
-            $db->table('loan_payment_installments')->insert([
-                'payment_id'     => $paymentId,
-                'installment_id' => $alloc['installment_id'],
-                'amount_applied' => $alloc['amount_applied'],
-            ]);
-        }
+        $db->table('loan_payment_installments')->insert([
+            'payment_id'     => $paymentId,
+            'installment_id' => $installmentId,
+            'amount_applied' => $amountPaid,
+        ]);
 
         $db->transComplete();
 
