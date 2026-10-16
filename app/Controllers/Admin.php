@@ -1154,8 +1154,9 @@ class Admin extends BaseController
         $basics        = count($accounts) - $pioneers;
         $totalWeight   = $basics + $pioneers * $pioneerWeight;
 
-        $basicShare   = $totalWeight > 0 ? round($profitPool / $totalWeight, 2) : 0.0;
-        $pioneerShare = round($basicShare * $pioneerWeight, 2);
+        // Round down to the centavo so the shares never add up to more than the pool.
+        $basicShare   = $totalWeight > 0 ? floor(round($profitPool / $totalWeight * 100, 6)) / 100 : 0.0;
+        $pioneerShare = floor(round($basicShare * $pioneerWeight * 100, 6)) / 100;
 
         return [
             'profit_pool'   => round($profitPool, 2),
