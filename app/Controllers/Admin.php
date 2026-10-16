@@ -61,49 +61,14 @@ class Admin extends BaseController
                               ->where('payment_status', 'Pending')
                               ->countAllResults();
 
-        $totalMembers = $db->table('members')->countAllResults();
-
-        $totalContributions = (float) ($db->table('financial_records')
-            ->where('record_type', 'Contribution')
-            ->where('approval_status', 'Approved')
-            ->selectSum('amount')->get()->getRowArray()['amount'] ?? 0);
-
-        $activeLoans = $db->table('loans')
-            ->where('loan_status', 'Active')
-            ->countAllResults();
-
-        $pendingApprovals = $pendingContributions + $pendingLoans + $pendingPayments;
-
-        $rawRecords = $db->table('financial_records fr')
-                         ->select('fr.financial_record_id AS id, fr.record_type AS transaction_type, fr.amount, fr.created_at, fr.first_approved_by, fr.second_approved_by, ca.account_number, m.first_name, m.last_name')
-                         ->join('cooperative_accounts ca', 'ca.account_id = fr.account_id', 'left')
-                         ->join('members m', 'm.member_id = ca.member_id', 'left')
-                         ->orderBy('fr.created_at', 'DESC')
-                         ->limit(10)
-                         ->get()
-                         ->getResultArray();
-
-        $recentFinancialRecords = array_map(function ($r) {
-            $r['approval_count'] = (!empty($r['second_approved_by']) ? 2 : (!empty($r['first_approved_by']) ? 1 : 0));
-            return $r;
-        }, $rawRecords);
-
-        $recentActivity = array_map(fn($r) => [
-            'description' => ($r['transaction_type'] ?? 'Transaction') . ' — ₱' . number_format($r['amount'], 2),
-            'created_at'  => $r['created_at'],
-        ], array_slice($recentFinancialRecords, 0, 6));
-
         return view('admin/dashboard', [
-            'needsDbUpdate'          => \App\Libraries\DatabaseUpdates::needsUpdate(),
-            'totalMembers'           => $totalMembers,
-            'totalContributions'     => $totalContributions,
-            'activeLoans'            => $activeLoans,
-            'pendingApprovals'       => $pendingApprovals,
-            'pendingContributions'   => $pendingContributions,
-            'pendingLoans'           => $pendingLoans,
-            'pendingPayments'        => $pendingPayments,
-            'recentFinancialRecords' => $recentFinancialRecords,
-            'recentActivity'         => $recentActivity,
+            'needsDbUpdate'        => \App\Libraries\DatabaseUpdates::needsUpdate(),
+            'totalMembers'         => $db->table('members')->countAllResults(),
+            'totalAccounts'        => $db->table('cooperative_accounts')->countAllResults(),
+            'pendingContributions' => $pendingContributions,
+            'pendingLoans'         => $pendingLoans,
+            'pendingPayments'      => $pendingPayments,
+            'overview'             => (new \App\Services\DashboardService())->build(null),
         ]);
     }
 
