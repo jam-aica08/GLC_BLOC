@@ -87,11 +87,14 @@
                             </td>
                             <td class="py-3 text-muted small"><?= esc($loan['applied_date'] ?? $loan['created_at'] ?? '-') ?></td>
                             <td class="py-3 text-center">
-                                <?php if (in_array($loan['status'] ?? '', ['Approved', 'Active'])): ?>
-                                    <a href="<?= base_url('member/loans/' . $loan['id'] . '/installments') ?>"
-                                       class="btn btn-sm btn-outline-primary">
-                                        <i class="fa-solid fa-calendar-days me-1"></i>Installments
-                                    </a>
+                                <?php if (isset($loan['panel'])): ?>
+                                    <?php $isOpen = in_array($loan['status'], ['Approved', 'Active'], true); ?>
+                                    <button type="button" class="btn btn-sm <?= $isOpen ? 'btn-warning' : 'btn-outline-secondary' ?>"
+                                            data-bs-toggle="modal" data-bs-target="#loanPanelModal"
+                                            data-loan-id="<?= (int) $loan['id'] ?>">
+                                        <i class="fa-solid fa-<?= $isOpen ? 'money-bill-wave' : 'calendar-days' ?> me-1"></i><?= $isOpen ? 'View &amp; Pay' : 'View' ?>
+                                    </button>
+                                    <template id="loan-panel-<?= (int) $loan['id'] ?>"><?= $loan['panel'] ?></template>
                                 <?php else: ?>
                                     <span class="text-muted small">—</span>
                                 <?php endif; ?>
@@ -192,5 +195,32 @@ document.getElementById('loan_account_id').addEventListener('change', function (
     document.getElementById('loan_rate').value = this.selectedOptions[0].dataset.rate;
 });
 </script>
+
+<!-- Loan Payment Window -->
+<div class="modal fade" id="loanPanelModal" tabindex="-1" aria-labelledby="loanPanelTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header" style="background:#1a1a2e;">
+                <h5 class="modal-title text-white" id="loanPanelTitle">
+                    <i class="fa-solid fa-money-bill-wave me-2" style="color:#f0a500;"></i>Loan #<span id="loanPanelId"></span>
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="loanPanelBody" data-pay-container></div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('loanPanelModal').addEventListener('show.bs.modal', function (e) {
+    const id = e.relatedTarget.dataset.loanId;
+    const body = document.getElementById('loanPanelBody');
+    body.dataset.loanId = id;
+    document.getElementById('loanPanelId').textContent = id;
+    body.innerHTML = document.getElementById('loan-panel-' + id).innerHTML;
+});
+</script>
+
+<?= view('partials/pay_panel_js') ?>
 
 <?= $this->endSection() ?>
