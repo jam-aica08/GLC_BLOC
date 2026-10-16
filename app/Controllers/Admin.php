@@ -250,13 +250,14 @@ class Admin extends BaseController
 
     /**
      * The opening contribution typed on the Add Member / Add Account form,
-     * or an error message. It must cover January up to this month (PHP 3,000
-     * in October) and be at most PHP 3,600.
+     * or an error message: PHP 300 to 3,600. The account activates once
+     * January up to this month is paid (PHP 3,000 in October), so the rest
+     * can follow in later contributions.
      */
     private function openingContribution(): float|string
     {
         $amount = round((float) $this->request->getPost('opening_contribution'), 2);
-        $min    = CooperativeAccountModel::joinAmount();
+        $min    = CooperativeAccountModel::CONTRIBUTION_MIN;
         $max    = CooperativeAccountModel::CONTRIBUTION_MAX;
 
         if ($amount < $min || $amount > $max) {
