@@ -18,7 +18,6 @@ use App\Services\LoanService;
  */
 class Member extends BaseController
 {
-    public const PAYMENT_METHODS = ['Cash', 'GCash', 'Bank Transfer'];
 
     // -------------------------------------------------------------------------
     // Auth guard
@@ -301,6 +300,10 @@ class Member extends BaseController
                                 ->orderBy('installment_number', 'ASC')
                                 ->limit(1)->get()->getRowArray();
                 $loan['monthly_payment'] = $firstInst ? (float)$firstInst['amount_due'] : 0.0;
+
+                if (in_array($loan['status'], ['Active', 'Approved', 'Paid'], true)) {
+                    $loan['panel'] = $this->loanPanel((int) $loan['id'], $loan['status']);
+                }
             }
             unset($loan);
         }
@@ -414,9 +417,38 @@ class Member extends BaseController
         }
 
         return view('member/loan_installments', [
-            'loan'     => $loan,
-            'schedule' => (new LoanService())->schedule($loanId),
+            'loan'  => $loan,
+            'panel' => $this->loanPanel($loanId, $loan['loan_status']),
         ]);
+    }
+
+    /** Rendered loan schedule / payment window for one loan. */
+    private function loanPanel(int $loanId, string $loanStatus): string
+    {
+        return view('partials/installment_schedule', [
+            'schedule' => (new LoanService())->schedule($loanId),
+            'canPay'   => in_array($loanStatus, ['Active', 'Approved'], true),
+            'loanId'   => $loanId,
+        ]);
+    }
+
+    /**
+     * Reply to a payment submission: JSON with the refreshed window for the
+     * popup, or a redirect with a flash message for a normal form post.
+     */
+    private function paymentResponse(int $loanId, string $loanStatus, bool $ok, string $message)
+    {
+        if ($this->request->isAJAX()) {
+            return $this->response->setJSON([
+                'ok'      => $ok,
+                'message' => $message,
+                'html'    => $this->loanPanel($loanId, $loanStatus),
+                'csrf'    => csrf_hash(),
+            ]);
+        }
+
+        session()->setFlashdata($ok ? 'success' : 'error', $message);
+        return redirect()->to('/member/loans/' . $loanId . '/installments');
     }
 
     /**
@@ -450,22 +482,13 @@ class Member extends BaseController
             return redirect()->to('/member/loans');
         }
 
-        $amountPaid = round((float) $this->request->getPost('amount_paid'), 2);
-        if ($amountPaid <= 0) {
-            session()->setFlashdata('error', 'Payment amount must be greater than zero.');
-            return redirect()->to('/member/loans/' . $loanId . '/installments');
-        }
-
-        $installmentId = (int) $this->request->getPost('installment_id');
-        if ($installmentId < 1) {
-            session()->setFlashdata('error', 'Please tick the month you are paying.');
-            return redirect()->to('/member/loans/' . $loanId . '/installments');
-        }
-
-        $method = (string) $this->request->getPost('payment_method');
-        if (! in_array($method, self::PAYMENT_METHODS, true)) {
-            session()->setFlashdata('error', 'Please choose a payment method.');
-            return redirect()->to('/member/loans/' . $loanId . '/installments');
+        $amounts = [];
+        $posted  = (array) $this->request->getPost('amounts');
+        foreach ((array) $this->request->getPost('installment_ids') as $id) {
+            $id = (int) $id;
+            if ($id > 0) {
+                $amounts[$id] = round((float) ($posted[$id] ?? 0), 2);
+            }
         }
 
         $now   = date('Y-m-d H:i:s');
@@ -476,18 +499,19 @@ class Member extends BaseController
         // Lock the loan so two quick submissions cannot both pass the checks below.
         $db->query('SELECT loan_id FROM loans WHERE loan_id = ? FOR UPDATE', [$loanId]);
 
-        $error = (new LoanService())->validatePayment($loanId, $amountPaid, $installmentId);
+        $error = (new LoanService())->validatePayment($loanId, $amounts);
         if ($error !== null) {
             $db->transRollback();
-            session()->setFlashdata('error', $error);
-            return redirect()->to('/member/loans/' . $loanId . '/installments');
+            return $this->paymentResponse($loanId, $loan['loan_status'], false, $error);
         }
+
+        $total = round(array_sum($amounts), 2);
 
         $frId = model(FinancialRecordModel::class)->insert([
             'account_id'      => $loan['account_id'],
             'record_type'     => 'Loan Payment',
             'transaction_date'=> $today,
-            'amount'          => $amountPaid,
+            'amount'          => $total,
             'approval_status' => 'Pending',
             'processed_by'    => (int) session()->get('user_id'),
             'reference_id'    => $loanId,
@@ -496,33 +520,32 @@ class Member extends BaseController
         $db->table('loan_payments')->insert([
             'loan_id'             => $loanId,
             'payment_date'        => $today,
-            'amount_paid'         => $amountPaid,
-            'payment_method'      => $method,
+            'amount_paid'         => $total,
             'financial_record_id' => $frId ?: null,
-            'principal_amount'    => $amountPaid,
+            'principal_amount'    => $total,
             'interest_amount'     => 0.00,
             'payment_status'      => 'Pending',
             'created_at'          => $now,
             'updated_at'          => $now,
         ]);
-
         $paymentId = $db->insertID();
 
-        $db->table('loan_payment_installments')->insert([
-            'payment_id'     => $paymentId,
-            'installment_id' => $installmentId,
-            'amount_applied' => $amountPaid,
-        ]);
+        foreach ($amounts as $id => $amount) {
+            $db->table('loan_payment_installments')->insert([
+                'payment_id'     => $paymentId,
+                'installment_id' => $id,
+                'amount_applied' => $amount,
+            ]);
+        }
 
         $db->transComplete();
 
         if (! $db->transStatus()) {
-            session()->setFlashdata('error', 'Failed to submit payment. Please try again.');
-            return redirect()->to('/member/loans/' . $loanId . '/installments');
+            return $this->paymentResponse($loanId, $loan['loan_status'], false, 'Failed to submit payment. Please try again.');
         }
 
-        session()->setFlashdata('success', 'Payment submitted and pending approval.');
-        return redirect()->to('/member/loans/' . $loanId . '/installments');
+        return $this->paymentResponse($loanId, $loan['loan_status'], true,
+            'Payment of PHP ' . number_format($total, 2) . ' submitted and waiting for approval.');
     }
 
     // =========================================================================
@@ -658,7 +681,7 @@ class Member extends BaseController
         $db       = db_connect();
 
         $payments = $db->table('loan_payments lp')
-                       ->select('lp.payment_id AS id, lp.loan_id, lp.amount_paid, lp.payment_method, lp.payment_date, lp.payment_status AS status, l.loan_amount, l.loan_status, ca.account_number, (SELECT COALESCE(SUM(li.amount_paid), 0) FROM loan_installments li WHERE li.loan_id = l.loan_id) AS total_paid, (l.loan_amount + l.interest_amount) AS total_payable', false)
+                       ->select('lp.payment_id AS id, lp.loan_id, lp.amount_paid, lp.payment_date, lp.payment_status AS status, l.loan_amount, l.loan_status, ca.account_number, (SELECT COALESCE(SUM(li.amount_paid), 0) FROM loan_installments li WHERE li.loan_id = l.loan_id) AS total_paid, (l.loan_amount + l.interest_amount) AS total_payable', false)
                        ->join('loans l', 'l.loan_id = lp.loan_id')
                        ->join('cooperative_accounts ca', 'ca.account_id = l.account_id')
                        ->where('ca.member_id', $memberId)
