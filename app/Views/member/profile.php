@@ -112,8 +112,8 @@
     <?php if (in_array('Pending', array_column($accounts ?? [], 'account_status'), true)): ?>
         <div class="card-footer bg-warning-subtle small" role="note">
             <i class="fa-solid fa-hourglass-half me-1"></i><strong>Account not active yet:</strong>
-            contribute between <strong>₱300</strong> (minimum) and <strong>₱3,600</strong> (maximum) per contribution, following the cooperative's business rules.
-            The account activates once the amount shown in Status is paid and approved.
+            pay the amount shown in Status (from January up to the month the account was opened, ₱300 a month) to activate it.
+            You can pay it in one contribution of up to ₱3,600. Once active, each contribution can be ₱300 to ₱3,600.
             <a href="<?= base_url('member/contributions') ?>" class="alert-link">Contribute now</a>
         </div>
     <?php endif; ?>
@@ -132,11 +132,7 @@
             <form method="post" action="<?= base_url('member/profile/accounts/add') ?>">
                 <?= csrf_field() ?>
                 <div class="modal-body p-4">
-                    <div class="alert alert-info small py-2 mb-3" role="note">
-                        <i class="fa-solid fa-circle-info me-1"></i><strong>Before your new account is activated:</strong>
-                        each contribution must be at least <strong>₱300</strong> and at most <strong>₱3,600</strong> (cooperative business rule).
-                        The account becomes active once ₱300 is contributed and approved.
-                    </div>
+                    <?= view('partials/activation_rule') ?>
                     <label for="open_account_type" class="form-label fw-semibold small">Account Type <span class="text-danger">*</span></label>
                     <select class="form-select" id="open_account_type" name="account_type" required>
                         <option value="" disabled selected>Select account type</option>
