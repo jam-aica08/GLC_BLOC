@@ -16,7 +16,7 @@ CREATE TABLE `analytics_snapshots` (
 ) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 INSERT INTO `analytics_snapshots` VALUES
-(1,'2026-01-31','Monthly','{\"total_contributions\":300,\"total_loans\":0,\"total_dividends\":0,\"active_members\":1,\"active_accounts\":1}','2026-10-16 04:48:42','2026-10-16 04:48:42');
+(1,'2026-01-31','Monthly','{\"total_contributions\":300,\"total_loans\":0,\"total_dividends\":0,\"active_members\":1,\"active_accounts\":1}','2026-10-16 06:17:00','2026-10-16 06:17:00');
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
 CREATE TABLE `blockchain_ledger` (
@@ -35,7 +35,7 @@ CREATE TABLE `blockchain_ledger` (
 ) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 INSERT INTO `blockchain_ledger` VALUES
-(1,1,'00e6f1769de88c87d8720fd506fa669740e8419465fc3f55864f523bb5f9e63a','0000000000000000000000000000000000000000000000000000000000000000',1,'2026-10-16 04:48:42','Valid');
+(1,1,'23a169db3e8188135645b2466f0b55dfd52863354b1a0da833531a208a70ddf7',NULL,1,'2026-10-16 06:17:00','Valid');
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
 CREATE TABLE `ci_sessions` (
@@ -68,7 +68,7 @@ CREATE TABLE `contributions` (
 ) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 INSERT INTO `contributions` VALUES
-(1,1,'2026-01',300.00,'2026-01-05','Approved',1,'2026-10-16 04:48:42','2026-10-16 04:48:42');
+(1,1,'2026-01',300.00,'2026-01-05','Approved',1,'2026-10-16 06:17:00','2026-10-16 06:17:00');
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
 CREATE TABLE `cooperative_accounts` (
@@ -142,7 +142,7 @@ CREATE TABLE `financial_records` (
 ) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 INSERT INTO `financial_records` VALUES
-(1,1,'Contribution','2026-01-05',300.00,'Approved',1,1,'2026-01-06 09:00:00',1,'2026-01-06 10:00:00',NULL,'2026-10-16 04:48:42','2026-10-16 04:48:42');
+(1,1,'Contribution','2026-01-05',300.00,'Approved',1,1,'2026-01-06 09:00:00',1,'2026-01-06 10:00:00',NULL,'2026-10-16 06:17:00','2026-10-16 06:17:00');
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
 CREATE TABLE `loan_installments` (
@@ -264,13 +264,13 @@ CREATE TABLE `migrations` (
 ) ENGINE=InnoDB AUTO_INCREMENT=8 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 INSERT INTO `migrations` VALUES
-(1,'2026-10-12-000001','App\\Database\\Migrations\\CreateGlcBlocSchema','default','App',1792126122,1),
-(2,'2026-10-12-000002','App\\Database\\Migrations\\CreateCiSessions','default','App',1792126122,1),
-(3,'2026-10-14-000003','App\\Database\\Migrations\\RemoveLoanPenalties','default','App',1792126122,1),
-(4,'2026-10-14-000004','App\\Database\\Migrations\\AccountJoiningAndPaymentMethod','default','App',1792126122,1),
-(5,'2026-10-14-000005','App\\Database\\Migrations\\InstallmentBalances','default','App',1792126122,1),
-(6,'2026-10-14-000006','App\\Database\\Migrations\\EnsureSchema','default','App',1792126122,1),
-(7,'2026-10-16-000007','App\\Database\\Migrations\\InstallmentCarryOver','default','App',1792126122,1);
+(1,'2026-10-12-000001','App\\Database\\Migrations\\CreateGlcBlocSchema','default','App',1792131420,1),
+(2,'2026-10-12-000002','App\\Database\\Migrations\\CreateCiSessions','default','App',1792131420,1),
+(3,'2026-10-14-000003','App\\Database\\Migrations\\RemoveLoanPenalties','default','App',1792131420,1),
+(4,'2026-10-14-000004','App\\Database\\Migrations\\AccountJoiningAndPaymentMethod','default','App',1792131420,1),
+(5,'2026-10-14-000005','App\\Database\\Migrations\\InstallmentBalances','default','App',1792131420,1),
+(6,'2026-10-14-000006','App\\Database\\Migrations\\EnsureSchema','default','App',1792131420,1),
+(7,'2026-10-16-000007','App\\Database\\Migrations\\InstallmentCarryOver','default','App',1792131420,1);
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
 CREATE TABLE `roles` (
@@ -300,6 +300,6 @@ CREATE TABLE `users` (
 ) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 INSERT INTO `users` VALUES
-(1,1,'admin','admin@glcbloc.com','$2y$10$PXSNVKAo7ahjRzuoixhPAe5ZNevz0R7Qbw5CtqFHyiI9AU3Pl/vuS','Active'),
-(2,2,'jdoe','jdoe@example.com','$2y$10$whHDxLmmwbN6vKkWii4xaOzZb95l4YM43vBqN8VTNEGNVyAdqS/oS','Active');
+(1,1,'admin','admin@glcbloc.com','$2y$10$YpvQwXVsySEr95OX5bDZruwX1dLQZ/lLCQ0wRE9UbfUdt5f845FQq','Active'),
+(2,2,'jdoe','jdoe@example.com','$2y$10$Ctu15ZB3M.IMTstDoljIt.iTZ5rtUA0C1f4Pynb/L6QAmCOWZQz.q','Active');
 SET FOREIGN_KEY_CHECKS=1;
