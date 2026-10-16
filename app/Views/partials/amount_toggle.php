@@ -10,6 +10,7 @@
     try { hidden = localStorage.getItem(KEY) === '1'; } catch (e) {}
 
     function render() {
+        document.documentElement.classList.toggle('amounts-hidden', hidden);
         amounts.forEach(function (el) {
             if (el.dataset.value === undefined) el.dataset.value = el.textContent;
             el.textContent = hidden ? '₱ ••••••' : el.dataset.value;
