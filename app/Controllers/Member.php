@@ -601,12 +601,14 @@ class Member extends BaseController
         return view('member/profile', [
             'member'   => $member,
             'accounts' => $accounts,
+            'requests'    => (new \App\Services\AccountRequestService())->forMember($memberId),
+            'hasPendingRequest' => (new \App\Services\AccountRequestService())->hasPending($memberId),
         ]);
     }
 
     /**
-     * POST: the member opens another account. Like every account it becomes
-     * active once January up to its opening month is paid (PHP 3,000 in October).
+     * POST: the member asks for another account. An admin approves the
+     * request (the account is then opened) or rejects it.
      */
     public function openAccount()
     {
@@ -628,15 +630,21 @@ class Member extends BaseController
             return redirect()->to('/member/profile');
         }
 
-        $accountNumber = model(CooperativeAccountModel::class)->openAccount($memberId, $accountType);
+        $requests = new \App\Services\AccountRequestService();
+        if (! $requests->available()) {
+            session()->setFlashdata('error', 'Account requests are not available yet. Please try again later.');
+            return redirect()->to('/member/profile');
+        }
+        if ($requests->hasPending($memberId)) {
+            session()->setFlashdata('error', 'You already have a request waiting for approval.');
+            return redirect()->to('/member/profile');
+        }
 
-        session()->setFlashdata('success', "Account {$accountNumber} added. It is activated once PHP " . number_format(CooperativeAccountModel::joinAmount(), 2) . " is paid.");
+        $requests->create($memberId, $accountType);
+
+        session()->setFlashdata('success', "Your request for a {$accountType} account was sent. You can pay for it once an admin approves it.");
         return redirect()->to('/member/profile');
     }
-
-    // =========================================================================
-    // Payments
-    // =========================================================================
 
     public function payments(): string
     {

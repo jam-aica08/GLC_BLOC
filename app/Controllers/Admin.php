@@ -108,6 +108,7 @@ class Admin extends BaseController
             'pendingContributions' => $pendingContributions,
             'pendingLoans'         => $pendingLoans,
             'pendingPayments'      => $pendingPayments,
+            'pendingRequests'      => (new \App\Services\AccountRequestService())->pendingCount(),
             'overview'             => (new \App\Services\DashboardService())->build(null),
         ]);
     }
@@ -158,7 +159,11 @@ class Admin extends BaseController
         }
         unset($member);
 
-        return view('admin/members', ['members' => $members, 'search' => $search]);
+        return view('admin/members', [
+            'members'         => $members,
+            'search'          => $search,
+            'accountRequests' => (new \App\Services\AccountRequestService())->pending(),
+        ]);
     }
 
     /**
@@ -314,6 +319,46 @@ class Admin extends BaseController
 
         session()->setFlashdata('success', "{$accountType} account {$accountNumber} added for {$member['first_name']} {$member['last_name']}. "
             . 'The opening contribution of PHP ' . number_format($opening, 2) . ' is waiting for approval in Contributions.');
+        return redirect()->to('/admin/members');
+    }
+
+    /**
+     * POST: approve a member's request for a new account; the account is
+     * opened as Pending from this month.
+     */
+    public function approveAccountRequest(int $id)
+    {
+        $this->requireAdmin();
+
+        if (! $this->request->is('post')) {
+            return redirect()->to('/admin/members');
+        }
+
+        [$accountNumber, $error] = (new \App\Services\AccountRequestService())->approve($id, (int) session()->get('user_id'));
+        if ($error !== null) {
+            session()->setFlashdata('error', $error);
+        } else {
+            session()->setFlashdata('success', "Request approved. Account {$accountNumber} is open and becomes active once PHP "
+                . number_format(CooperativeAccountModel::joinAmount(), 2) . ' (January to ' . date('F') . ') is paid.');
+        }
+
+        return redirect()->to('/admin/members');
+    }
+
+    /**
+     * POST: reject a member's request for a new account.
+     */
+    public function rejectAccountRequest(int $id)
+    {
+        $this->requireAdmin();
+
+        if (! $this->request->is('post')) {
+            return redirect()->to('/admin/members');
+        }
+
+        $rejected = (new \App\Services\AccountRequestService())->reject($id, (int) session()->get('user_id'));
+        session()->setFlashdata($rejected ? 'success' : 'error', $rejected ? 'Request rejected.' : 'This request is no longer waiting for approval.');
+
         return redirect()->to('/admin/members');
     }
 

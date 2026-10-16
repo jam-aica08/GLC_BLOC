@@ -39,6 +39,9 @@ class DatabaseUpdates
             if ($db->fieldExists('penalty_amount', 'loan_installments')) {
                 $status['problems'][] = 'old penalty columns are still present';
             }
+            if (! $db->tableExists('account_requests', false)) {
+                $status['problems'][] = 'account_requests table is missing';
+            }
         } catch (\Throwable $e) {
             log_message('error', 'DatabaseUpdates::status failed: ' . $e->getMessage());
             $status['error'] = $e->getMessage();
@@ -50,8 +53,8 @@ class DatabaseUpdates
     /**
      * Bring the tables in line with the current code: no penalty columns,
      * 'Pending' account status, PHP 300 monthly contribution, payment_method,
-     * installment carry-over (carried_over column, 'Partial' status).
-     * Safe to run any number of times.
+     * installment carry-over (carried_over column, 'Partial' status),
+     * account_requests table. Safe to run any number of times.
      */
     public static function repairSchema($db, $forge): void
     {
@@ -85,6 +88,25 @@ class DatabaseUpdates
             ]);
         }
         $db->query("ALTER TABLE loan_installments MODIFY payment_status ENUM('Upcoming','Due','Late','Paid','Partial') NOT NULL DEFAULT 'Upcoming'");
+
+        // Members ask for a new account here; an admin approves or rejects it.
+        if (! $db->tableExists('account_requests', false)) {
+            $forge->addField([
+                'request_id'   => ['type' => 'INT', 'unsigned' => true, 'auto_increment' => true],
+                'member_id'    => ['type' => 'INT', 'unsigned' => true],
+                'account_type' => ['type' => 'ENUM', 'constraint' => ['Pioneer', 'Basic']],
+                'status'       => ['type' => 'ENUM', 'constraint' => ['Pending', 'Approved', 'Rejected'], 'default' => 'Pending'],
+                'account_id'   => ['type' => 'INT', 'unsigned' => true, 'null' => true],
+                'reviewed_by'  => ['type' => 'INT', 'unsigned' => true, 'null' => true],
+                'reviewed_at'  => ['type' => 'DATETIME', 'null' => true],
+                'created_at'   => ['type' => 'DATETIME', 'null' => true],
+                'updated_at'   => ['type' => 'DATETIME', 'null' => true],
+            ]);
+            $forge->addKey('request_id', true);
+            $forge->addKey(['member_id', 'status']);
+            $forge->addForeignKey('member_id', 'members', 'member_id', 'CASCADE', 'CASCADE', 'fk_account_requests_member');
+            $forge->createTable('account_requests', true);
+        }
 
         $db->resetDataCache();
     }

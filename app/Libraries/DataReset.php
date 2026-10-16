@@ -53,6 +53,7 @@ class DataReset
                     'user_id'
                 );
 
+                $deleted['account_requests']     = self::wipe($db, 'account_requests');
                 $deleted['cooperative_accounts'] = self::wipe($db, 'cooperative_accounts');
                 $deleted['members']              = self::wipe($db, 'members');
 
