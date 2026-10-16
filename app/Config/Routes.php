@@ -22,6 +22,8 @@ $routes->group('admin', ['filter' => 'auth:admin'], function ($routes) {
     $routes->post('members/deactivate/(:num)', 'Admin::deactivateMember/$1');
     $routes->post('members/reactivate/(:num)', 'Admin::reactivateMember/$1');
     $routes->post('members/(:num)/accounts/add', 'Admin::addAccount/$1');
+    $routes->post('members/requests/(:num)/approve', 'Admin::approveAccountRequest/$1');
+    $routes->post('members/requests/(:num)/reject', 'Admin::rejectAccountRequest/$1');
 
     // Contributions
     $routes->get('contributions', 'Admin::contributions');
