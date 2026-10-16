@@ -2,6 +2,7 @@
 
 namespace App\Controllers;
 
+use App\Libraries\DataReset;
 use App\Libraries\DatabaseUpdates;
 use App\Models\UserModel;
 use CodeIgniter\HTTP\RedirectResponse;
@@ -69,6 +70,41 @@ class Settings extends BaseController
         }
 
         return redirect()->to($this->home())->with('success', 'Database is up to date.');
+    }
+
+    /**
+     * POST (admin): delete all loans, contributions, payments, dividends and
+     * ledger entries (optionally members too). Needs "RESET" and the admin's password.
+     */
+    public function resetData(): RedirectResponse
+    {
+        if ($this->role() !== 'admin') {
+            return redirect()->to('/login');
+        }
+
+        $user = model(UserModel::class)->find((int) session()->get('user_id'));
+        if (trim((string) $this->request->getPost('confirm')) !== 'RESET') {
+            return redirect()->to($this->home())->with('error', 'Type RESET in the box to confirm.');
+        }
+        if (! $user || ! password_verify((string) $this->request->getPost('password'), $user['password_hash'])) {
+            return redirect()->to($this->home())->with('error', 'Your password is incorrect. Nothing was deleted.');
+        }
+
+        $includeMembers = $this->request->getPost('scope') === 'all';
+        $result         = DataReset::run($includeMembers);
+        if (is_string($result)) {
+            return redirect()->to($this->home())->with('error', 'Reset failed, nothing was deleted: ' . $result);
+        }
+
+        $summary = [];
+        foreach ($result as $table => $rows) {
+            if ($rows > 0) {
+                $summary[] = str_replace('_', ' ', $table) . ": {$rows}";
+            }
+        }
+
+        return redirect()->to($this->home())->with('success', 'Data reset complete. Deleted — '
+            . ($summary === [] ? 'nothing (already empty).' : implode(', ', $summary) . '.'));
     }
 
     public function changePassword(): RedirectResponse
