@@ -57,6 +57,7 @@ class Member extends BaseController
         $db       = db_connect();
 
         // Member's cooperative accounts
+        model(CooperativeAccountModel::class)->syncStatuses();
         $accounts = $db->table('cooperative_accounts')
                        ->where('member_id', $memberId)
                        ->get()
@@ -85,6 +86,7 @@ class Member extends BaseController
         $memberId   = $this->requireMember();
         $db         = db_connect();
 
+        model(CooperativeAccountModel::class)->syncStatuses();
         $accounts   = $db->table('cooperative_accounts')
                          ->where('member_id', $memberId)
                          ->get()
@@ -148,6 +150,7 @@ class Member extends BaseController
 
         // Ownership check: the account must belong to this member
         $db      = db_connect();
+        model(CooperativeAccountModel::class)->syncStatuses();
         $account = $db->table('cooperative_accounts')
                       ->where('account_id', $accountId)
                       ->where('member_id', $memberId)
@@ -297,6 +300,7 @@ class Member extends BaseController
 
         // Ownership check
         $db      = db_connect();
+        model(CooperativeAccountModel::class)->syncStatuses();
         $account = $db->table('cooperative_accounts')
                       ->where('account_id', $accountId)
                       ->where('member_id', $memberId)
@@ -582,6 +586,7 @@ class Member extends BaseController
         $memberModel = model(MemberModel::class);
         $member      = $memberModel->getMemberWithUser($memberId);
 
+        model(CooperativeAccountModel::class)->syncStatuses();
         $accounts = $db->table('cooperative_accounts')
                        ->where('member_id', $memberId)
                        ->orderBy('account_id', 'ASC')

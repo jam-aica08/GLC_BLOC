@@ -41,6 +41,9 @@ class DataReset
                 $deleted[$table] = self::wipe($db, $table);
             }
 
+            // With every contribution gone, no account has paid to be active.
+            $db->table('cooperative_accounts')->where('account_status', 'Active')->update(['account_status' => 'Pending']);
+
             if ($includeMembers) {
                 $memberUserIds = array_column(
                     $db->table('users u')->select('u.user_id')
