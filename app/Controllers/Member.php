@@ -623,7 +623,7 @@ class Member extends BaseController
 
         $accountNumber = model(CooperativeAccountModel::class)->openAccount($memberId, $accountType);
 
-        session()->setFlashdata('success', "Account {$accountNumber} added. It becomes active once you contribute PHP 300 to it.");
+        session()->setFlashdata('success', "Account {$accountNumber} added. Contribute at least PHP 300 (up to PHP 3,600 per contribution) to activate it.");
         return redirect()->to('/member/profile');
     }
 
