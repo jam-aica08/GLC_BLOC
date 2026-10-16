@@ -687,7 +687,7 @@ class Admin extends BaseController
         $db       = db_connect();
 
         $query = $db->table('loan_payments lp')
-                    ->select("lp.payment_id AS id, lp.loan_id, lp.amount_paid, lp.payment_date, lp.payment_status AS status, lp.financial_record_id, l.loan_amount, l.loan_status, m.member_number, ca.account_number, CONCAT(m.first_name, ' ', m.last_name) AS member_name, (SELECT COALESCE(SUM(li.amount_paid), 0) FROM loan_installments li WHERE li.loan_id = l.loan_id) AS total_paid, (l.loan_amount + l.interest_amount) AS total_payable, fr.first_approved_by, u1.username AS approver1_name", false)
+                    ->select("lp.payment_id AS id, lp.loan_id, lp.amount_paid, lp.payment_date, lp.payment_status AS status, lp.financial_record_id, l.loan_amount, l.loan_status, m.member_number, ca.account_number, CONCAT(m.first_name, ' ', m.last_name) AS member_name, (SELECT COALESCE(SUM(li.amount_paid), 0) FROM loan_installments li WHERE li.loan_id = l.loan_id) AS total_paid, (l.loan_amount + l.interest_amount) AS total_payable, fr.first_approved_by, u1.username AS approver1_name, (SELECT GROUP_CONCAT(CONCAT('Month ', li2.installment_number, ': ₱', FORMAT(lpi.amount_applied, 2)) ORDER BY li2.installment_number SEPARATOR ', ') FROM loan_payment_installments lpi JOIN loan_installments li2 ON li2.installment_id = lpi.installment_id WHERE lpi.payment_id = lp.payment_id) AS months", false)
                     ->join('financial_records fr', 'fr.financial_record_id = lp.financial_record_id', 'left')
                     ->join('users u1', 'u1.user_id = fr.first_approved_by', 'left')
                     ->join('loans l', 'l.loan_id = lp.loan_id', 'left')
@@ -737,6 +737,11 @@ class Admin extends BaseController
 
         if ($payment['payment_status'] !== 'Pending') {
             session()->setFlashdata('error', 'Payment is no longer pending.');
+            return redirect()->to('/admin/payments');
+        }
+
+        if ($problem = $this->paymentOverBalance($payment)) {
+            session()->setFlashdata('error', $problem);
             return redirect()->to('/admin/payments');
         }
 
@@ -863,6 +868,21 @@ class Admin extends BaseController
     }
 
     /**
+     * A payment larger than what is left on its loan cannot be applied in
+     * full (for example an old duplicate), so it must be rejected instead.
+     */
+    private function paymentOverBalance(array $payment): ?string
+    {
+        $balance = (new LoanService())->schedule((int) $payment['loan_id'])['summary']['balance'];
+        if ((float) $payment['amount_paid'] > $balance + 0.004) {
+            return 'Payment #' . $payment['payment_id'] . ' (PHP ' . number_format((float) $payment['amount_paid'], 2)
+                 . ') is more than the remaining balance of loan #' . $payment['loan_id']
+                 . ' (PHP ' . number_format($balance, 2) . '). Please reject it.';
+        }
+        return null;
+    }
+
+    /**
      * Mark an approved payment and apply each month's amount to the loan
      * schedule. See LoanService::applyPayment().
      */
@@ -961,6 +981,14 @@ class Admin extends BaseController
         if ($fr['approval_status'] !== 'Pending') {
             session()->setFlashdata('error', 'Record is no longer pending.');
             return redirect()->to('/admin/financial-records');
+        }
+
+        if ($fr['record_type'] === 'Loan Payment') {
+            $payment = $db->table('loan_payments')->where('financial_record_id', $id)->get()->getRowArray();
+            if ($payment && ($problem = $this->paymentOverBalance($payment))) {
+                session()->setFlashdata('error', $problem);
+                return redirect()->to('/admin/financial-records');
+            }
         }
 
         $db->transStart();
