@@ -1,6 +1,7 @@
 <script>
 // Adds a live search box to every card that holds a data table.
 document.querySelectorAll('.card').forEach(function (card) {
+    if (card.hasAttribute('data-no-search')) return;
     const table = card.querySelector('table');
     if (!table || !table.tBodies.length) return;
     const rows = Array.from(table.tBodies[0].rows).filter(r => !r.querySelector('td[colspan]'));

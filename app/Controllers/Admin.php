@@ -687,7 +687,7 @@ class Admin extends BaseController
         $db       = db_connect();
 
         $query = $db->table('loan_payments lp')
-                    ->select("lp.payment_id AS id, lp.loan_id, lp.amount_paid, lp.payment_method, lp.payment_date, lp.payment_status AS status, lp.financial_record_id, l.loan_amount, l.loan_status, m.member_number, ca.account_number, CONCAT(m.first_name, ' ', m.last_name) AS member_name, (SELECT COALESCE(SUM(li.amount_paid), 0) FROM loan_installments li WHERE li.loan_id = l.loan_id) AS total_paid, (l.loan_amount + l.interest_amount) AS total_payable, fr.first_approved_by, u1.username AS approver1_name", false)
+                    ->select("lp.payment_id AS id, lp.loan_id, lp.amount_paid, lp.payment_date, lp.payment_status AS status, lp.financial_record_id, l.loan_amount, l.loan_status, m.member_number, ca.account_number, CONCAT(m.first_name, ' ', m.last_name) AS member_name, (SELECT COALESCE(SUM(li.amount_paid), 0) FROM loan_installments li WHERE li.loan_id = l.loan_id) AS total_paid, (l.loan_amount + l.interest_amount) AS total_payable, fr.first_approved_by, u1.username AS approver1_name", false)
                     ->join('financial_records fr', 'fr.financial_record_id = lp.financial_record_id', 'left')
                     ->join('users u1', 'u1.user_id = fr.first_approved_by', 'left')
                     ->join('loans l', 'l.loan_id = lp.loan_id', 'left')
@@ -863,8 +863,8 @@ class Admin extends BaseController
     }
 
     /**
-     * Mark an approved payment and apply it to the loan schedule (month by
-     * month, with carry-over). See LoanService::applyPayment().
+     * Mark an approved payment and apply each month's amount to the loan
+     * schedule. See LoanService::applyPayment().
      */
     private function applyLoanPayment(array $payment): void
     {
@@ -873,19 +873,12 @@ class Admin extends BaseController
            ->where('payment_id', $payment['payment_id'])
            ->update(['payment_status' => 'Approved', 'updated_at' => date('Y-m-d H:i:s')]);
 
-        $start = $db->table('loan_payment_installments lpi')
-                    ->select('lpi.installment_id')
-                    ->join('loan_installments li', 'li.installment_id = lpi.installment_id')
-                    ->where('lpi.payment_id', $payment['payment_id'])
-                    ->orderBy('li.installment_number', 'ASC')
-                    ->limit(1)->get()->getRowArray();
+        $allocations = [];
+        foreach ($db->table('loan_payment_installments')->where('payment_id', $payment['payment_id'])->get()->getResultArray() as $row) {
+            $allocations[(int) $row['installment_id']] = ($allocations[(int) $row['installment_id']] ?? 0) + (float) $row['amount_applied'];
+        }
 
-        (new LoanService())->applyPayment(
-            (int) $payment['loan_id'],
-            (int) ($start['installment_id'] ?? 0),
-            (float) $payment['amount_paid'],
-            $payment['payment_date']
-        );
+        (new LoanService())->applyPayment((int) $payment['loan_id'], $allocations, $payment['payment_date']);
     }
 
     /**
