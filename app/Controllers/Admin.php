@@ -143,6 +143,7 @@ class Admin extends BaseController
         $members = $query->get()->getResultArray();
 
         $accountModel     = model(CooperativeAccountModel::class);
+        $accountModel->syncStatuses();
         $accountsByMember = [];
         $accounts = $db->table('cooperative_accounts')
                        ->orderBy('account_id', 'ASC')
@@ -928,7 +929,7 @@ class Admin extends BaseController
             $db->table('contributions')
                ->where('financial_record_id', $frId)
                ->update(['payment_status' => 'Approved', 'updated_at' => date('Y-m-d H:i:s')]);
-            model(CooperativeAccountModel::class)->activateIfComplete((int) $fr['account_id']);
+            model(CooperativeAccountModel::class)->syncStatuses();
         } elseif ($fr['record_type'] === 'Loan Payment') {
             $payment = $db->table('loan_payments')->where('financial_record_id', $frId)->get()->getRowArray();
             if ($payment && $payment['payment_status'] === 'Pending') {
@@ -1208,6 +1209,7 @@ class Admin extends BaseController
     private function planDividends(int $year): array
     {
         $db = db_connect();
+        model(CooperativeAccountModel::class)->syncStatuses();
 
         $profitPool = (float) ($db->table('loans')
             ->selectSum('interest_amount')
