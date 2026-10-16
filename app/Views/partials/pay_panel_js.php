@@ -25,7 +25,7 @@
         });
         form.querySelector('.js-pay-total').textContent = peso(total);
         form.querySelector('.js-pay-note').textContent = notes.join(' ');
-        form.querySelector('.js-pay-submit').disabled = total <= 0;
+        form.querySelector('.js-pay-submit').disabled = total <= 0 || form.hasAttribute('data-locked');
     }
 
     document.addEventListener('change', function (e) {
