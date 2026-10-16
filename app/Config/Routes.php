@@ -30,6 +30,7 @@ $routes->group('admin', ['filter' => 'auth:admin'], function ($routes) {
 
     // Loans
     $routes->get('loans', 'Admin::loans');
+    $routes->get('loans/(:num)/schedule', 'Admin::loanSchedule/$1');
     $routes->post('loans/approve/(:num)', 'Admin::approveLoan/$1');
     $routes->post('loans/reject/(:num)', 'Admin::rejectLoan/$1');
 
