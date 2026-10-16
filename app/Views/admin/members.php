@@ -205,8 +205,8 @@
                         </div>
                         <div class="col-md-6">
                             <label for="opening_contribution" class="form-label fw-semibold small">Opening Contribution (₱) <span class="text-danger">*</span></label>
-                            <input type="number" class="form-control" id="opening_contribution" name="opening_contribution" min="<?= \App\Models\CooperativeAccountModel::joinAmount() ?>" max="3600" step="0.01" value="<?= \App\Models\CooperativeAccountModel::joinAmount() ?>" required>
-                            <div class="form-text">At least ₱<?= number_format(\App\Models\CooperativeAccountModel::joinAmount(), 2) ?> (January–<?= date('F') ?>) to activate, up to ₱3,600. Approved in Contributions.</div>
+                            <input type="number" class="form-control" id="opening_contribution" name="opening_contribution" min="300" max="3600" step="0.01" value="<?= \App\Models\CooperativeAccountModel::joinAmount() ?>" required>
+                            <div class="form-text">₱<?= number_format(\App\Models\CooperativeAccountModel::joinAmount(), 2) ?> (January–<?= date('F') ?>) activates the account; it can be paid in parts of ₱300 to ₱3,600. Approved in Contributions.</div>
                         </div>
                     </div>
                 </div>
@@ -243,8 +243,8 @@
                     </select>
                     <div class="mt-3">
                         <label for="new_opening_contribution" class="form-label fw-semibold small">Opening Contribution (₱) <span class="text-danger">*</span></label>
-                        <input type="number" class="form-control" id="new_opening_contribution" name="opening_contribution" min="<?= \App\Models\CooperativeAccountModel::joinAmount() ?>" max="3600" step="0.01" value="<?= \App\Models\CooperativeAccountModel::joinAmount() ?>" required>
-                        <div class="form-text">At least ₱<?= number_format(\App\Models\CooperativeAccountModel::joinAmount(), 2) ?> (January–<?= date('F') ?>) to activate, up to ₱3,600. Approved in Contributions.</div>
+                        <input type="number" class="form-control" id="new_opening_contribution" name="opening_contribution" min="300" max="3600" step="0.01" value="<?= \App\Models\CooperativeAccountModel::joinAmount() ?>" required>
+                        <div class="form-text">₱<?= number_format(\App\Models\CooperativeAccountModel::joinAmount(), 2) ?> (January–<?= date('F') ?>) activates the account; it can be paid in parts of ₱300 to ₱3,600. Approved in Contributions.</div>
                     </div>
                 </div>
                 <div class="modal-footer">
