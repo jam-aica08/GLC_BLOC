@@ -24,6 +24,8 @@
     </div>
 <?php endif; ?>
 
+<?= view('partials/list_search', ['action' => 'admin/contributions', 'search' => $search, 'filterStatus' => $filterStatus, 'placeholder' => 'Search by member name, member #, account # or contribution ID']) ?>
+
 <!-- Filter Tabs -->
 <div class="card mb-3">
     <div class="card-body py-2 px-3">
@@ -51,10 +53,10 @@
 </div>
 
 <!-- Contributions Table -->
-<div class="card">
+<div class="card" data-no-search>
     <div class="card-header d-flex justify-content-between align-items-center">
         <span><i class="fa-solid fa-piggy-bank me-2" style="color:#f0a500;"></i>Contribution Records</span>
-        <span class="badge bg-secondary"><?= count($contributions ?? []) ?> record(s)</span>
+        <span class="badge bg-secondary"><?= (int) $page['total'] ?> record(s)</span>
     </div>
     <div class="card-body p-0">
         <div class="table-responsive">
@@ -142,6 +144,7 @@
             </table>
         </div>
     </div>
+    <?= view('partials/pager', ['page' => $page, 'action' => 'admin/contributions', 'query' => ['status' => $filterStatus, 'q' => $search]]) ?>
 </div>
 
 <?= $this->endSection() ?>

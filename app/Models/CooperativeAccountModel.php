@@ -17,6 +17,10 @@ class CooperativeAccountModel extends Model
     /** Pioneer accounts receive this much more (%) than a Basic share of dividends. */
     public const PIONEER_DIVIDEND_BONUS = 2.00;
 
+    /** Opening contribution allowed when an admin opens an account (PHP). */
+    public const OPENING_MIN = 300.00;
+    public const OPENING_MAX = 3600.00;
+
     protected $table            = 'cooperative_accounts';
     protected $primaryKey       = 'account_id';
     protected $useAutoIncrement = true;
@@ -208,6 +212,41 @@ class CooperativeAccountModel extends Model
         ]);
 
         return $accountNumber;
+    }
+
+    /**
+     * Record the opening contribution of a new account as a pending
+     * contribution. It counts toward activating the account once both
+     * admins approve it in Contributions.
+     */
+    public function recordOpeningContribution(string $accountNumber, float $amount, int $processedBy): void
+    {
+        $accountId = (int) $this->db->table($this->table)->select('account_id')
+                                    ->where('account_number', $accountNumber)
+                                    ->get()->getRowArray()['account_id'];
+        $now = date('Y-m-d H:i:s');
+
+        $this->db->table('financial_records')->insert([
+            'account_id'       => $accountId,
+            'record_type'      => 'Contribution',
+            'transaction_date' => date('Y-m-d'),
+            'amount'           => $amount,
+            'approval_status'  => 'Pending',
+            'processed_by'     => $processedBy,
+            'created_at'       => $now,
+            'updated_at'       => $now,
+        ]);
+
+        $this->db->table('contributions')->insert([
+            'account_id'          => $accountId,
+            'contribution_period' => date('Y-m'),
+            'amount'              => $amount,
+            'payment_date'        => date('Y-m-d'),
+            'payment_status'      => 'Pending',
+            'financial_record_id' => $this->db->insertID(),
+            'created_at'          => $now,
+            'updated_at'          => $now,
+        ]);
     }
 
     /**

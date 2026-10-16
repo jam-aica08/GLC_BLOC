@@ -39,6 +39,46 @@ class Admin extends BaseController
         }
     }
 
+    private const PER_PAGE = 15;
+
+    /**
+     * Run one page of a query. Returns the rows and the page numbers for partials/pager.
+     */
+    private function paginate(\CodeIgniter\Database\BaseBuilder $query): array
+    {
+        $total = $query->countAllResults(false);
+        $pages = max(1, (int) ceil($total / self::PER_PAGE));
+        $page  = min($pages, max(1, (int) $this->request->getGet('page')));
+        $rows  = $query->limit(self::PER_PAGE, ($page - 1) * self::PER_PAGE)->get()->getResultArray();
+
+        return [$rows, [
+            'page'  => $page,
+            'pages' => $pages,
+            'total' => $total,
+            'from'  => $total ? ($page - 1) * self::PER_PAGE + 1 : 0,
+            'to'    => ($page - 1) * self::PER_PAGE + count($rows),
+        ]];
+    }
+
+    /**
+     * Match a member by name, member #, account # or the record's own ID.
+     */
+    private function searchMemberColumns(\CodeIgniter\Database\BaseBuilder $query, string $search, string $idColumn): void
+    {
+        if ($search === '') {
+            return;
+        }
+
+        $query->groupStart()
+              ->like("CONCAT(m.first_name, ' ', m.last_name)", $search, 'both', null, true)
+              ->orLike('m.member_number', $search, 'both', null, true)
+              ->orLike('ca.account_number', $search, 'both', null, true);
+        if (ctype_digit(ltrim($search, '#'))) {
+            $query->orWhere($idColumn, (int) ltrim($search, '#'));
+        }
+        $query->groupEnd();
+    }
+
     // =========================================================================
     // Dashboard
     // =========================================================================
@@ -131,6 +171,12 @@ class Admin extends BaseController
             return redirect()->to('/admin/members');
         }
 
+        $opening = $this->openingContribution();
+        if (is_string($opening)) {
+            session()->setFlashdata('error', $opening);
+            return redirect()->to('/admin/members');
+        }
+
         $db = db_connect();
         $db->transStart();
 
@@ -181,7 +227,9 @@ class Admin extends BaseController
             if (! in_array($accountType, CooperativeAccountModel::ACCOUNT_TYPES, true)) {
                 $accountType = 'Basic';
             }
-            model(CooperativeAccountModel::class)->openAccount((int) $memberId, $accountType);
+            $accountModel  = model(CooperativeAccountModel::class);
+            $accountNumber = $accountModel->openAccount((int) $memberId, $accountType);
+            $accountModel->recordOpeningContribution($accountNumber, $opening, (int) session()->get('user_id'));
 
             $db->transComplete();
 
@@ -189,13 +237,31 @@ class Admin extends BaseController
                 throw new \RuntimeException('Transaction failed during member creation.');
             }
 
-            session()->setFlashdata('success', "Member {$memberNumber} created successfully.");
+            session()->setFlashdata('success', "Member {$memberNumber} created with account {$accountNumber}. "
+                . 'The opening contribution of PHP ' . number_format($opening, 2) . ' is waiting for approval in Contributions.');
         } catch (\Throwable $e) {
             $db->transRollback();
             session()->setFlashdata('error', 'Failed to add member: ' . $e->getMessage());
         }
 
         return redirect()->to('/admin/members');
+    }
+
+    /**
+     * The opening contribution typed on the Add Member / Add Account form,
+     * or an error message when it is outside PHP 300 – 3,600.
+     */
+    private function openingContribution(): float|string
+    {
+        $amount = round((float) $this->request->getPost('opening_contribution'), 2);
+        $min    = CooperativeAccountModel::OPENING_MIN;
+        $max    = CooperativeAccountModel::OPENING_MAX;
+
+        if ($amount < $min || $amount > $max) {
+            return 'The opening contribution must be between PHP ' . number_format($min, 2) . ' and PHP ' . number_format($max, 2) . '.';
+        }
+
+        return $amount;
     }
 
     /**
@@ -225,9 +291,26 @@ class Admin extends BaseController
             return redirect()->to('/admin/members');
         }
 
-        $accountNumber = model(CooperativeAccountModel::class)->openAccount($memberId, $accountType);
+        $opening = $this->openingContribution();
+        if (is_string($opening)) {
+            session()->setFlashdata('error', $opening);
+            return redirect()->to('/admin/members');
+        }
 
-        session()->setFlashdata('success', "{$accountType} account {$accountNumber} added for {$member['first_name']} {$member['last_name']}. It becomes active once PHP 300 is contributed to it.");
+        $db = db_connect();
+        $db->transStart();
+        $accountModel  = model(CooperativeAccountModel::class);
+        $accountNumber = $accountModel->openAccount($memberId, $accountType);
+        $accountModel->recordOpeningContribution($accountNumber, $opening, (int) session()->get('user_id'));
+        $db->transComplete();
+
+        if (! $db->transStatus()) {
+            session()->setFlashdata('error', 'Could not open the account. Please try again.');
+            return redirect()->to('/admin/members');
+        }
+
+        session()->setFlashdata('success', "{$accountType} account {$accountNumber} added for {$member['first_name']} {$member['last_name']}. "
+            . 'The opening contribution of PHP ' . number_format($opening, 2) . ' is waiting for approval in Contributions.');
         return redirect()->to('/admin/members');
     }
 
@@ -297,11 +380,17 @@ class Admin extends BaseController
             $query->where('c.payment_status', $filterStatus);
         }
 
-        $contributions = $query->get()->getResultArray();
+        $search = trim((string) $this->request->getGet('q'));
+        $this->searchMemberColumns($query, $search, 'c.contribution_id');
+        $query->orderBy('c.contribution_id', 'DESC');
+
+        [$contributions, $page] = $this->paginate($query);
 
         return view('admin/contributions', [
             'contributions' => $contributions,
             'filterStatus'  => $filterStatus,
+            'search'        => $search,
+            'page'          => $page,
         ]);
     }
 
@@ -491,11 +580,17 @@ class Admin extends BaseController
             $query->where('l.loan_status', $filterStatus);
         }
 
-        $loans = $query->get()->getResultArray();
+        $search = trim((string) $this->request->getGet('q'));
+        $this->searchMemberColumns($query, $search, 'l.loan_id');
+        $query->orderBy('l.loan_id', 'DESC');
+
+        [$loans, $page] = $this->paginate($query);
 
         return view('admin/loans', [
             'loans'        => $loans,
             'filterStatus' => $filterStatus,
+            'search'       => $search,
+            'page'         => $page,
         ]);
     }
 
@@ -517,14 +612,17 @@ class Admin extends BaseController
                             ->get()->getRowArray();
 
         if (! $loan) {
+            if ($this->request->isAJAX()) {
+                return '<div class="alert alert-danger mb-0">Loan not found.</div>';
+            }
             session()->setFlashdata('error', 'Loan not found.');
             return redirect()->to('/admin/loans');
         }
 
-        return view('admin/loan_schedule', [
-            'loan'     => $loan,
-            'schedule' => (new LoanService())->schedule($id),
-        ]);
+        $data = ['loan' => $loan, 'schedule' => (new LoanService())->schedule($id)];
+
+        // The Loans page opens the schedule in a pop-up window and only needs its contents.
+        return view($this->request->isAJAX() ? 'admin/loan_schedule_body' : 'admin/loan_schedule', $data);
     }
 
     public function approveLoan(int $id)
