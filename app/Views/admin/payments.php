@@ -58,6 +58,7 @@
                         <th class="py-3">Account #</th>
                         <th class="py-3">Member</th>
                         <th class="py-3">Amount Paid</th>
+                        <th class="py-3">For</th>
                         <th class="py-3">Payment Date</th>
                         <th class="py-3">Loan Total</th>
                         <th class="py-3">Total Paid</th>
@@ -78,6 +79,7 @@
                                 <small class="text-muted"><?= esc($payment['member_number'] ?? '') ?></small>
                             </td>
                             <td class="py-3 fw-semibold">&#8369;<?= number_format($payment['amount_paid'] ?? 0, 2) ?></td>
+                            <td class="py-3 small"><?= esc($payment['months'] ?? '—') ?></td>
                             <td class="py-3 text-muted"><?= esc($payment['payment_date'] ?? '-') ?></td>
                             <?php $payBalance = max(0, (float) $payment['total_payable'] - (float) $payment['total_paid']); ?>
                             <td class="py-3">&#8369;<?= number_format($payment['total_payable'] ?? 0, 2) ?></td>
@@ -127,7 +129,7 @@
                         <?php endforeach; ?>
                     <?php else: ?>
                         <tr>
-                            <td colspan="11" class="text-center py-5 text-muted">
+                            <td colspan="12" class="text-center py-5 text-muted">
                                 <i class="fa-solid fa-money-bill-wave fa-2x mb-3 d-block opacity-25"></i>
                                 No payment records found for the selected filter.
                             </td>
