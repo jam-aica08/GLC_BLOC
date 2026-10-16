@@ -51,8 +51,9 @@
         ['Contributions', $pendingContributions, 'admin/contributions?status=Pending', 'fa-piggy-bank'],
         ['Loans', $pendingLoans, 'admin/loans?status=Pending', 'fa-hand-holding-dollar'],
         ['Loan Payments', $pendingPayments, 'admin/payments?status=Pending', 'fa-money-bill-wave'],
+        ['Account Requests', $pendingRequests, 'admin/members#account-requests', 'fa-inbox'],
     ] as [$label, $count, $url, $icon]): ?>
-        <div class="col-sm-4">
+        <div class="col-sm-6 col-lg-3">
             <a href="<?= base_url($url) ?>" class="card text-decoration-none h-100 <?= $count ? 'border-warning' : '' ?>" style="color:#1a1a2e;">
                 <div class="card-body py-2 px-3 d-flex justify-content-between align-items-center">
                     <span class="small"><i class="fa-solid <?= $icon ?> me-2 text-muted"></i>Pending <?= $label ?></span>

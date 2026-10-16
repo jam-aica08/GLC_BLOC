@@ -41,6 +41,52 @@
     </div>
 </form>
 
+<!-- Account requests from members -->
+<?php if (! empty($accountRequests)): ?>
+<div class="card mb-3 border-warning" id="account-requests" data-no-search>
+    <div class="card-header d-flex justify-content-between align-items-center bg-warning-subtle">
+        <span class="fw-semibold"><i class="fa-solid fa-inbox me-2"></i>Account Requests</span>
+        <span class="badge bg-warning text-dark"><?= count($accountRequests) ?> waiting</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table align-middle mb-0" style="font-size:0.875rem;">
+            <thead class="table-light">
+                <tr><th class="px-4">Member</th><th>Account Type</th><th>Requested</th><th class="text-end pe-4">Actions</th></tr>
+            </thead>
+            <tbody>
+                <?php foreach ($accountRequests as $req): ?>
+                    <tr>
+                        <td class="px-4">
+                            <div class="fw-semibold"><?= esc($req['member_name']) ?></div>
+                            <small class="text-muted"><?= esc($req['member_number']) ?></small>
+                        </td>
+                        <td><?= esc($req['account_type']) ?></td>
+                        <td class="text-muted"><?= esc(date('M j, Y g:i A', strtotime($req['created_at']))) ?></td>
+                        <td class="text-end pe-4">
+                            <div class="d-inline-flex gap-1">
+                                <form method="post" action="<?= base_url('admin/members/requests/' . (int) $req['request_id'] . '/approve') ?>">
+                                    <?= csrf_field() ?>
+                                    <button type="submit" class="btn btn-sm btn-success" onclick="return confirm('Open a <?= esc($req['account_type'], 'js') ?> account for <?= esc($req['member_name'], 'js') ?>?')">
+                                        <i class="fa-solid fa-check me-1"></i>Approve
+                                    </button>
+                                </form>
+                                <form method="post" action="<?= base_url('admin/members/requests/' . (int) $req['request_id'] . '/reject') ?>">
+                                    <?= csrf_field() ?>
+                                    <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Reject this request?')">
+                                        <i class="fa-solid fa-xmark me-1"></i>Reject
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+    <div class="card-footer bg-white small text-muted">Approving opens the account. It becomes active once January to the month of approval is paid.</div>
+</div>
+<?php endif; ?>
+
 <!-- Members Table Card -->
 <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center">
