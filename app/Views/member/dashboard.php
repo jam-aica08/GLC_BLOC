@@ -33,102 +33,31 @@
     <?php endif; ?>
 <?php endforeach; ?>
 
-<div class="row g-3 mb-4">
-    <div class="col-sm-6 col-lg-3">
-        <div class="card shadow-sm text-center">
-            <div class="card-body py-3">
-                <div class="text-muted small mb-1"><i class="fas fa-university me-1"></i>Total Accounts</div>
-                <div class="fw-bold fs-4"><?= count($accounts ?? []) ?></div>
-            </div>
-        </div>
-    </div>
-    <div class="col-sm-6 col-lg-3">
-        <div class="card shadow-sm text-center">
-            <div class="card-body py-3">
-                <div class="text-muted small mb-1"><i class="fas fa-hand-holding-usd me-1"></i>Total Contributions <button type="button" class="btn btn-sm btn-link p-0 ms-1 text-muted js-amount-toggle" title="Hide amount" aria-label="Hide amount"><i class="fa-solid fa-eye-slash"></i></button></div>
-                <div class="fw-bold fs-4 text-success js-amount">₱<?= number_format($totalContributions ?? 0, 2) ?></div>
-            </div>
-        </div>
-    </div>
-    <div class="col-sm-6 col-lg-3">
-        <div class="card shadow-sm text-center">
-            <div class="card-body py-3">
-                <div class="text-muted small mb-1"><i class="fas fa-money-bill-wave me-1"></i>Active Loans</div>
-                <div class="fw-bold fs-4 text-warning"><?= $activeLoansCount ?? 0 ?></div>
-            </div>
-        </div>
-    </div>
-    <div class="col-sm-6 col-lg-3">
-        <div class="card shadow-sm text-center">
-            <div class="card-body py-3">
-                <div class="text-muted small mb-1"><i class="fas fa-coins me-1"></i>Dividends</div>
-                <div class="fw-bold fs-4 text-info">₱<?= number_format($totalDividends ?? 0, 2) ?></div>
-            </div>
-        </div>
-    </div>
-</div>
+<?= view('partials/dashboard_overview', ['d' => $overview, 'isAdmin' => false]) ?>
 
-<div class="row g-4">
-    <div class="col-lg-6">
-        <div class="card shadow-sm">
-            <div class="card-header fw-semibold bg-white">My Accounts</div>
-            <div class="card-body p-0">
-                <div class="table-responsive">
-                    <table class="table table-sm mb-0">
-                        <thead class="table-light">
-                            <tr><th>Account #</th><th>Type</th><th>Status</th></tr>
-                        </thead>
-                        <tbody>
-                            <?php if (empty($accounts)): ?>
-                                <tr><td colspan="3" class="text-center text-muted py-3">No accounts found.</td></tr>
-                            <?php else: ?>
-                                <?php foreach ($accounts as $acc): ?>
-                                    <tr>
-                                        <td><?= esc($acc['account_number']) ?></td>
-                                        <td><?= esc($acc['account_type']) ?></td>
-                                        <td>
-                                            <span class="badge bg-<?= $acc['account_status'] === 'Active' ? 'success' : 'secondary' ?>">
-                                                <?= esc($acc['account_status']) ?>
-                                            </span>
-                                        </td>
-                                    </tr>
-                                <?php endforeach; ?>
-                            <?php endif; ?>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
+<!-- My accounts -->
+<div class="card dash-tile mt-3" data-no-search>
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <span class="fw-semibold"><i class="fa-solid fa-building-columns me-2" style="color:#f0a500;"></i>My Accounts</span>
+        <a href="<?= base_url('member/profile') ?>" class="btn btn-sm btn-outline-secondary">Open another account</a>
     </div>
-    <div class="col-lg-6">
-        <div class="card shadow-sm">
-            <div class="card-header fw-semibold bg-white">Recent Activity</div>
-            <div class="card-body p-0">
-                <div class="table-responsive">
-                    <table class="table table-sm mb-0">
-                        <thead class="table-light">
-                            <tr><th>Type</th><th>Amount</th><th>Status</th></tr>
-                        </thead>
-                        <tbody>
-                            <?php if (empty($recentRecords)): ?>
-                                <tr><td colspan="3" class="text-center text-muted py-3">No recent transactions.</td></tr>
-                            <?php else: ?>
-                                <?php foreach (array_slice($recentRecords, 0, 5) as $r): ?>
-                                    <tr>
-                                        <td><?= esc($r['record_type']) ?></td>
-                                        <td>₱<?= number_format($r['amount'], 2) ?></td>
-                                        <td>
-                                            <?php $c = ['Pending'=>'warning','Approved'=>'success','Rejected'=>'danger'][$r['approval_status']] ?? 'secondary'; ?>
-                                            <span class="badge bg-<?= $c ?>"><?= esc($r['approval_status']) ?></span>
-                                        </td>
-                                    </tr>
-                                <?php endforeach; ?>
-                            <?php endif; ?>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
+    <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+            <thead class="table-light"><tr><th class="ps-3">Account #</th><th>Type</th><th>Opened</th><th>Status</th></tr></thead>
+            <tbody>
+                <?php if (empty($accounts)): ?>
+                    <tr><td colspan="4" class="text-center text-muted py-3">No accounts yet.</td></tr>
+                <?php endif; ?>
+                <?php foreach ($accounts as $acc): ?>
+                    <tr>
+                        <td class="ps-3"><code><?= esc($acc['account_number']) ?></code></td>
+                        <td><?= esc($acc['account_type']) ?></td>
+                        <td><?= esc(date('M j, Y', strtotime($acc['account_start_date']))) ?></td>
+                        <td><span class="badge bg-<?= $acc['account_status'] === 'Active' ? 'success' : ($acc['account_status'] === 'Pending' ? 'warning text-dark' : 'secondary') ?>"><?= esc($acc['account_status']) ?></span></td>
+                    </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
     </div>
 </div>
 
