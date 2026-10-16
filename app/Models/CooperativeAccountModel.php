@@ -134,36 +134,24 @@ class CooperativeAccountModel extends Model
     }
 
     /**
-     * Contribution standing for an account. A member's first account joins the
-     * cooperative only after paying every month from January of its start year
-     * up to and including its start month; any additional account is opened
-     * once PHP 300 has been paid on it. After that each account owes PHP 300
-     * a month.
+     * Contribution standing for an account. Every account joins the
+     * cooperative only after paying every month from January of its start
+     * year up to and including its start month (an account opened in
+     * October needs PHP 3,000). After that each account owes PHP 300 a month.
      *
      * @return array{required_to_join: float, required_to_date: float, paid: float,
      *               join_balance: float, due_balance: float}
      */
     public function getStanding(array $account): array
     {
-        $start = strtotime($account['account_start_date'] ?: 'now');
+        $start      = strtotime($account['account_start_date'] ?: 'now');
         $startYear  = (int) date('Y', $start);
         $startMonth = (int) date('n', $start);
 
-        $firstAccountId = (int) ($this->db->table($this->table)
-            ->selectMin('account_id')
-            ->where('member_id', $account['member_id'])
-            ->get()->getRowArray()['account_id'] ?? 0);
-        $isFirstAccount = $firstAccountId === (int) $account['account_id'];
-
-        // First accounts owe from January of their start year; extra accounts from the month they were opened.
         $monthsSinceJanuary = ((int) date('Y') - $startYear) * 12 + (int) date('n');
-        $monthsToDate       = $isFirstAccount
-            ? max($monthsSinceJanuary, $startMonth)
-            : max(1, $monthsSinceJanuary - $startMonth + 1);
-
-        $requiredToJoin = $isFirstAccount ? $startMonth * self::MONTHLY_CONTRIBUTION : self::MONTHLY_CONTRIBUTION;
-        $requiredToDate = $monthsToDate * self::MONTHLY_CONTRIBUTION;
-        $paid           = $this->getTotalContributions((int) $account['account_id']);
+        $requiredToJoin     = self::joinAmount($account['account_start_date'] ?: null);
+        $requiredToDate     = max($monthsSinceJanuary, $startMonth) * self::MONTHLY_CONTRIBUTION;
+        $paid               = $this->getTotalContributions((int) $account['account_id']);
 
         return [
             'required_to_join' => $requiredToJoin,
@@ -172,6 +160,37 @@ class CooperativeAccountModel extends Model
             'join_balance'     => max(0.0, round($requiredToJoin - $paid, 2)),
             'due_balance'      => max(0.0, round($requiredToDate - $paid, 2)),
         ];
+    }
+
+    /**
+     * What an account opened on $date must pay before it becomes active:
+     * PHP 300 for every month from January to the opening month.
+     */
+    public static function joinAmount(?string $date = null): float
+    {
+        return (int) date('n', $date ? strtotime($date) : time()) * self::MONTHLY_CONTRIBUTION;
+    }
+
+    /**
+     * Smallest contribution allowed for this account right now. While the
+     * account is Pending it is whatever is still needed to activate it
+     * (contributions already waiting for approval count); once Active it is
+     * PHP 300.
+     */
+    public function minimumContribution(array $account): float
+    {
+        if (($account['account_status'] ?? '') !== 'Pending') {
+            return self::CONTRIBUTION_MIN;
+        }
+
+        $pending = (float) ($this->db->table('contributions')
+            ->selectSum('amount', 'total')
+            ->where('account_id', (int) $account['account_id'])
+            ->where('payment_status', 'Pending')
+            ->get()->getRow()->total ?? 0);
+        $remaining = $this->getStanding($account)['join_balance'] - $pending;
+
+        return round(min(self::CONTRIBUTION_MAX, max(self::CONTRIBUTION_MIN, $remaining)), 2);
     }
 
     /**

@@ -161,7 +161,7 @@
                         <label for="account_id" class="form-label fw-semibold small">Account <span class="text-danger">*</span></label>
                         <select class="form-select" id="account_id" name="account_id" required>
                             <?php foreach (($accounts ?? []) as $acc): if (! in_array($acc['account_status'], ['Active', 'Pending'], true)) continue; ?>
-                                <option value="<?= esc($acc['account_id']) ?>">
+                                <option value="<?= esc($acc['account_id']) ?>" data-min="<?= esc(number_format($acc['min_contribution'], 2, '.', '')) ?>">
                                     <?= esc($acc['account_number']) ?> (<?= esc($acc['account_type']) ?><?= $acc['account_status'] === 'Pending' ? ' — joining, ₱' . number_format($acc['standing']['join_balance'], 2) . ' left' : '' ?>)
                                 </option>
                             <?php endforeach; ?>
@@ -179,11 +179,11 @@
                         <div class="input-group">
                             <span class="input-group-text">&#8369;</span>
                             <input type="number" class="form-control" id="amount" name="amount"
-                                   step="0.01" min="<?= \App\Models\CooperativeAccountModel::CONTRIBUTION_MIN ?>" max="<?= \App\Models\CooperativeAccountModel::CONTRIBUTION_MAX ?>" required
-                                   value="<?= esc(number_format($monthly, 2, '.', '')) ?>">
+                                   step="0.01" min="300" max="<?= \App\Models\CooperativeAccountModel::CONTRIBUTION_MAX ?>" required value="300">
                         </div>
-                        <div class="form-text">The required contribution is ₱<?= number_format($monthly, 2) ?> per month. Each contribution can be from ₱300 to ₱3,600, so you can pay up to 12 months at once.</div>
+                        <div class="form-text" id="amountHelp" aria-live="polite"></div>
                     </div>
+                    <?= view('partials/activation_rule', ['class' => 'mb-0']) ?>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -195,5 +195,28 @@
         </div>
     </div>
 </div>
+
+<script>
+// The minimum depends on the account: what is left to activate a Pending account, PHP 300 once Active.
+(function () {
+    const select = document.getElementById('account_id');
+    const amount = document.getElementById('amount');
+    const help   = document.getElementById('amountHelp');
+    if (!select || !amount) return;
+    const peso = n => '₱' + Number(n).toLocaleString('en-PH', { minimumFractionDigits: 2 });
+    function apply() {
+        const option = select.options[select.selectedIndex];
+        if (!option) return;
+        const min = parseFloat(option.dataset.min || '300');
+        amount.min = min;
+        if (!amount.value || parseFloat(amount.value) < min) amount.value = min.toFixed(2);
+        help.textContent = min > 300
+            ? 'This account is not active yet: pay at least ' + peso(min) + ' (up to ₱3,600.00) to activate it.'
+            : 'Each contribution can be ₱300.00 to ₱3,600.00 (₱300 a month, up to 12 months at once).';
+    }
+    select.addEventListener('change', apply);
+    apply();
+})();
+</script>
 
 <?= $this->endSection() ?>

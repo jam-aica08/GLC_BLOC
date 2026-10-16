@@ -112,6 +112,7 @@ class Member extends BaseController
         $accountModel = model(CooperativeAccountModel::class);
         foreach ($accounts as &$acc) {
             $acc['standing'] = $accountModel->getStanding($acc);
+            $acc['min_contribution'] = $accountModel->minimumContribution($acc);
         }
         unset($acc);
 
@@ -163,9 +164,11 @@ class Member extends BaseController
             return redirect()->to('/member/contributions');
         }
 
-        if ($amount < CooperativeAccountModel::CONTRIBUTION_MIN || $amount > CooperativeAccountModel::CONTRIBUTION_MAX) {
-            session()->setFlashdata('error', 'A contribution must be between PHP '
-                . number_format(CooperativeAccountModel::CONTRIBUTION_MIN, 2) . ' and PHP '
+        $minimum = model(CooperativeAccountModel::class)->minimumContribution($account);
+        if ($amount < $minimum || $amount > CooperativeAccountModel::CONTRIBUTION_MAX) {
+            session()->setFlashdata('error', ($account['account_status'] === 'Pending'
+                    ? 'This account is not active yet. Pay at least PHP ' . number_format($minimum, 2) . ' (January up to the month it was opened) and at most PHP '
+                    : 'A contribution must be between PHP ' . number_format($minimum, 2) . ' and PHP ')
                 . number_format(CooperativeAccountModel::CONTRIBUTION_MAX, 2) . '.');
             return redirect()->to('/member/contributions');
         }
@@ -598,8 +601,8 @@ class Member extends BaseController
     }
 
     /**
-     * POST: the member opens another account. It becomes active once PHP 300
-     * has been contributed to it.
+     * POST: the member opens another account. Like every account it becomes
+     * active once January up to its opening month is paid (PHP 3,000 in October).
      */
     public function openAccount()
     {
@@ -623,7 +626,7 @@ class Member extends BaseController
 
         $accountNumber = model(CooperativeAccountModel::class)->openAccount($memberId, $accountType);
 
-        session()->setFlashdata('success', "Account {$accountNumber} added. Contribute at least PHP 300 (up to PHP 3,600 per contribution) to activate it.");
+        session()->setFlashdata('success', "Account {$accountNumber} added. Contribute PHP " . number_format(CooperativeAccountModel::joinAmount(), 2) . " (January to " . date('F') . ") to activate it.");
         return redirect()->to('/member/profile');
     }
 
