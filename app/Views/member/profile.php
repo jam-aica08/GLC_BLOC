@@ -110,11 +110,9 @@
         </div>
     </div>
     <?php if (in_array('Pending', array_column($accounts ?? [], 'account_status'), true)): ?>
-        <div class="card-footer bg-warning-subtle small" role="note">
-            <i class="fa-solid fa-hourglass-half me-1"></i><strong>Account not active yet:</strong>
-            pay the amount shown in Status (from January up to the month the account was opened, ₱300 a month) to activate it.
-            You can pay it in one contribution of up to ₱3,600. Once active, each contribution can be ₱300 to ₱3,600.
-            <a href="<?= base_url('member/contributions') ?>" class="alert-link">Contribute now</a>
+        <div class="card-footer bg-white small text-muted">
+            Accounts marked <em>Joining</em> activate once the amount shown is paid.
+            <a href="<?= base_url('member/contributions') ?>">Contribute</a>
         </div>
     <?php endif; ?>
 </div>

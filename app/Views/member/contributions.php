@@ -183,7 +183,6 @@
                         </div>
                         <div class="form-text" id="amountHelp" aria-live="polite"></div>
                     </div>
-                    <?= view('partials/activation_rule', ['class' => 'mb-0']) ?>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -211,8 +210,8 @@
         amount.min = min;
         if (!amount.value || parseFloat(amount.value) < min) amount.value = min.toFixed(2);
         help.textContent = min > 300
-            ? 'This account is not active yet: pay at least ' + peso(min) + ' (up to ₱3,600.00) to activate it.'
-            : 'Each contribution can be ₱300.00 to ₱3,600.00 (₱300 a month, up to 12 months at once).';
+            ? 'Pay at least ' + peso(min) + ' to activate this account.'
+            : '₱300 a month. You can pay up to ₱3,600 at once.';
     }
     select.addEventListener('change', apply);
     apply();

@@ -167,7 +167,7 @@ class Member extends BaseController
         $minimum = model(CooperativeAccountModel::class)->minimumContribution($account);
         if ($amount < $minimum || $amount > CooperativeAccountModel::CONTRIBUTION_MAX) {
             session()->setFlashdata('error', ($account['account_status'] === 'Pending'
-                    ? 'This account is not active yet. Pay at least PHP ' . number_format($minimum, 2) . ' (January up to the month it was opened) and at most PHP '
+                    ? 'To activate this account, pay at least PHP ' . number_format($minimum, 2) . ' and at most PHP '
                     : 'A contribution must be between PHP ' . number_format($minimum, 2) . ' and PHP ')
                 . number_format(CooperativeAccountModel::CONTRIBUTION_MAX, 2) . '.');
             return redirect()->to('/member/contributions');
@@ -626,7 +626,7 @@ class Member extends BaseController
 
         $accountNumber = model(CooperativeAccountModel::class)->openAccount($memberId, $accountType);
 
-        session()->setFlashdata('success', "Account {$accountNumber} added. Contribute PHP " . number_format(CooperativeAccountModel::joinAmount(), 2) . " (January to " . date('F') . ") to activate it.");
+        session()->setFlashdata('success', "Account {$accountNumber} added. It is activated once PHP " . number_format(CooperativeAccountModel::joinAmount(), 2) . " is paid.");
         return redirect()->to('/member/profile');
     }
 
