@@ -157,8 +157,9 @@ class LedgerService
             // --- Check 2: previous_hash linkage ------------------------------
             $storedPrevHash = $entry['previous_hash'];
             if ($prevHash === null) {
-                // First entry: previous_hash must be null
-                if ($storedPrevHash !== null) {
+                // First entry: previous_hash must be empty (null, or the all-zero
+                // genesis value written by the original sample data).
+                if ($storedPrevHash !== null && $storedPrevHash !== self::GENESIS_HASH) {
                     $this->markTampered($db, $ledgerId);
                     $tampered++;
                     $firstFailure = [
@@ -204,7 +205,9 @@ class LedgerService
             $canonicalPayload = $this->buildCanonicalPayload($record);
             $computedHash     = hash('sha256', $canonicalPayload . ($storedPrevHash ?? ''));
 
-            if (!hash_equals($computedHash, (string) $entry['transaction_hash'])) {
+            if (! hash_equals($computedHash, (string) $entry['transaction_hash'])
+                && ! ($seq === 1 && $storedPrevHash === self::GENESIS_HASH
+                      && hash_equals($this->legacyGenesisHash($record), (string) $entry['transaction_hash']))) {
                 $this->markTampered($db, $ledgerId);
                 $tampered++;
                 $firstFailure = [
@@ -216,7 +219,10 @@ class LedgerService
                 continue;
             }
 
-            // Entry is valid
+            // Entry is valid; clear a flag left by an earlier check.
+            if (($entry['verification_status'] ?? 'Valid') !== 'Valid') {
+                $db->table('blockchain_ledger')->where('ledger_id', $ledgerId)->update(['verification_status' => 'Valid']);
+            }
             $valid++;
             $prevHash     = $entry['transaction_hash'];
             $prevSequence = $seq;
@@ -235,6 +241,26 @@ class LedgerService
     // -------------------------------------------------------------------------
     // Private helpers
     // -------------------------------------------------------------------------
+
+    /** previous_hash used by the original sample genesis entry. */
+    private const GENESIS_HASH = '0000000000000000000000000000000000000000000000000000000000000000';
+
+    /**
+     * Hash format used by the original sample data (GlcBlocSeeder) for the
+     * genesis entry, before the canonical v1 payload existed.
+     */
+    private function legacyGenesisHash(array $record): string
+    {
+        $data = json_encode([
+            'financial_record_id' => (int) $record['financial_record_id'],
+            'account_id'          => (int) $record['account_id'],
+            'amount'              => (float) $record['amount'],
+            'record_type'         => (string) $record['record_type'],
+            'transaction_date'    => substr((string) $record['transaction_date'], 0, 10),
+        ]);
+
+        return hash('sha256', $data . self::GENESIS_HASH);
+    }
 
     /**
      * Build a deterministic, versioned canonical string from a financial_record row.

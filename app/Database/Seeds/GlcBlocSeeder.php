@@ -121,25 +121,9 @@ class GlcBlocSeeder extends Seeder
             'updated_at'         => date('Y-m-d H:i:s'),
         ]);
 
-        // ── Sample blockchain ledger entry ────────────────────────────────────
-        $transactionData = json_encode([
-            'financial_record_id' => $financialRecordId,
-            'account_id'          => $accountId,
-            'amount'              => 300.00,
-            'record_type'         => 'Contribution',
-            'transaction_date'    => '2026-01-05',
-        ]);
-
-        $transactionHash = hash('sha256', $transactionData . '0000000000000000000000000000000000000000000000000000000000000000');
-
-        $this->db->table('blockchain_ledger')->insert([
-            'financial_record_id' => $financialRecordId,
-            'transaction_hash'    => $transactionHash,
-            'previous_hash'       => '0000000000000000000000000000000000000000000000000000000000000000',
-            'ledger_sequence'     => 1,
-            'recorded_at'         => date('Y-m-d H:i:s'),
-            'verification_status' => 'Valid',
-        ]);
+        // ── Sample blockchain ledger entry (genesis, same format as the app) ──
+        $record = $this->db->table('financial_records')->where('financial_record_id', $financialRecordId)->get()->getRowArray();
+        (new \App\Services\LedgerService())->createEntry((int) $financialRecordId, $record);
 
         // ── Sample analytics snapshot ─────────────────────────────────────────
         $this->db->table('analytics_snapshots')->insert([
