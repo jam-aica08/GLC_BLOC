@@ -163,8 +163,10 @@ class Member extends BaseController
             return redirect()->to('/member/contributions');
         }
 
-        if ($amount <= 0) {
-            session()->setFlashdata('error', 'Amount must be greater than zero.');
+        if ($amount < CooperativeAccountModel::CONTRIBUTION_MIN || $amount > CooperativeAccountModel::CONTRIBUTION_MAX) {
+            session()->setFlashdata('error', 'A contribution must be between PHP '
+                . number_format(CooperativeAccountModel::CONTRIBUTION_MIN, 2) . ' and PHP '
+                . number_format(CooperativeAccountModel::CONTRIBUTION_MAX, 2) . '.');
             return redirect()->to('/member/contributions');
         }
 

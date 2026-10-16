@@ -17,9 +17,9 @@ class CooperativeAccountModel extends Model
     /** Pioneer accounts receive this much more (%) than a Basic share of dividends. */
     public const PIONEER_DIVIDEND_BONUS = 2.00;
 
-    /** Opening contribution allowed when an admin opens an account (PHP). */
-    public const OPENING_MIN = 300.00;
-    public const OPENING_MAX = 3600.00;
+    /** Allowed amount for any single contribution, including the opening one (PHP). */
+    public const CONTRIBUTION_MIN = 300.00;
+    public const CONTRIBUTION_MAX = 3600.00;
 
     protected $table            = 'cooperative_accounts';
     protected $primaryKey       = 'account_id';

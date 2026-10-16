@@ -254,8 +254,8 @@ class Admin extends BaseController
     private function openingContribution(): float|string
     {
         $amount = round((float) $this->request->getPost('opening_contribution'), 2);
-        $min    = CooperativeAccountModel::OPENING_MIN;
-        $max    = CooperativeAccountModel::OPENING_MAX;
+        $min    = CooperativeAccountModel::CONTRIBUTION_MIN;
+        $max    = CooperativeAccountModel::CONTRIBUTION_MAX;
 
         if ($amount < $min || $amount > $max) {
             return 'The opening contribution must be between PHP ' . number_format($min, 2) . ' and PHP ' . number_format($max, 2) . '.';
@@ -762,11 +762,17 @@ class Admin extends BaseController
             $query->where('lp.payment_status', $filterStatus);
         }
 
-        $payments = $query->get()->getResultArray();
+        $search = trim((string) $this->request->getGet('q'));
+        $this->searchMemberColumns($query, $search, 'lp.loan_id');
+        $query->orderBy('lp.payment_id', 'DESC');
+
+        [$payments, $page] = $this->paginate($query);
 
         return view('admin/payments', [
             'payments'     => $payments,
             'filterStatus' => $filterStatus,
+            'search'       => $search,
+            'page'         => $page,
         ]);
     }
 

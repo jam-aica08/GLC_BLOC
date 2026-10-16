@@ -179,10 +179,10 @@
                         <div class="input-group">
                             <span class="input-group-text">&#8369;</span>
                             <input type="number" class="form-control" id="amount" name="amount"
-                                   step="0.01" min="0.01" required
+                                   step="0.01" min="<?= \App\Models\CooperativeAccountModel::CONTRIBUTION_MIN ?>" max="<?= \App\Models\CooperativeAccountModel::CONTRIBUTION_MAX ?>" required
                                    value="<?= esc(number_format($monthly, 2, '.', '')) ?>">
                         </div>
-                        <div class="form-text">The required contribution is ₱<?= number_format($monthly, 2) ?> per month. You can pay any amount, for example several months at once.</div>
+                        <div class="form-text">The required contribution is ₱<?= number_format($monthly, 2) ?> per month. Each contribution can be from ₱300 to ₱3,600, so you can pay up to 12 months at once.</div>
                     </div>
                 </div>
                 <div class="modal-footer">
