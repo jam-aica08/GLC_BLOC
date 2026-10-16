@@ -537,6 +537,31 @@ class Admin extends BaseController
     /**
      * POST: approve a loan and generate installments via LoanService.
      */
+    /**
+     * GET: a loan's month-by-month schedule with amounts paid and balance.
+     */
+    public function loanSchedule(int $id): string|\CodeIgniter\HTTP\RedirectResponse
+    {
+        $this->requireAdmin();
+
+        $loan = db_connect()->table('loans l')
+                            ->select("l.*, ca.account_number, ca.account_type, m.member_number, CONCAT(m.first_name, ' ', m.last_name) AS member_name", false)
+                            ->join('cooperative_accounts ca', 'ca.account_id = l.account_id', 'left')
+                            ->join('members m', 'm.member_id = ca.member_id', 'left')
+                            ->where('l.loan_id', $id)
+                            ->get()->getRowArray();
+
+        if (! $loan) {
+            session()->setFlashdata('error', 'Loan not found.');
+            return redirect()->to('/admin/loans');
+        }
+
+        return view('admin/loan_schedule', [
+            'loan'     => $loan,
+            'schedule' => (new LoanService())->schedule($id),
+        ]);
+    }
+
     public function approveLoan(int $id)
     {
         $this->requireAdmin();
@@ -838,58 +863,29 @@ class Admin extends BaseController
     }
 
     /**
-     * Apply an approved payment to its installments, oldest first. Installment
-     * amounts never change: amount_paid and remaining_balance are updated, and
-     * an installment becomes Paid only when nothing is left on it. Any unpaid
-     * part stays on that installment and is paid before the next one.
+     * Mark an approved payment and apply it to the loan schedule (month by
+     * month, with carry-over). See LoanService::applyPayment().
      */
     private function applyLoanPayment(array $payment): void
     {
-        $db  = db_connect();
-        $now = date('Y-m-d H:i:s');
-
+        $db = db_connect();
         $db->table('loan_payments')
            ->where('payment_id', $payment['payment_id'])
-           ->update(['payment_status' => 'Approved', 'updated_at' => $now]);
+           ->update(['payment_status' => 'Approved', 'updated_at' => date('Y-m-d H:i:s')]);
 
-        $allocations = $db->table('loan_payment_installments lpi')
-                          ->select('lpi.amount_applied, li.*')
-                          ->join('loan_installments li', 'li.installment_id = lpi.installment_id')
-                          ->where('lpi.payment_id', $payment['payment_id'])
-                          ->orderBy('li.installment_number', 'ASC')
-                          ->get()
-                          ->getResultArray();
+        $start = $db->table('loan_payment_installments lpi')
+                    ->select('lpi.installment_id')
+                    ->join('loan_installments li', 'li.installment_id = lpi.installment_id')
+                    ->where('lpi.payment_id', $payment['payment_id'])
+                    ->orderBy('li.installment_number', 'ASC')
+                    ->limit(1)->get()->getRowArray();
 
-        foreach ($allocations as $inst) {
-            $due       = (float) $inst['amount_due'];
-            $paid      = round(min($due, (float) $inst['amount_paid'] + (float) $inst['amount_applied']), 2);
-            $remaining = round($due - $paid, 2);
-
-            $update = [
-                'amount_paid'       => $paid,
-                'remaining_balance' => $remaining,
-                'payment_date'      => $payment['payment_date'],
-                'updated_at'        => $now,
-            ];
-            if ($remaining <= 0) {
-                $update['payment_status'] = 'Paid';
-            }
-
-            $db->table('loan_installments')
-               ->where('installment_id', $inst['installment_id'])
-               ->update($update);
-        }
-
-        $unpaid = $db->table('loan_installments')
-                     ->where('loan_id', $payment['loan_id'])
-                     ->where('payment_status !=', 'Paid')
-                     ->countAllResults();
-
-        if ($unpaid === 0) {
-            $db->table('loans')
-               ->where('loan_id', $payment['loan_id'])
-               ->update(['loan_status' => 'Paid', 'updated_at' => $now]);
-        }
+        (new LoanService())->applyPayment(
+            (int) $payment['loan_id'],
+            (int) ($start['installment_id'] ?? 0),
+            (float) $payment['amount_paid'],
+            $payment['payment_date']
+        );
     }
 
     /**

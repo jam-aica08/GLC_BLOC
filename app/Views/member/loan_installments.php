@@ -3,11 +3,10 @@
 
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
-        <h4 class="fw-bold mb-1"><i class="fas fa-calendar-alt me-2 text-warning"></i>Loan Installments</h4>
+        <h4 class="fw-bold mb-1"><i class="fas fa-calendar-alt me-2 text-warning"></i>Loan #<?= (int) $loan['loan_id'] ?></h4>
         <p class="text-muted small mb-0">
-            Loan #<?= esc($loan['loan_id'] ?? '') ?> —
-            ₱<?= number_format($loan['loan_amount'] ?? 0, 2) ?> at <?= esc($loan['interest_rate'] ?? '') ?>% |
-            <?= esc($loan['loan_term_months'] ?? '') ?> months
+            ₱<?= number_format($loan['loan_amount'] ?? 0, 2) ?> at <?= esc($loan['interest_rate'] ?? '') ?>% ·
+            <?= (int) ($loan['loan_term_months'] ?? 0) ?> months · <?= esc($loan['account_number'] ?? '') ?>
         </p>
     </div>
     <a href="<?= base_url('member/loans') ?>" class="btn btn-outline-secondary btn-sm">
@@ -17,94 +16,22 @@
 
 <?= view('partials/flash') ?>
 
-<?php $balance = max(0, $totalPayable - $totalPaid); ?>
-<div class="row g-3 mb-4">
-    <div class="col-sm-4"><div class="card text-center"><div class="card-body py-3">
-        <div class="text-muted small">Total Payable</div>
-        <div class="fw-bold fs-5">₱<?= number_format($totalPayable, 2) ?></div>
-    </div></div></div>
-    <div class="col-sm-4"><div class="card text-center"><div class="card-body py-3">
-        <div class="text-muted small">Total Paid</div>
-        <div class="fw-bold fs-5 text-success">₱<?= number_format($totalPaid, 2) ?></div>
-    </div></div></div>
-    <div class="col-sm-4"><div class="card text-center"><div class="card-body py-3">
-        <div class="text-muted small">Remaining Balance</div>
-        <div class="fw-bold fs-5 <?= $balance > 0 ? 'text-danger' : 'text-success' ?>">₱<?= number_format($balance, 2) ?></div>
-    </div></div></div>
-</div>
-
 <?php $canPay = in_array($loan['loan_status'] ?? '', ['Active', 'Approved'], true); ?>
-<form method="post" action="<?= base_url('member/loans/' . (int) ($loan['loan_id'] ?? 0) . '/pay') ?>" id="payForm">
-    <?= csrf_field() ?>
-    <div class="card shadow-sm mb-4">
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
-                    <thead class="table-dark">
-                        <tr>
-                            <th style="width:48px;"><span class="visually-hidden">Select</span></th>
-                            <th>#</th>
-                            <th>Due Date</th>
-                            <th>Installment</th>
-                            <th>Paid</th>
-                            <th>Remaining</th>
-                            <th>Carried Over</th>
-                            <th>Total Due Now</th>
-                            <th>Status</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php if (empty($installments)): ?>
-                            <tr><td colspan="9" class="text-center py-4 text-muted">No installments found.</td></tr>
-                        <?php endif; ?>
-                        <?php $carried = 0.0; ?>
-                        <?php foreach ($installments as $inst): ?>
-                            <?php
-                                $unpaid    = max(0, round($inst['amount_due'] - $inst['amount_paid'], 2));
-                                $isPending = in_array((int) $inst['installment_id'], $pendingIds, true);
-                                $selectable = $canPay && $inst['payment_status'] !== 'Paid' && $unpaid > 0 && ! $isPending;
-                                $c = ['Upcoming' => 'secondary', 'Due' => 'warning', 'Late' => 'danger', 'Paid' => 'success'][$inst['payment_status']] ?? 'secondary';
-                            ?>
-                            <tr>
-                                <td>
-                                    <?php if ($selectable): ?>
-                                        <input class="form-check-input js-inst" type="checkbox" name="installment_ids[]"
-                                               value="<?= (int) $inst['installment_id'] ?>" data-unpaid="<?= esc(number_format($unpaid, 2, '.', '')) ?>"
-                                               aria-label="Pay installment <?= esc($inst['installment_number']) ?>">
-                                    <?php endif; ?>
-                                </td>
-                                <td><?= esc($inst['installment_number']) ?></td>
-                                <td><?= esc($inst['due_date']) ?></td>
-                                <td>₱<?= number_format($inst['amount_due'], 2) ?></td>
-                                <td>₱<?= number_format($inst['amount_paid'], 2) ?></td>
-                                <td>₱<?= number_format($unpaid, 2) ?></td>
-                                <td class="<?= ($carried > 0 && $unpaid > 0) ? 'text-danger' : 'text-muted' ?>"><?= ($carried > 0 && $unpaid > 0) ? '₱' . number_format($carried, 2) : '—' ?></td>
-                                <td class="fw-semibold"><?= $unpaid > 0 ? '₱' . number_format($carried + $unpaid, 2) : '—' ?></td>
-                                <td>
-                                    <?php if ($isPending): ?>
-                                        <span class="badge bg-info text-dark">Payment pending approval</span>
-                                    <?php else: ?>
-                                        <span class="badge bg-<?= $c ?>"><?= esc($inst['payment_status']) ?></span>
-                                    <?php endif; ?>
-                                </td>
-                            </tr>
-                            <?php if (! $isPending) { $carried = round($carried + $unpaid, 2); } ?>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
 
-    <?php if ($canPay): ?>
+<form method="post" action="<?= base_url('member/loans/' . (int) $loan['loan_id'] . '/pay') ?>" id="payForm">
+    <?= csrf_field() ?>
+
+    <?= view('partials/installment_schedule', ['schedule' => $schedule, 'canSelect' => $canPay]) ?>
+
+    <?php if ($canPay && $schedule['summary']['current'] && ! $schedule['summary']['has_pending']): ?>
     <div class="card shadow-sm">
-        <div class="card-header bg-white fw-semibold"><i class="fas fa-money-bill me-2"></i>Pay Selected Installments</div>
+        <div class="card-header bg-white fw-semibold"><i class="fas fa-money-bill me-2"></i>Make a Payment</div>
         <div class="card-body">
+            <p class="small text-muted mb-3">Tick <strong>Month <?= (int) $schedule['summary']['current']['installment_number'] ?></strong> in the table above, then enter how much you are paying.</p>
             <div class="row g-3">
                 <div class="col-md-5">
-                    <label for="payAmount" class="form-label fw-semibold small">Amount (₱)</label>
+                    <label for="payAmount" class="form-label fw-semibold small">Amount to pay (₱)</label>
                     <input type="number" name="amount_paid" id="payAmount" step="0.01" min="0.01" class="form-control" required disabled>
-                    <div class="form-text">Filled in from the installments you tick; you can pay less. The oldest installment is paid first, and any unpaid part carries over to the next one.</div>
                 </div>
                 <div class="col-md-7">
                     <span class="form-label fw-semibold small d-block mb-2">Payment Method</span>
@@ -117,9 +44,11 @@
                     <?php endforeach; ?>
                 </div>
             </div>
+            <div class="alert alert-light border mt-3 mb-0 d-none" id="payMessage" role="status" aria-live="polite"></div>
             <button type="submit" class="btn btn-warning mt-3" id="paySubmit" disabled>
                 <i class="fas fa-paper-plane me-1"></i>Submit Payment
             </button>
+            <div class="form-text">Your payment is applied after it is approved by the administrators.</div>
         </div>
     </div>
     <?php endif; ?>
@@ -127,30 +56,47 @@
 
 <script>
 (function () {
-    const boxes = Array.from(document.querySelectorAll('.js-inst'));
+    const box = document.getElementById('payThisMonth');
     const amount = document.getElementById('payAmount');
     const submit = document.getElementById('paySubmit');
-    const form = document.getElementById('payForm');
-    if (!amount) return;
-    function update() {
-        let total = 0, any = false;
-        boxes.forEach(function (b) { if (b.checked) { total += parseFloat(b.dataset.unpaid); any = true; } });
-        amount.disabled = !any;
-        submit.disabled = !any;
-        amount.max = any ? total.toFixed(2) : '';
-        amount.value = any ? total.toFixed(2) : '';
+    const message = document.getElementById('payMessage');
+    if (!box || !amount) return;
+
+    const peso = n => '₱' + n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const owed = parseFloat(box.dataset.owed);
+    const balance = parseFloat(box.dataset.balance);
+    const month = box.dataset.month;
+    const nextMonth = box.dataset.nextMonth;
+
+    function describe() {
+        const value = parseFloat(amount.value);
+        if (!box.checked || !(value > 0)) { message.classList.add('d-none'); return; }
+        let text;
+        if (value > balance) {
+            text = 'This is more than your remaining balance of ' + peso(balance) + '.';
+        } else if (value < owed) {
+            const rest = owed - value;
+            text = 'You are paying ' + peso(value) + '. The remaining ' + peso(rest) +
+                (nextMonth ? ' will be added to Month ' + nextMonth + '.' : ' stays as your remaining balance.');
+        } else if (value > owed) {
+            text = 'You are paying ' + peso(value) + '. Month ' + month + ' will be fully paid and the extra ' +
+                peso(value - owed) + ' goes to the next month(s).';
+        } else {
+            text = 'You are paying ' + peso(value) + '. Month ' + month + ' will be fully paid.';
+        }
+        message.textContent = text;
+        message.classList.remove('d-none');
     }
-    // Older unpaid installments must be paid first, so ticking one ticks the earlier ones.
-    boxes.forEach(function (b, i) {
-        b.addEventListener('change', function () {
-            boxes.forEach(function (other, j) {
-                if (b.checked && j < i) other.checked = true;
-                if (!b.checked && j > i) other.checked = false;
-            });
-            update();
-        });
+
+    box.addEventListener('change', function () {
+        amount.disabled = !box.checked;
+        submit.disabled = !box.checked;
+        amount.max = balance.toFixed(2);
+        amount.value = box.checked ? parseFloat(box.dataset.dueNow).toFixed(2) : '';
+        describe();
     });
-    form.addEventListener('submit', function () {
+    amount.addEventListener('input', describe);
+    document.getElementById('payForm').addEventListener('submit', function () {
         submit.disabled = true;
         submit.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Submitting…';
     });
