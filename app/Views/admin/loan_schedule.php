@@ -2,7 +2,7 @@
 <?= $this->section('content') ?>
 
 <div class="d-flex justify-content-between align-items-center mb-3">
-    <h4 class="mb-0 fw-bold">Loan #<?= (int) $loan['loan_id'] ?> Schedule</h4>
+    <h4 class="mb-0 fw-bold">Loan #<?= (int) $loan['loan_id'] ?> · <?= esc($loan['member_name'] ?? '') ?></h4>
     <a href="<?= base_url('admin/loans') ?>" class="btn btn-outline-secondary btn-sm"><i class="fas fa-arrow-left me-1"></i>Back to Loans</a>
 </div>
 
