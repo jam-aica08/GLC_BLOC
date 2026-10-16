@@ -1,20 +1,13 @@
 <?= $this->extend('layouts/main') ?>
 <?= $this->section('content') ?>
 
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <div>
-        <h4 class="mb-1 fw-bold">Loan #<?= (int) $loan['loan_id'] ?> Schedule</h4>
-        <p class="text-muted small mb-0">
-            <?= esc($loan['member_name'] ?? '') ?> (<?= esc($loan['member_number'] ?? '') ?>) ·
-            <?= esc($loan['account_number'] ?? '') ?> · ₱<?= number_format($loan['loan_amount'], 2) ?>
-            at <?= esc($loan['interest_rate']) ?>% · <?= (int) $loan['loan_term_months'] ?> months · <?= esc($loan['loan_status']) ?>
-        </p>
-    </div>
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="mb-0 fw-bold">Loan #<?= (int) $loan['loan_id'] ?> Schedule</h4>
     <a href="<?= base_url('admin/loans') ?>" class="btn btn-outline-secondary btn-sm"><i class="fas fa-arrow-left me-1"></i>Back to Loans</a>
 </div>
 
 <div class="card shadow-sm" data-no-search><div class="card-body">
-<?= view('partials/installment_schedule', ['schedule' => $schedule, 'canPay' => false, 'loanId' => (int) $loan['loan_id']]) ?>
+<?= view('admin/loan_schedule_body', ['loan' => $loan, 'schedule' => $schedule]) ?>
 </div></div>
 
 <?= $this->endSection() ?>
