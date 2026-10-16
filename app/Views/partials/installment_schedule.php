@@ -9,7 +9,8 @@
  */
 $summary = $schedule['summary'];
 $rows    = $schedule['rows'];
-$canPay  = ($canPay ?? false) && $summary['current'] !== null && ! $summary['has_pending'];
+$canPay  = ($canPay ?? false) && $summary['current'] !== null;
+$locked  = $summary['has_pending'];
 $peso    = fn($n) => '₱' . number_format((float) $n, 2);
 ?>
 <div class="row g-2 mb-3 text-center">
@@ -33,7 +34,7 @@ $peso    = fn($n) => '₱' . number_format((float) $n, 2);
 <?php endif; ?>
 
 <?php if ($canPay): ?>
-<form method="post" action="<?= base_url('member/loans/' . (int) $loanId . '/pay') ?>" class="js-pay-form">
+<form method="post" action="<?= base_url('member/loans/' . (int) $loanId . '/pay') ?>" class="js-pay-form" <?= $locked ? 'data-locked' : '' ?>>
     <?= csrf_field() ?>
     <p class="small text-muted mb-2">Tick the month(s) you want to pay and type the amount. You can pay less, or pay later months early.
         Anything still unpaid after a due date is added to the next month.</p>
@@ -106,6 +107,9 @@ $peso    = fn($n) => '₱' . number_format((float) $n, 2);
             <i class="fas fa-paper-plane me-1"></i>Submit Payment
         </button>
     </div>
-    <div class="small text-muted mt-1">Payments are applied after approval by the administrators.</div>
+    <div class="small text-muted mt-1">
+        <?= $locked ? 'You can submit another payment once your previous payment is approved or rejected.'
+                    : 'Payments are applied after approval by the administrators.' ?>
+    </div>
 </form>
 <?php endif; ?>
