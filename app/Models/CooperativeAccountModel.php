@@ -194,23 +194,19 @@ class CooperativeAccountModel extends Model
     }
 
     /**
-     * Move a Pending account to Active once its January catch-up is fully paid.
+     * Make every account's status match its approved contributions: an
+     * account is Active only when January up to its opening month is paid
+     * and approved, otherwise it is Pending. Closed and Inactive accounts
+     * are left alone.
      */
-    public function activateIfComplete(int $accountId): bool
+    public function syncStatuses(): void
     {
-        $account = $this->find($accountId);
-        if (! $account || $account['account_status'] !== 'Pending') {
-            return false;
-        }
-        if ($this->getStanding($account)['join_balance'] > 0) {
-            return false;
-        }
+        $paid = '(SELECT COALESCE(SUM(c.amount), 0) FROM contributions c'
+              . ' WHERE c.account_id = cooperative_accounts.account_id AND c.payment_status = \'Approved\')';
+        $join = 'MONTH(account_start_date) * ' . self::MONTHLY_CONTRIBUTION;
 
-        $this->db->table($this->table)
-                 ->where('account_id', $accountId)
-                 ->update(['account_status' => 'Active']);
-
-        return true;
+        $this->db->query("UPDATE cooperative_accounts SET account_status = 'Pending' WHERE account_status = 'Active' AND {$paid} < {$join}");
+        $this->db->query("UPDATE cooperative_accounts SET account_status = 'Active' WHERE account_status = 'Pending' AND {$paid} >= {$join}");
     }
 
     /**
