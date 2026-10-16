@@ -24,6 +24,8 @@
     </div>
 <?php endif; ?>
 
+<?= view('partials/list_search', ['action' => 'admin/loans', 'search' => $search, 'filterStatus' => $filterStatus, 'placeholder' => 'Search by member name, member #, account # or loan ID']) ?>
+
 <!-- Filter Tabs -->
 <div class="card mb-3">
     <div class="card-body py-2 px-3">
@@ -47,10 +49,10 @@
 </div>
 
 <!-- Loans Table -->
-<div class="card">
+<div class="card" data-no-search>
     <div class="card-header d-flex justify-content-between align-items-center">
         <span><i class="fa-solid fa-hand-holding-dollar me-2" style="color:#f0a500;"></i>Loan Applications</span>
-        <span class="badge bg-secondary"><?= count($loans ?? []) ?> record(s)</span>
+        <span class="badge bg-secondary"><?= (int) $page['total'] ?> record(s)</span>
     </div>
     <div class="card-body p-0">
         <div class="table-responsive">
@@ -118,7 +120,8 @@
                                         </form>
                                     </div>
                                 <?php elseif ($status === 'Active' || $status === 'Paid'): ?>
-                                    <a href="<?= base_url('admin/loans/' . (int) $loan['id'] . '/schedule') ?>" class="btn btn-sm btn-outline-primary">
+                                    <a href="<?= base_url('admin/loans/' . (int) $loan['id'] . '/schedule') ?>" class="btn btn-sm btn-outline-primary js-schedule"
+                                       data-loan-id="<?= (int) $loan['id'] ?>" data-title="Loan #<?= (int) $loan['id'] ?> · <?= esc($loan['member_name'] ?? '') ?>">
                                         <i class="fa-solid fa-calendar-days me-1"></i>Schedule
                                     </a>
                                 <?php else: ?>
@@ -139,6 +142,52 @@
             </table>
         </div>
     </div>
+    <?= view('partials/pager', ['page' => $page, 'action' => 'admin/loans', 'query' => ['status' => $filterStatus, 'q' => $search]]) ?>
 </div>
+
+<!-- Schedule pop-up -->
+<div class="modal fade" id="scheduleModal" tabindex="-1" aria-labelledby="scheduleModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header" style="background:#1a1a2e;">
+                <h5 class="modal-title text-white" id="scheduleModalLabel"><i class="fa-solid fa-calendar-days me-2" style="color:#f0a500;"></i><span>Loan Schedule</span></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="scheduleModalBody" aria-live="polite"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Open a loan's schedule in the pop-up instead of a new page. Each schedule is loaded once, then reused.
+(function () {
+    const modalEl = document.getElementById('scheduleModal');
+    const body    = document.getElementById('scheduleModalBody');
+    const title   = modalEl.querySelector('.modal-title span');
+    const cache   = {};
+
+    document.addEventListener('click', async function (e) {
+        const link = e.target.closest('.js-schedule');
+        if (!link || typeof bootstrap === 'undefined') return;   // without Bootstrap the link opens the full page
+        e.preventDefault();
+
+        title.textContent = link.dataset.title;
+        body.innerHTML = '<div class="text-center py-5 text-muted"><span class="spinner-border spinner-border-sm me-2"></span>Loading schedule…</div>';
+        bootstrap.Modal.getOrCreateInstance(modalEl).show();
+
+        const id = link.dataset.loanId;
+        try {
+            if (!cache[id]) {
+                const res = await fetch(link.href, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                if (!res.ok) throw new Error(res.status);
+                cache[id] = await res.text();
+            }
+            body.innerHTML = cache[id];
+        } catch (err) {
+            body.innerHTML = '<div class="alert alert-danger mb-0">Could not load the schedule. <a href="' + link.href + '">Open it as a page</a>.</div>';
+        }
+    });
+})();
+</script>
 
 <?= $this->endSection() ?>

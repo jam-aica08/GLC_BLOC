@@ -203,6 +203,11 @@
                                 <option value="Basic" <?= (old('account_type') === 'Basic') ? 'selected' : '' ?>>Basic</option>
                             </select>
                         </div>
+                        <div class="col-md-6">
+                            <label for="opening_contribution" class="form-label fw-semibold small">Opening Contribution (₱) <span class="text-danger">*</span></label>
+                            <input type="number" class="form-control" id="opening_contribution" name="opening_contribution" min="300" max="3600" step="0.01" value="300" required>
+                            <div class="form-text">₱300 minimum, ₱3,600 maximum. Needs approval by two admins in Contributions; counts toward activating the account.</div>
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -236,6 +241,11 @@
                         <option value="Pioneer">Pioneer</option>
                         <option value="Basic">Basic</option>
                     </select>
+                    <div class="mt-3">
+                        <label for="new_opening_contribution" class="form-label fw-semibold small">Opening Contribution (₱) <span class="text-danger">*</span></label>
+                        <input type="number" class="form-control" id="new_opening_contribution" name="opening_contribution" min="300" max="3600" step="0.01" value="300" required>
+                        <div class="form-text">₱300 minimum, ₱3,600 maximum. Needs approval by two admins in Contributions.</div>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
