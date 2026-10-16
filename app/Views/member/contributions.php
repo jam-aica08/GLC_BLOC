@@ -161,7 +161,7 @@
                         <label for="account_id" class="form-label fw-semibold small">Account <span class="text-danger">*</span></label>
                         <select class="form-select" id="account_id" name="account_id" required>
                             <?php foreach (($accounts ?? []) as $acc): if (! in_array($acc['account_status'], ['Active', 'Pending'], true)) continue; ?>
-                                <option value="<?= esc($acc['account_id']) ?>" data-min="<?= esc(number_format($acc['min_contribution'], 2, '.', '')) ?>">
+                                <option value="<?= esc($acc['account_id']) ?>" data-min="<?= esc(number_format($acc['min_contribution'], 2, '.', '')) ?>" data-left="<?= esc(number_format($acc['left_to_activate'], 2, '.', '')) ?>">
                                     <?= esc($acc['account_number']) ?> (<?= esc($acc['account_type']) ?><?= $acc['account_status'] === 'Pending' ? ' — joining, ₱' . number_format($acc['standing']['join_balance'], 2) . ' left' : '' ?>)
                                 </option>
                             <?php endforeach; ?>
@@ -196,7 +196,7 @@
 </div>
 
 <script>
-// The minimum depends on the account: what is left to activate a Pending account, PHP 300 once Active.
+// Shows what is left to activate a Pending account; the minimum is PHP 300 (or less when less is left).
 (function () {
     const select = document.getElementById('account_id');
     const amount = document.getElementById('amount');
@@ -206,11 +206,12 @@
     function apply() {
         const option = select.options[select.selectedIndex];
         if (!option) return;
-        const min = parseFloat(option.dataset.min || '300');
+        const min  = parseFloat(option.dataset.min || '300');
+        const left = parseFloat(option.dataset.left || '0');
         amount.min = min;
         if (!amount.value || parseFloat(amount.value) < min) amount.value = min.toFixed(2);
-        help.textContent = min > 300
-            ? 'Pay at least ' + peso(min) + ' to activate this account.'
+        help.textContent = left > 0
+            ? peso(left) + ' left to activate this account. You can pay it in parts.'
             : '₱300 a month. You can pay up to ₱3,600 at once.';
     }
     select.addEventListener('change', apply);

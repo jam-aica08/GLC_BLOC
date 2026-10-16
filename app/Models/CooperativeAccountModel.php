@@ -172,15 +172,26 @@ class CooperativeAccountModel extends Model
     }
 
     /**
-     * Smallest contribution allowed for this account right now. While the
-     * account is Pending it is whatever is still needed to activate it
-     * (contributions already waiting for approval count); once Active it is
-     * PHP 300.
+     * Smallest contribution allowed for this account right now: PHP 300.
+     * A Pending account can be paid in parts; only when less than PHP 300
+     * is left to activate it (contributions waiting for approval count) is
+     * the minimum that remainder.
      */
     public function minimumContribution(array $account): float
     {
+        $remaining = $this->amountLeftToActivate($account);
+
+        return ($remaining > 0 && $remaining < self::CONTRIBUTION_MIN) ? $remaining : self::CONTRIBUTION_MIN;
+    }
+
+    /**
+     * What a Pending account still needs before it can be activated, after
+     * approved and waiting contributions. 0 for an Active account.
+     */
+    public function amountLeftToActivate(array $account): float
+    {
         if (($account['account_status'] ?? '') !== 'Pending') {
-            return self::CONTRIBUTION_MIN;
+            return 0.0;
         }
 
         $pending = (float) ($this->db->table('contributions')
@@ -188,9 +199,8 @@ class CooperativeAccountModel extends Model
             ->where('account_id', (int) $account['account_id'])
             ->where('payment_status', 'Pending')
             ->get()->getRow()->total ?? 0);
-        $remaining = $this->getStanding($account)['join_balance'] - $pending;
 
-        return round(min(self::CONTRIBUTION_MAX, max(self::CONTRIBUTION_MIN, $remaining)), 2);
+        return round(max(0.0, $this->getStanding($account)['join_balance'] - $pending), 2);
     }
 
     /**

@@ -115,6 +115,7 @@ class Member extends BaseController
         foreach ($accounts as &$acc) {
             $acc['standing'] = $accountModel->getStanding($acc);
             $acc['min_contribution'] = $accountModel->minimumContribution($acc);
+            $acc['left_to_activate'] = $accountModel->amountLeftToActivate($acc);
         }
         unset($acc);
 
@@ -169,10 +170,8 @@ class Member extends BaseController
 
         $minimum = model(CooperativeAccountModel::class)->minimumContribution($account);
         if ($amount < $minimum || $amount > CooperativeAccountModel::CONTRIBUTION_MAX) {
-            session()->setFlashdata('error', ($account['account_status'] === 'Pending'
-                    ? 'To activate this account, pay at least PHP ' . number_format($minimum, 2) . ' and at most PHP '
-                    : 'A contribution must be between PHP ' . number_format($minimum, 2) . ' and PHP ')
-                . number_format(CooperativeAccountModel::CONTRIBUTION_MAX, 2) . '.');
+            session()->setFlashdata('error', 'A contribution must be between PHP ' . number_format($minimum, 2)
+                . ' and PHP ' . number_format(CooperativeAccountModel::CONTRIBUTION_MAX, 2) . '.');
             return redirect()->to('/member/contributions');
         }
 
