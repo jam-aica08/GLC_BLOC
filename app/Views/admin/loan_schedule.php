@@ -13,6 +13,8 @@
     <a href="<?= base_url('admin/loans') ?>" class="btn btn-outline-secondary btn-sm"><i class="fas fa-arrow-left me-1"></i>Back to Loans</a>
 </div>
 
-<?= view('partials/installment_schedule', ['schedule' => $schedule, 'canSelect' => false]) ?>
+<div class="card shadow-sm" data-no-search><div class="card-body">
+<?= view('partials/installment_schedule', ['schedule' => $schedule, 'canPay' => false, 'loanId' => (int) $loan['loan_id']]) ?>
+</div></div>
 
 <?= $this->endSection() ?>

@@ -22,7 +22,6 @@
                         <th class="py-3">Loan</th>
                         <th class="py-3">Account</th>
                         <th class="py-3">Amount</th>
-                        <th class="py-3">Method</th>
                         <th class="py-3">Date</th>
                         <th class="py-3">Status</th>
                         <th class="py-3">Loan Paid / Total</th>
@@ -31,7 +30,7 @@
                 </thead>
                 <tbody>
                     <?php if (empty($payments)): ?>
-                        <tr><td colspan="9" class="text-center py-5 text-muted">No payments yet. Pay an installment from <a href="<?= base_url('member/loans') ?>">My Loans</a>.</td></tr>
+                        <tr><td colspan="8" class="text-center py-5 text-muted">No payments yet. Pay from <a href="<?= base_url('member/loans') ?>">My Loans</a> → View &amp; Pay.</td></tr>
                     <?php endif; ?>
                     <?php foreach ($payments as $p): ?>
                         <?php
@@ -44,7 +43,6 @@
                             <td class="py-3"><a href="<?= base_url('member/loans/' . $p['loan_id'] . '/installments') ?>">Loan #<?= esc($p['loan_id']) ?></a></td>
                             <td class="py-3"><code><?= esc($p['account_number']) ?></code></td>
                             <td class="py-3 fw-semibold">₱<?= number_format($p['amount_paid'], 2) ?></td>
-                            <td class="py-3"><?= esc($p['payment_method'] ?? '—') ?></td>
                             <td class="py-3 text-muted"><?= esc($p['payment_date']) ?></td>
                             <td class="py-3"><span class="badge <?= $badge ?>"><?= esc($label) ?></span></td>
                             <td class="py-3">₱<?= number_format($p['total_paid'], 2) ?> / ₱<?= number_format($p['total_payable'], 2) ?></td>
