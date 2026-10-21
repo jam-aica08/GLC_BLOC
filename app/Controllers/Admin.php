@@ -602,6 +602,22 @@ class Admin extends BaseController
             return redirect()->to('/admin/loans');
         }
 
+        // Contributions can be rejected, or the account closed, after someone
+        // applies, so the account and the limit (twice the approved
+        // contributions) are checked again before any money is released.
+        model(CooperativeAccountModel::class)->syncStatuses();
+        $account = $db->table('cooperative_accounts')->where('account_id', $loan['account_id'])->get()->getRowArray();
+        if (($account['account_status'] ?? '') !== 'Active') {
+            session()->setFlashdata('error', "Account {$account['account_number']} is no longer active, so loan #{$id} cannot be approved. Reject it instead.");
+            return redirect()->to('/admin/loans');
+        }
+        $limit = $loanService->checkMaxLoanLimit((int) $loan['account_id']);
+        if ((float) $loan['loan_amount'] > $limit + 0.004) {
+            session()->setFlashdata('error', "Loan #{$id} (PHP " . number_format((float) $loan['loan_amount'], 2) . ') is now above this member\'s limit of PHP '
+                . number_format($limit, 2) . ' (twice their approved contributions). Reject it, or approve it once more contributions are approved.');
+            return redirect()->to('/admin/loans');
+        }
+
         $releaseDate = $this->request->getPost('release_date') ?: $today;
 
         $db->transStart();
