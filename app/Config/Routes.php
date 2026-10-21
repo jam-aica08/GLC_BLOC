@@ -74,6 +74,12 @@ $routes->group('admin', ['filter' => 'auth:admin'], function ($routes) {
     $routes->get('reports', 'Admin::reports');
     $routes->get('reports/export', 'Admin::exportReport');
 
+    // Data import (Excel)
+    $routes->get('import', 'DataImport::index');
+    $routes->get('import/template', 'DataImport::template');
+    $routes->get('import/sample', 'DataImport::sample');
+    $routes->post('import', 'DataImport::upload');
+
     // Settings
     $routes->get('settings', 'Settings::index');
     $routes->post('settings/password', 'Settings::changePassword');

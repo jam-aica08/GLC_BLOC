@@ -93,8 +93,9 @@ class LoanService
     /**
      * Move unpaid amounts of past-due months into the next month. Skipped while
      * a payment is waiting for approval, so on-time payments are counted first.
+     * $asOf (Y-m-d) replays history as of that day; it defaults to today.
      */
-    public function rollOver(int $loanId): void
+    public function rollOver(int $loanId, ?string $asOf = null): void
     {
         $db = db_connect();
 
@@ -111,7 +112,7 @@ class LoanService
                    ->orderBy('installment_number', 'ASC')
                    ->get()->getResultArray();
 
-        $today = date('Y-m-d');
+        $today = $asOf ?? date('Y-m-d');
         $now   = date('Y-m-d H:i:s');
         $last  = count($rows) - 1;
 
@@ -300,8 +301,9 @@ class LoanService
      * to the next open month. A month becomes Paid once fully covered.
      *
      * @param array<int, float> $allocations installment_id => amount
+     * @param ?string           $asOf        Roll over as of this day instead of today (imports).
      */
-    public function applyPayment(int $loanId, array $allocations, string $paymentDate): void
+    public function applyPayment(int $loanId, array $allocations, string $paymentDate, ?string $asOf = null): void
     {
         $db  = db_connect();
         $now = date('Y-m-d H:i:s');
@@ -346,7 +348,7 @@ class LoanService
             }
         }
 
-        $this->rollOver($loanId);
+        $this->rollOver($loanId, $asOf);
 
         $open = $db->table('loan_installments')
                    ->where('loan_id', $loanId)

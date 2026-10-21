@@ -31,6 +31,9 @@ $glcNav = [
         ['admin/analytics', 'fa-chart-line', 'Analytics'],
         ['admin/reports', 'fa-file-lines', 'Reports'],
     ],
+    'Data' => [
+        ['admin/import', 'fa-file-import', 'Import data'],
+    ],
 ];
 ?>
 <!-- Sidebar -->
