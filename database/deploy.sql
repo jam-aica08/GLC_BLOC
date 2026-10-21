@@ -33,7 +33,7 @@ CREATE TABLE `analytics_snapshots` (
 ) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 INSERT INTO `analytics_snapshots` VALUES
-(1,'2026-01-31','Monthly','{\"total_contributions\":300,\"total_loans\":0,\"total_dividends\":0,\"active_members\":1,\"active_accounts\":1}','2026-10-16 18:13:31','2026-10-16 18:13:31');
+(1,'2026-01-31','Monthly','{\"total_contributions\":300,\"total_loans\":0,\"total_dividends\":0,\"active_members\":1,\"active_accounts\":1}','2026-10-21 09:16:11','2026-10-21 09:16:11');
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
 CREATE TABLE `blockchain_ledger` (
@@ -52,7 +52,7 @@ CREATE TABLE `blockchain_ledger` (
 ) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 INSERT INTO `blockchain_ledger` VALUES
-(1,1,'23a169db3e8188135645b2466f0b55dfd52863354b1a0da833531a208a70ddf7',NULL,1,'2026-10-16 18:13:31','Valid');
+(1,1,'23a169db3e8188135645b2466f0b55dfd52863354b1a0da833531a208a70ddf7',NULL,1,'2026-10-21 09:16:11','Valid');
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
 CREATE TABLE `ci_sessions` (
@@ -85,7 +85,7 @@ CREATE TABLE `contributions` (
 ) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 INSERT INTO `contributions` VALUES
-(1,1,'2026-01',300.00,'2026-01-05','Approved',1,'2026-10-16 18:13:31','2026-10-16 18:13:31');
+(1,1,'2026-01',300.00,'2026-01-05','Approved',1,'2026-10-21 09:16:11','2026-10-21 09:16:11');
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
 CREATE TABLE `cooperative_accounts` (
@@ -106,8 +106,38 @@ INSERT INTO `cooperative_accounts` VALUES
 (1,1,'ACC-2026-001','Pioneer','2026-01-01',300.00,'Active');
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE `dividend_distributions` (
+  `distribution_id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `distribution_year` int(10) unsigned NOT NULL,
+  `year_lock` int(10) unsigned DEFAULT NULL,
+  `profit_pool` decimal(15,2) NOT NULL,
+  `basic_count` int(10) unsigned NOT NULL,
+  `pioneer_count` int(10) unsigned NOT NULL,
+  `total_weight` decimal(12,4) NOT NULL,
+  `basic_share` decimal(18,6) NOT NULL,
+  `pioneer_share` decimal(18,6) NOT NULL,
+  `total_distributed` decimal(15,2) NOT NULL,
+  `distribution_date` date NOT NULL,
+  `status` enum('Pending','Approved','Rejected') NOT NULL DEFAULT 'Pending',
+  `created_by` int(10) unsigned DEFAULT NULL,
+  `first_approved_by` int(10) unsigned DEFAULT NULL,
+  `first_approval_date` datetime DEFAULT NULL,
+  `second_approved_by` int(10) unsigned DEFAULT NULL,
+  `second_approval_date` datetime DEFAULT NULL,
+  `rejected_by` int(10) unsigned DEFAULT NULL,
+  `rejected_at` datetime DEFAULT NULL,
+  `created_at` datetime DEFAULT NULL,
+  `updated_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`distribution_id`),
+  UNIQUE KEY `uq_dividend_distributions_year` (`year_lock`),
+  KEY `distribution_year` (`distribution_year`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
 CREATE TABLE `dividends` (
   `dividend_id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `distribution_id` int(10) unsigned DEFAULT NULL,
   `account_id` int(10) unsigned NOT NULL,
   `distribution_year` year(4) NOT NULL,
   `profit_pool` decimal(15,2) NOT NULL DEFAULT 0.00,
@@ -115,7 +145,7 @@ CREATE TABLE `dividends` (
   `dividend_per_account` decimal(15,2) NOT NULL DEFAULT 0.00,
   `dividend_amount` decimal(15,2) NOT NULL,
   `distribution_date` date DEFAULT NULL,
-  `dividend_status` enum('Pending','Approved','Distributed') NOT NULL DEFAULT 'Pending',
+  `dividend_status` enum('Pending','Approved','Distributed','Rejected') NOT NULL DEFAULT 'Pending',
   `financial_record_id` int(10) unsigned DEFAULT NULL,
   `created_at` datetime DEFAULT NULL,
   `updated_at` datetime DEFAULT NULL,
@@ -124,6 +154,7 @@ CREATE TABLE `dividends` (
   KEY `dividend_status` (`dividend_status`),
   KEY `distribution_year` (`distribution_year`),
   KEY `fk_dividends_financial_record` (`financial_record_id`),
+  KEY `idx_dividends_distribution` (`distribution_id`),
   CONSTRAINT `fk_dividends_account` FOREIGN KEY (`account_id`) REFERENCES `cooperative_accounts` (`account_id`) ON UPDATE CASCADE,
   CONSTRAINT `fk_dividends_financial_record` FOREIGN KEY (`financial_record_id`) REFERENCES `financial_records` (`financial_record_id`) ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
@@ -159,7 +190,7 @@ CREATE TABLE `financial_records` (
 ) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 INSERT INTO `financial_records` VALUES
-(1,1,'Contribution','2026-01-05',300.00,'Approved',1,1,'2026-01-06 09:00:00',1,'2026-01-06 10:00:00',NULL,'2026-10-16 18:13:31','2026-10-16 18:13:31');
+(1,1,'Contribution','2026-01-05',300.00,'Approved',1,1,'2026-01-06 09:00:00',1,'2026-01-06 10:00:00',NULL,'2026-10-21 09:16:11','2026-10-21 09:16:11');
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
 CREATE TABLE `loan_installments` (
@@ -278,17 +309,18 @@ CREATE TABLE `migrations` (
   `time` int(11) NOT NULL,
   `batch` int(11) unsigned NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=10 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 INSERT INTO `migrations` VALUES
-(1,'2026-10-12-000001','App\\Database\\Migrations\\CreateGlcBlocSchema','default','App',1792145611,1),
-(2,'2026-10-12-000002','App\\Database\\Migrations\\CreateCiSessions','default','App',1792145611,1),
-(3,'2026-10-14-000003','App\\Database\\Migrations\\RemoveLoanPenalties','default','App',1792145611,1),
-(4,'2026-10-14-000004','App\\Database\\Migrations\\AccountJoiningAndPaymentMethod','default','App',1792145611,1),
-(5,'2026-10-14-000005','App\\Database\\Migrations\\InstallmentBalances','default','App',1792145611,1),
-(6,'2026-10-14-000006','App\\Database\\Migrations\\EnsureSchema','default','App',1792145611,1),
-(7,'2026-10-16-000007','App\\Database\\Migrations\\InstallmentCarryOver','default','App',1792145611,1),
-(8,'2026-10-16-000008','App\\Database\\Migrations\\CreateAccountRequests','default','App',1792145611,1);
+(1,'2026-10-12-000001','App\\Database\\Migrations\\CreateGlcBlocSchema','default','App',1792545371,1),
+(2,'2026-10-12-000002','App\\Database\\Migrations\\CreateCiSessions','default','App',1792545371,1),
+(3,'2026-10-14-000003','App\\Database\\Migrations\\RemoveLoanPenalties','default','App',1792545371,1),
+(4,'2026-10-14-000004','App\\Database\\Migrations\\AccountJoiningAndPaymentMethod','default','App',1792545371,1),
+(5,'2026-10-14-000005','App\\Database\\Migrations\\InstallmentBalances','default','App',1792545371,1),
+(6,'2026-10-14-000006','App\\Database\\Migrations\\EnsureSchema','default','App',1792545371,1),
+(7,'2026-10-16-000007','App\\Database\\Migrations\\InstallmentCarryOver','default','App',1792545371,1),
+(8,'2026-10-16-000008','App\\Database\\Migrations\\CreateAccountRequests','default','App',1792545371,1),
+(9,'2026-10-21-000009','App\\Database\\Migrations\\DividendDistributions','default','App',1792545371,1);
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
 CREATE TABLE `roles` (
@@ -318,6 +350,6 @@ CREATE TABLE `users` (
 ) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 INSERT INTO `users` VALUES
-(1,1,'admin','admin@glcbloc.com','$2y$10$HPAjJ5bGmFqfjlMnwu0gSOGtVObH3LY3zO9MIEYE4tl8/L17a5axG','Active'),
-(2,2,'jdoe','jdoe@example.com','$2y$10$dZ1bGmTOZ9KTNA9IC5pIreG8tGbOlQTSBsAJkp9hGb9Glq102zBu6','Active');
+(1,1,'admin','admin@glcbloc.com','$2y$10$b0Mq9Ijn.LS.KL4lG4P9F.8NQdqbsJsK4qnc34OpIWT5dU.du4Wue','Active'),
+(2,2,'jdoe','jdoe@example.com','$2y$10$9AO4GSmp83UcAL2IiXHsyutLnsYlyYY0B8XmkjjDdQLtG4LjQT26G','Active');
 SET FOREIGN_KEY_CHECKS=1;

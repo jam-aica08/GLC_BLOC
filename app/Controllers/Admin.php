@@ -1100,6 +1100,11 @@ class Admin extends BaseController
             return redirect()->to('/admin/financial-records');
         }
 
+        if ($fr['record_type'] === 'Dividend') {
+            session()->setFlashdata('error', 'Dividends are approved as a whole distribution on the Dividends page.');
+            return redirect()->to('/admin/financial-records');
+        }
+
         if ($fr['record_type'] === 'Loan Payment') {
             $payment = $db->table('loan_payments')->where('financial_record_id', $id)->get()->getRowArray();
             if ($payment && ($problem = $this->paymentOverBalance($payment))) {
@@ -1205,6 +1210,11 @@ class Admin extends BaseController
             return redirect()->to('/admin/financial-records');
         }
 
+        if ($fr['record_type'] === 'Dividend') {
+            session()->setFlashdata('error', 'Dividends are rejected as a whole distribution on the Dividends page.');
+            return redirect()->to('/admin/financial-records');
+        }
+
         $now = date('Y-m-d H:i:s');
         $frModel->update($id, ['approval_status' => 'Rejected', 'updated_at' => $now]);
 
@@ -1228,66 +1238,21 @@ class Admin extends BaseController
     {
         $this->requireAdmin();
 
-        $db        = db_connect();
-        $dividends = $db->table('dividends d')
-                        ->select('d.*, ca.account_number, m.first_name, m.last_name')
-                        ->join('cooperative_accounts ca', 'ca.account_id = d.account_id', 'left')
-                        ->join('members m', 'm.member_id = ca.member_id', 'left')
-                        ->orderBy('d.distribution_year', 'DESC')
-                        ->orderBy('d.created_at', 'DESC')
-                        ->get()
-                        ->getResultArray();
-
-        $year = (int) ($this->request->getGet('year') ?: date('Y'));
+        $service = new \App\Services\DividendService();
+        $year    = (int) ($this->request->getGet('year') ?: date('Y'));
 
         return view('admin/dividends', [
-            'dividends' => $dividends,
-            'year'      => $year,
-            'plan'      => $this->planDividends($year),
+            'year'          => $year,
+            'plan'          => $service->plan($year),
+            'available'     => $service->available(),
+            'distributions' => $service->distributions(),
+            'dividends'     => $service->records($year),
         ]);
     }
 
     /**
-     * Profit pool = interest earned on loans approved in the year. Every Active
-     * account gets an equal share, Pioneer accounts get PIONEER_DIVIDEND_BONUS %
-     * more than a Basic share, and the shares add up to the whole pool.
-     */
-    private function planDividends(int $year): array
-    {
-        $db = db_connect();
-        model(CooperativeAccountModel::class)->syncStatuses();
-
-        $profitPool = (float) ($db->table('loans')
-            ->selectSum('interest_amount')
-            ->whereIn('loan_status', ['Active', 'Paid'])
-            ->where('YEAR(approval_date)', $year)
-            ->get()->getRowArray()['interest_amount'] ?? 0);
-
-        $accounts = $db->table('cooperative_accounts')
-                       ->where('account_status', 'Active')
-                       ->get()->getResultArray();
-
-        $pioneerWeight = 1 + CooperativeAccountModel::PIONEER_DIVIDEND_BONUS / 100;
-        $pioneers      = count(array_filter($accounts, fn($a) => $a['account_type'] === 'Pioneer'));
-        $basics        = count($accounts) - $pioneers;
-        $totalWeight   = $basics + $pioneers * $pioneerWeight;
-
-        // Round down to the centavo so the shares never add up to more than the pool.
-        $basicShare   = $totalWeight > 0 ? floor(round($profitPool / $totalWeight * 100, 6)) / 100 : 0.0;
-        $pioneerShare = floor(round($basicShare * $pioneerWeight * 100, 6)) / 100;
-
-        return [
-            'profit_pool'   => round($profitPool, 2),
-            'accounts'      => $accounts,
-            'basic_count'   => $basics,
-            'pioneer_count' => $pioneers,
-            'basic_share'   => $basicShare,
-            'pioneer_share' => $pioneerShare,
-        ];
-    }
-
-    /**
-     * POST: calculate and record per-account dividend = profit_pool / eligible_accounts.
+     * POST: create the year's distribution as a Pending batch after the
+     * administrator confirmed the figures. Two administrators then approve it.
      */
     public function distributeDividends()
     {
@@ -1297,113 +1262,51 @@ class Admin extends BaseController
             return redirect()->to('/admin/dividends');
         }
 
-        $distributionYear = (int) $this->request->getPost('distribution_year');
-        $distributionDate = $this->request->getPost('distribution_date') ?: date('Y-m-d');
+        $year = (int) $this->request->getPost('distribution_year');
+        [$id, $error] = (new \App\Services\DividendService())->create(
+            $year,
+            (string) $this->request->getPost('distribution_date'),
+            (int) session()->get('user_id'),
+            (float) $this->request->getPost('expected_pool'),
+            (int) $this->request->getPost('expected_accounts'),
+        );
 
-        if ($distributionYear < 2000) {
-            session()->setFlashdata('error', 'Invalid year.');
+        session()->setFlashdata($error ? 'error' : 'success', $error
+            ?? "Distribution #{$id} for {$year} was created and is waiting for approval by two administrators.");
+
+        return redirect()->to('/admin/dividends?year=' . $year);
+    }
+
+    /** POST: first or second approval of a distribution batch. */
+    public function approveDividendDistribution(int $id)
+    {
+        $this->requireAdmin();
+
+        if (! $this->request->is('post')) {
             return redirect()->to('/admin/dividends');
         }
 
-        $plan       = $this->planDividends($distributionYear);
-        $profitPool = $plan['profit_pool'];
+        [$message, $ok] = (new \App\Services\DividendService())->approve($id, (int) session()->get('user_id'));
+        session()->setFlashdata($ok ? 'success' : 'error', $message);
 
-        if ($profitPool <= 0) {
-            session()->setFlashdata('error', "There is no loan interest earned in {$distributionYear} to distribute.");
-            return redirect()->to('/admin/dividends?year=' . $distributionYear);
-        }
+        return redirect()->to('/admin/dividends?year=' . (int) $this->request->getPost('year'));
+    }
 
-        $db = db_connect();
+    /** POST: reject a Pending distribution batch. */
+    public function rejectDividendDistribution(int $id)
+    {
+        $this->requireAdmin();
 
-        // Prevent duplicate distribution for the same year
-        $existingDividend = $db->table('dividends')
-                               ->where('distribution_year', $distributionYear)
-                               ->limit(1)->get()->getRowArray();
-        if ($existingDividend) {
-            session()->setFlashdata('error', "Dividends for year {$distributionYear} have already been distributed.");
+        if (! $this->request->is('post')) {
             return redirect()->to('/admin/dividends');
         }
 
-        $accounts      = $plan['accounts'];
-        $eligibleCount = count($accounts);
-        if ($eligibleCount === 0) {
-            session()->setFlashdata('error', 'No eligible accounts found.');
-            return redirect()->to('/admin/dividends');
-        }
+        $ok = (new \App\Services\DividendService())->reject($id, (int) session()->get('user_id'));
+        session()->setFlashdata($ok ? 'success' : 'error', $ok
+            ? 'Distribution rejected. Its records are kept as Rejected and the year can be distributed again.'
+            : 'This distribution is no longer waiting for approval.');
 
-        $dividendPerAccount = $plan['basic_share'];
-        $now                = date('Y-m-d H:i:s');
-        $currentUserId      = (int) session()->get('user_id');
-
-        $db->transStart();
-
-        $insertedFrIds = [];
-
-        foreach ($accounts as $account) {
-            $amount = $account['account_type'] === 'Pioneer' ? $plan['pioneer_share'] : $plan['basic_share'];
-
-            // Create financial_record first so we can link it to the dividend row
-            $db->table('financial_records')->insert([
-                'account_id'          => $account['account_id'],
-                'record_type'         => 'Dividend',
-                'transaction_date'    => $distributionDate,
-                'amount'              => $amount,
-                'approval_status'     => 'Approved',
-                'processed_by'        => $currentUserId,
-                'first_approved_by'   => $currentUserId,
-                'first_approval_date' => $now,
-                'second_approved_by'  => $currentUserId,
-                'second_approval_date'=> $now,
-                'created_at'          => $now,
-                'updated_at'          => $now,
-            ]);
-
-            $frId = (int) $db->insertID();
-
-            $db->table('dividends')->insert([
-                'account_id'             => $account['account_id'],
-                'distribution_year'      => $distributionYear,
-                'profit_pool'            => $profitPool,
-                'eligible_account_count' => $eligibleCount,
-                'dividend_per_account'   => $dividendPerAccount,
-                'dividend_amount'        => $amount,
-                'distribution_date'      => $distributionDate,
-                'dividend_status'        => 'Distributed',
-                'financial_record_id'    => $frId,
-                'created_at'             => $now,
-                'updated_at'             => $now,
-            ]);
-
-            $insertedFrIds[] = [
-                'fr_id'      => $frId,
-                'account_id' => (int) $account['account_id'],
-            ];
-        }
-
-        $db->transComplete();
-
-        if (! $db->transStatus()) {
-            session()->setFlashdata('error', 'Failed to distribute dividends.');
-            return redirect()->to('/admin/dividends');
-        }
-
-        // Append ledger entries for each dividend financial record
-        $frModel       = model(FinancialRecordModel::class);
-        $ledgerService = new LedgerService();
-        foreach ($insertedFrIds as $item) {
-            $frFresh = $frModel->find($item['fr_id']);
-            if (! $frFresh) {
-                continue;
-            }
-            try {
-                $ledgerService->createEntry($item['fr_id'], $frFresh);
-            } catch (\Throwable $e) {
-                log_message('error', 'LedgerService::createEntry failed for Dividend FR #' . $item['fr_id'] . ': ' . $e->getMessage());
-            }
-        }
-
-        session()->setFlashdata('success', "Dividends of PHP " . number_format($profitPool, 2) . " distributed to {$eligibleCount} accounts (Basic PHP {$plan['basic_share']}, Pioneer PHP {$plan['pioneer_share']}).");
-        return redirect()->to('/admin/dividends');
+        return redirect()->to('/admin/dividends?year=' . (int) $this->request->getPost('year'));
     }
 
     // =========================================================================

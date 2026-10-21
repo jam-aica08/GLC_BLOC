@@ -135,6 +135,8 @@
                                     <span class="text-success small">
                                         <i class="fa-solid fa-circle-check me-1"></i>Complete
                                     </span>
+                                <?php elseif (($record['transaction_type'] ?? $record['type'] ?? '') === 'Dividend'): ?>
+                                    <a href="<?= base_url('admin/dividends?year=' . date('Y', strtotime($record['transaction_date'] ?? $record['created_at'] ?? 'now'))) ?>" class="small">Approve on Dividends page</a>
                                 <?php elseif ($canApprove1st): ?>
                                     <div class="d-flex gap-1 justify-content-center">
                                         <form action="<?= base_url('admin/financial-records/approve/' . $record['id']) ?>" method="post">
