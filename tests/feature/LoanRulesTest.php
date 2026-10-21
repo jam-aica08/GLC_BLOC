@@ -93,6 +93,34 @@ final class LoanRulesTest extends CIUnitTestCase
         $this->assertSame(0, $this->openLoans());
     }
 
+    public function testApprovalIsRefusedWhenTheLoanIsNowAboveTheLimit(): void
+    {
+        $this->apply(100)->assertRedirectTo('/member/loans');
+        $loanId = (int) $this->db->table('loans')->where('account_id', $this->accountId)->get()->getRow('loan_id');
+
+        // The contribution behind the limit is rejected after the application.
+        $this->db->table('financial_records')->where(['account_id' => $this->accountId, 'record_type' => 'Contribution'])
+            ->update(['approval_status' => 'Rejected']);
+
+        $admin = ['user_id' => 1, 'username' => 'admin', 'role' => 'Admin', 'logged_in' => true];
+        $this->withSession($admin)->post('admin/loans/approve/' . $loanId)->assertRedirectTo('/admin/loans');
+
+        $this->seeInDatabase('loans', ['loan_id' => $loanId, 'loan_status' => 'Pending']);
+        $this->dontSeeInDatabase('loan_installments', ['loan_id' => $loanId]);
+    }
+
+    public function testApprovalWithinTheLimitStillWorks(): void
+    {
+        $this->apply(100);
+        $loanId = (int) $this->db->table('loans')->where('account_id', $this->accountId)->get()->getRow('loan_id');
+
+        $admin = ['user_id' => 1, 'username' => 'admin', 'role' => 'Admin', 'logged_in' => true];
+        $this->withSession($admin)->post('admin/loans/approve/' . $loanId)->assertRedirectTo('/admin/loans');
+
+        $this->seeInDatabase('loans', ['loan_id' => $loanId, 'loan_status' => 'Active']);
+        $this->seeInDatabase('loan_installments', ['loan_id' => $loanId, 'installment_number' => 1]);
+    }
+
     public function testInvalidTermIsRefused(): void
     {
         $this->apply(100, 7);

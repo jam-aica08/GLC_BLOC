@@ -1,84 +1,40 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="utf-8">
-    <title><?= lang('Errors.pageNotFound') ?></title>
-
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex">
+    <title>Page not found · GLC-BLOC</title>
+    <!-- Self-contained like production.php: no database, helper or stylesheet needed. -->
     <style>
-        div.logo {
-            height: 200px;
-            width: 155px;
-            display: inline-block;
-            opacity: 0.08;
-            position: absolute;
-            top: 2rem;
-            left: 50%;
-            margin-left: -73px;
-        }
-        body {
-            height: 100%;
-            background: #fafafa;
-            font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-            color: #777;
-            font-weight: 300;
-        }
-        h1 {
-            font-weight: lighter;
-            letter-spacing: normal;
-            font-size: 3rem;
-            margin-top: 0;
-            margin-bottom: 0;
-            color: #222;
-        }
-        .wrap {
-            max-width: 1024px;
-            margin: 5rem auto;
-            padding: 2rem;
-            background: #fff;
-            text-align: center;
-            border: 1px solid #efefef;
-            border-radius: 0.5rem;
-            position: relative;
-        }
-        pre {
-            white-space: normal;
-            margin-top: 1.5rem;
-        }
-        code {
-            background: #fafafa;
-            border: 1px solid #efefef;
-            padding: 0.5rem 1rem;
-            border-radius: 5px;
-            display: block;
-        }
-        p {
-            margin-top: 1.5rem;
-        }
-        .footer {
-            margin-top: 2rem;
-            border-top: 1px solid #efefef;
-            padding: 1em 2em 0 2em;
-            font-size: 85%;
-            color: #999;
-        }
-        a:active,
-        a:link,
-        a:visited {
-            color: #dd4814;
-        }
+        :root { --navy: #0d0b5e; --indigo: #2622b0; --muted: #61657f; --bg: #f4f5fb; --border: #e5e7f2; }
+        * { box-sizing: border-box; }
+        body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px 16px;
+               background: var(--bg); color: var(--navy); font-family: 'Segoe UI', system-ui, -apple-system, Roboto, Arial, sans-serif; }
+        .card { width: 100%; max-width: 440px; background: #fff; border: 1px solid var(--border); border-radius: 20px; padding: 36px 28px 30px;
+                text-align: center; box-shadow: 0 20px 50px rgba(16, 15, 60, .08); position: relative; overflow: hidden; }
+        .card::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 4px; background: linear-gradient(100deg, #ff0a7e, #5b1fb0 42%, #1b1890 62%, #00c2e6); }
+        img { width: 120px; height: auto; margin-bottom: 18px; }
+        .code { font-size: .8rem; font-weight: 700; letter-spacing: .12em; color: var(--muted); margin: 0 0 6px; }
+        h1 { font-size: 1.45rem; margin: 0 0 8px; }
+        p { color: var(--muted); line-height: 1.55; margin: 0 0 22px; overflow-wrap: anywhere; }
+        a { display: inline-block; padding: 11px 22px; border-radius: 12px; background: var(--indigo); color: #fff; text-decoration: none; font-weight: 600; }
+        a:hover, a:focus-visible { background: #1b1890; }
     </style>
 </head>
 <body>
-    <div class="wrap">
-        <h1>404</h1>
-
+    <main class="card">
+        <img src="/assets/img/logo-sm.png" alt="GLC-BLOC">
+        <p class="code">ERROR 404</p>
+        <h1>Page not found</h1>
         <p>
             <?php if (ENVIRONMENT !== 'production') : ?>
                 <?= nl2br(esc($message)) ?>
             <?php else : ?>
-                <?= lang('Errors.sorryCannotFind') ?>
+                The page you were looking for does not exist or has moved. Check the address, or go back to the start.
             <?php endif; ?>
         </p>
-    </div>
+        <a href="/">Back to sign in</a>
+    </main>
 </body>
 </html>
