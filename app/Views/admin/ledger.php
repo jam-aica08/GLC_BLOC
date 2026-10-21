@@ -39,7 +39,7 @@
     <div class="alert alert-dismissible fade show <?= ($verifyResult['status'] === 'valid') ? 'alert-success' : 'alert-danger' ?>"
          role="alert" style="border-radius:10px;">
         <div class="d-flex align-items-start gap-3">
-            <i class="fa-solid <?= ($verifyResult['status'] === 'valid') ? 'fa-shield-check' : 'fa-shield-exclamation' ?> fa-lg mt-1"></i>
+            <i class="fa-solid <?= ($verifyResult['status'] === 'valid') ? 'fa-circle-check' : 'fa-triangle-exclamation' ?> fa-lg mt-1"></i>
             <div>
                 <strong><?= ($verifyResult['status'] === 'valid') ? 'Ledger Integrity Verified' : 'Ledger Integrity Compromised' ?></strong>
                 <p class="mb-0 small"><?= esc($verifyResult['message'] ?? '') ?></p>
@@ -133,11 +133,11 @@
                             <td class="py-3">
                                 <?php if ($isValid): ?>
                                     <span class="badge bg-success">
-                                        <i class="fa-solid fa-shield-check me-1"></i>Valid
+                                        <i class="fa-solid fa-circle-check me-1"></i>Valid
                                     </span>
                                 <?php else: ?>
                                     <span class="badge bg-danger">
-                                        <i class="fa-solid fa-shield-exclamation me-1"></i>Tampered
+                                        <i class="fa-solid fa-triangle-exclamation me-1"></i>Tampered
                                     </span>
                                 <?php endif; ?>
                             </td>

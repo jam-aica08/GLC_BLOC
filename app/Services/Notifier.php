@@ -58,6 +58,41 @@ class Notifier
         }
     }
 
+    /**
+     * Keep one "activate your account" reminder per Pending account in the
+     * member's notifications, with the amount still needed. A changed amount
+     * replaces the old reminder; an account that is no longer Pending loses it.
+     *
+     * @param list<array> $accounts rows with account_id, account_number, account_status and standing.join_balance
+     */
+    public static function syncActivationReminders(int $memberId, array $accounts): void
+    {
+        try {
+            if ($memberId <= 0 || ! self::available()) {
+                return;
+            }
+            $db = db_connect();
+            foreach ($accounts as $acc) {
+                $prefix    = 'activate-' . (int) $acc['account_id'] . '-';
+                $remaining = (float) ($acc['standing']['join_balance'] ?? 0);
+                $pending   = ($acc['account_status'] ?? '') === 'Pending' && $remaining > 0;
+                $key       = $prefix . (int) round($remaining * 100);
+
+                if ($pending && $db->table('notifications')->where('member_id', $memberId)->where('event_key', $key)->countAllResults() > 0) {
+                    continue;
+                }
+                $db->table('notifications')->where('member_id', $memberId)->like('event_key', $prefix, 'after')->delete();
+                if ($pending) {
+                    self::toMember($memberId, 'account', 'Activate account ' . $acc['account_number'],
+                        'Account ' . $acc['account_number'] . ' becomes active once PHP ' . number_format($remaining, 2)
+                        . ' more is contributed (and approved).', 'member/contributions', $key);
+                }
+            }
+        } catch (Throwable $e) {
+            log_message('error', 'Notifier::syncActivationReminders failed: ' . $e->getMessage());
+        }
+    }
+
     /** Notify the member who owns an account. */
     public static function toAccountOwner(int $accountId, string $type, string $title, string $message, ?string $link = null, ?string $eventKey = null): void
     {

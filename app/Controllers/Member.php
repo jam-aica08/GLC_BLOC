@@ -72,6 +72,9 @@ class Member extends BaseController
         }
         unset($acc);
 
+        // What a Pending account still needs goes to the notification panel.
+        \App\Services\Notifier::syncActivationReminders($memberId, $accounts);
+
         return view('member/dashboard', [
             'accounts' => $accounts,
             'overview' => (new \App\Services\DashboardService())->build(array_map('intval', $accountIds)),

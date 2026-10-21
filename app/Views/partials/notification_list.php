@@ -32,7 +32,7 @@ $icons = ['contribution' => 'fa-piggy-bank', 'payment' => 'fa-money-bill-wave', 
                     </div>
                     <div class="small"><?= esc($n['message']) ?></div>
                     <div class="d-flex gap-3 mt-1">
-                        <?php if (! empty($n['link'])): ?><a class="small" href="<?= base_url($n['link']) ?>">Open</a><?php endif; ?>
+                        <?php if (! empty($n['link'])): ?><a class="small" href="<?= base_url($n['link']) ?>"><?= str_starts_with((string) $n['event_key'], 'activate-') ? 'Contribute now' : 'Open' ?></a><?php endif; ?>
                         <?php if ($unread): ?>
                             <form method="post" action="<?= base_url($area . '/notifications/' . (int) $n['notification_id'] . '/read') ?>">
                                 <?= csrf_field() ?><input type="hidden" name="next" value="<?= esc($next) ?>">
