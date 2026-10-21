@@ -25,4 +25,21 @@ class AccountAccess
             && $row['account_status'] === 'Active'
             && ($row['membership_status'] === null || $row['membership_status'] === 'Active');
     }
+
+    /**
+     * Whether the user is the super administrator, read from the database on
+     * each call (not the session) so a change of role takes effect at once.
+     * Only the super administrator may add admins, reset data, import data
+     * and read the audit logs.
+     */
+    public static function isSuperAdmin(int $userId): bool
+    {
+        $db = db_connect();
+        if ($userId <= 0 || ! $db->fieldExists('is_super_admin', 'users')) {
+            return false;
+        }
+
+        return (bool) ($db->table('users')->select('is_super_admin')
+            ->where('user_id', $userId)->get()->getRowArray()['is_super_admin'] ?? false);
+    }
 }

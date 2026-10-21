@@ -88,7 +88,7 @@
         </div>
     </div>
 
-    <?php if ($isAdmin): ?>
+    <?php if ($isSuper): ?>
     <div class="col-lg-6">
         <div class="card shadow-sm">
             <div class="card-header fw-semibold bg-white"><i class="fa-solid fa-user-shield me-2"></i>Add Administrator</div>
@@ -119,7 +119,7 @@
     <?php endif; ?>
 </div>
 
-<?php if ($isAdmin): ?>
+<?php if ($isSuper): ?>
     <div class="card shadow-sm mt-4 border-danger">
         <div class="card-header fw-semibold bg-danger-subtle text-danger"><i class="fa-solid fa-trash-can me-2"></i>Reset Data</div>
         <div class="card-body">

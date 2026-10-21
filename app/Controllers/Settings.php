@@ -2,6 +2,7 @@
 
 namespace App\Controllers;
 
+use App\Libraries\AccountAccess;
 use App\Libraries\DataReset;
 use App\Libraries\DatabaseUpdates;
 use App\Models\UserModel;
@@ -18,6 +19,12 @@ class Settings extends BaseController
         return strtolower((string) session()->get('role'));
     }
 
+    /** Adding admins and resetting data are for the super administrator only. */
+    private function isSuper(): bool
+    {
+        return $this->role() === 'admin' && AccountAccess::isSuperAdmin((int) session()->get('user_id'));
+    }
+
     private function home(): string
     {
         return $this->role() === 'admin' ? '/admin/settings' : '/member/settings';
@@ -28,6 +35,7 @@ class Settings extends BaseController
         return view('settings/index', [
             'layout'  => $this->role() === 'admin' ? 'layouts/main' : 'layouts/member_main',
             'isAdmin' => $this->role() === 'admin',
+            'isSuper' => $this->isSuper(),
             'user'    => model(UserModel::class)->find((int) session()->get('user_id')),
             'dbStatus' => $this->role() === 'admin' ? DatabaseUpdates::status() : null,
             'recentErrors' => $this->role() === 'admin' ? $this->recentErrors() : [],
@@ -80,6 +88,9 @@ class Settings extends BaseController
     {
         if ($this->role() !== 'admin') {
             return redirect()->to('/login');
+        }
+        if (! $this->isSuper()) {
+            return redirect()->to($this->home())->with('error', 'Only the super administrator can reset data.');
         }
 
         $user = model(UserModel::class)->find((int) session()->get('user_id'));
@@ -140,6 +151,9 @@ class Settings extends BaseController
     {
         if ($this->role() !== 'admin') {
             return redirect()->to('/login');
+        }
+        if (! $this->isSuper()) {
+            return redirect()->to($this->home())->with('error', 'Only the super administrator can add administrators.');
         }
 
         $username = trim((string) $this->request->getPost('username'));

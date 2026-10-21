@@ -31,10 +31,11 @@ $glcNav = [
         ['admin/analytics', 'fa-chart-line', 'Analytics'],
         ['admin/reports', 'fa-file-lines', 'Reports'],
     ],
-    'Data' => [
-        ['admin/import', 'fa-file-import', 'Import data'],
-    ],
 ];
+// Importing is for the super administrator only (enforced again by the controller).
+if (session()->get('is_super_admin')) {
+    $glcNav['Data'] = [['admin/import', 'fa-file-import', 'Import data']];
+}
 ?>
 <!-- Sidebar -->
 <aside id="sidebar" aria-label="Main navigation">

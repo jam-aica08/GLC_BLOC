@@ -1232,13 +1232,7 @@ class Admin extends BaseController
     /** The signed-in administrator is the super admin (checked in the database, not just the session). */
     private function isSuperAdmin(): bool
     {
-        $db = db_connect();
-        if (! $db->fieldExists('is_super_admin', 'users')) {
-            return false;
-        }
-
-        return (bool) ($db->table('users')->select('is_super_admin')
-            ->where('user_id', (int) session()->get('user_id'))->get()->getRowArray()['is_super_admin'] ?? false);
+        return \App\Libraries\AccountAccess::isSuperAdmin((int) session()->get('user_id'));
     }
 
     public function auditLogs()
