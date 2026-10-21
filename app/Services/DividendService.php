@@ -41,7 +41,8 @@ class DividendService
     /** False until "Apply Database Updates" has added the batch table. */
     public function available(): bool
     {
-        return $this->db->tableExists('dividend_distributions') && $this->db->fieldExists('distribution_id', 'dividends');
+        return \App\Libraries\SchemaCache::passes('dividend_distributions', fn () => $this->db->tableExists('dividend_distributions')
+            && $this->db->fieldExists('distribution_id', 'dividends'));
     }
 
     public static function validYear(int $year): bool
@@ -160,7 +161,7 @@ class DividendService
     private function legacyDividendsExist(int $year): bool
     {
         $q = $this->db->table('dividends')->where('distribution_year', $year)->where('dividend_status !=', 'Rejected');
-        if ($this->db->fieldExists('distribution_id', 'dividends')) {
+        if ($this->available()) {
             $q->where('distribution_id IS NULL');
         }
 

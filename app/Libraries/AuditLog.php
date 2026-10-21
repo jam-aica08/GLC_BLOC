@@ -49,7 +49,7 @@ class AuditLog
     public static function available(): bool
     {
         try {
-            return db_connect()->tableExists('audit_logs');
+            return SchemaCache::passes('table_audit_logs', static fn () => db_connect()->tableExists('audit_logs'));
         } catch (Throwable) {
             return false;
         }

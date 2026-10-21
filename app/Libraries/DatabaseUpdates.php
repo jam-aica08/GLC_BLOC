@@ -248,10 +248,14 @@ class DatabaseUpdates
         $db->resetDataCache();
     }
 
+    /** Shown as a banner on the dashboard. Once the database is up to date, that is remembered for an hour. */
     public static function needsUpdate(): bool
     {
-        $s = self::status();
-        return $s['pending'] !== [] || $s['problems'] !== [] || $s['error'] !== null;
+        return ! SchemaCache::passes('up_to_date', static function (): bool {
+            $s = self::status();
+
+            return $s['pending'] === [] && $s['problems'] === [] && $s['error'] === null;
+        });
     }
 
     /**

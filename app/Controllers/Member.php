@@ -66,6 +66,7 @@ class Member extends BaseController
         $accountIds = array_column($accounts, 'account_id');
 
         $accountModel = model(CooperativeAccountModel::class);
+        $accounts     = $accountModel->withTotals($accounts);
         foreach ($accounts as &$acc) {
             $acc['standing'] = $accountModel->getStanding($acc);
         }
@@ -112,6 +113,7 @@ class Member extends BaseController
         $pendingCount = count(array_filter($contributions, fn($c) => in_array($c['approval_status'] ?? 'Pending', ['Pending', ''])));
 
         $accountModel = model(CooperativeAccountModel::class);
+        $accounts     = $accountModel->withTotals($accounts);
         foreach ($accounts as &$acc) {
             $acc['standing'] = $accountModel->getStanding($acc);
             $acc['min_contribution'] = $accountModel->minimumContribution($acc);
@@ -616,6 +618,7 @@ class Member extends BaseController
                        ->getResultArray();
 
         $accountModel = model(CooperativeAccountModel::class);
+        $accounts     = $accountModel->withTotals($accounts);
         foreach ($accounts as &$acc) {
             $acc['standing'] = $accountModel->getStanding($acc);
         }

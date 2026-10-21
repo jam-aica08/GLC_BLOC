@@ -134,6 +134,34 @@ class CooperativeAccountModel extends Model
     }
 
     /**
+     * Add each account's approved and waiting contribution totals
+     * (approved_total, pending_total) with one query, so getStanding() and
+     * amountLeftToActivate() do not query once per account.
+     */
+    public function withTotals(array $accounts): array
+    {
+        $ids = array_map('intval', array_column($accounts, 'account_id'));
+        $totals = [];
+        if ($ids !== []) {
+            $rows = $this->db->table('contributions')
+                ->select('account_id, payment_status, SUM(amount) AS total')
+                ->whereIn('account_id', $ids)->whereIn('payment_status', ['Approved', 'Pending'])
+                ->groupBy(['account_id', 'payment_status'])
+                ->get()->getResultArray();
+            foreach ($rows as $r) {
+                $totals[(int) $r['account_id']][$r['payment_status']] = (float) $r['total'];
+            }
+        }
+        foreach ($accounts as &$acc) {
+            $acc['approved_total'] = $totals[(int) $acc['account_id']]['Approved'] ?? 0.0;
+            $acc['pending_total']  = $totals[(int) $acc['account_id']]['Pending'] ?? 0.0;
+        }
+        unset($acc);
+
+        return $accounts;
+    }
+
+    /**
      * Contribution standing for an account. Every account joins the
      * cooperative only after paying every month from January of its start
      * year up to and including its start month (an account opened in
@@ -151,7 +179,9 @@ class CooperativeAccountModel extends Model
         $monthsSinceJanuary = ((int) date('Y') - $startYear) * 12 + (int) date('n');
         $requiredToJoin     = self::joinAmount($account['account_start_date'] ?: null);
         $requiredToDate     = max($monthsSinceJanuary, $startMonth) * self::MONTHLY_CONTRIBUTION;
-        $paid               = $this->getTotalContributions((int) $account['account_id']);
+        $paid               = isset($account['approved_total'])
+            ? (float) $account['approved_total']
+            : $this->getTotalContributions((int) $account['account_id']);
 
         return [
             'required_to_join' => $requiredToJoin,
@@ -194,11 +224,13 @@ class CooperativeAccountModel extends Model
             return 0.0;
         }
 
-        $pending = (float) ($this->db->table('contributions')
-            ->selectSum('amount', 'total')
-            ->where('account_id', (int) $account['account_id'])
-            ->where('payment_status', 'Pending')
-            ->get()->getRow()->total ?? 0);
+        $pending = isset($account['pending_total'])
+            ? (float) $account['pending_total']
+            : (float) ($this->db->table('contributions')
+                ->selectSum('amount', 'total')
+                ->where('account_id', (int) $account['account_id'])
+                ->where('payment_status', 'Pending')
+                ->get()->getRow()->total ?? 0);
 
         return round(max(0.0, $this->getStanding($account)['join_balance'] - $pending), 2);
     }
@@ -215,8 +247,16 @@ class CooperativeAccountModel extends Model
               . ' WHERE c.account_id = cooperative_accounts.account_id AND c.payment_status = \'Approved\')';
         $join = 'MONTH(account_start_date) * ' . self::MONTHLY_CONTRIBUTION;
 
-        $this->db->query("UPDATE cooperative_accounts SET account_status = 'Pending' WHERE account_status = 'Active' AND {$paid} < {$join}");
-        $this->db->query("UPDATE cooperative_accounts SET account_status = 'Active' WHERE account_status = 'Pending' AND {$paid} >= {$join}");
+        $wrongActive  = "account_status = 'Active' AND {$paid} < {$join}";
+        $wrongPending = "account_status = 'Pending' AND {$paid} >= {$join}";
+
+        // Usually nothing is out of line, so look first and write only when needed.
+        $mismatch = $this->db->query("SELECT 1 FROM cooperative_accounts WHERE ({$wrongActive}) OR ({$wrongPending}) LIMIT 1")->getRow();
+        if (! $mismatch) {
+            return;
+        }
+        $this->db->query("UPDATE cooperative_accounts SET account_status = 'Pending' WHERE {$wrongActive}");
+        $this->db->query("UPDATE cooperative_accounts SET account_status = 'Active' WHERE {$wrongPending}");
     }
 
     /**
