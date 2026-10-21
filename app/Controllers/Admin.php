@@ -147,10 +147,10 @@ class Admin extends BaseController
         $accountModel     = model(CooperativeAccountModel::class);
         $accountModel->syncStatuses();
         $accountsByMember = [];
-        $accounts = $db->table('cooperative_accounts')
+        $accounts = $accountModel->withTotals($db->table('cooperative_accounts')
                        ->orderBy('account_id', 'ASC')
                        ->get()
-                       ->getResultArray();
+                       ->getResultArray());
         foreach ($accounts as $acc) {
             $acc['standing'] = $accountModel->getStanding($acc);
             $accountsByMember[$acc['member_id']][] = $acc;

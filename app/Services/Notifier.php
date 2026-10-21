@@ -19,7 +19,7 @@ class Notifier
     public static function available(string $table = 'notifications'): bool
     {
         try {
-            return db_connect()->tableExists($table);
+            return \App\Libraries\SchemaCache::passes('table_' . $table, static fn () => db_connect()->tableExists($table));
         } catch (Throwable) {
             return false;
         }
