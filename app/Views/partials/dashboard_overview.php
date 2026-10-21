@@ -60,7 +60,9 @@ $loanLink = fn($loan) => $isAdmin ? base_url('admin/loans/' . (int) $loan['loan_
     <div class="card-body d-flex flex-wrap gap-4 align-items-center justify-content-between">
         <div>
             <div class="fw-semibold"><i class="fa-solid fa-coins me-2 glc-icon"></i><?= (int) $dp['year'] ?> Dividends (estimate)</div>
-            <div class="small text-muted">Profit pool <?= $peso($dp['profit_pool']) ?> · <?= $dp['basic_count'] ?> Basic, <?= $dp['pioneer_count'] ?> Pioneer active account(s)</div>
+            <div class="small text-muted mt-2">Profit pool</div>
+            <div class="pool-figure"><?= $peso($dp['profit_pool']) ?></div>
+            <div class="small text-muted"><?= $dp['basic_count'] ?> Basic, <?= $dp['pioneer_count'] ?> Pioneer active account(s)</div>
         </div>
         <div class="d-flex flex-wrap gap-4">
             <div>

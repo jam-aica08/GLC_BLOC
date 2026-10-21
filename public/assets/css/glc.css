@@ -123,6 +123,22 @@ code { color: var(--glc-text); }
 .input-group > :not(:last-child):not(.dropdown-toggle):not(.dropdown-menu) { border-top-right-radius: 0; border-bottom-right-radius: 0; }
 
 .glc-icon { color: var(--glc-accent); }
+
+/* Dividend profit pool: the headline figure of a distribution. */
+.pool-hero {
+    background: var(--glc-gradient-dark);
+    color: #fff;
+    border-radius: var(--glc-radius);
+    padding: 18px 22px 20px;
+    position: relative;
+    overflow: hidden;
+    height: 100%;
+}
+.pool-hero::after { content: ""; position: absolute; inset: auto 0 0 0; height: 4px; background: var(--glc-gradient); }
+.pool-hero .pool-label { font-size: .78rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: rgba(255, 255, 255, .78); }
+.pool-hero .pool-value { font-size: clamp(2rem, 4.5vw, 2.6rem); font-weight: 800; line-height: 1.1; margin: 6px 0 4px; color: var(--glc-accent-on-dark); overflow-wrap: anywhere; }
+.pool-hero .pool-sub { font-size: .82rem; color: rgba(255, 255, 255, .78); }
+.pool-figure { font-size: clamp(1.7rem, 3.6vw, 2.2rem); font-weight: 800; line-height: 1.1; color: var(--glc-indigo); }
 .text-brand { color: var(--glc-indigo) !important; }
 .bg-brand { background-color: var(--glc-indigo) !important; color: #fff; }
 
