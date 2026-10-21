@@ -1413,14 +1413,24 @@ class Admin extends BaseController
         $f  = $this->reportFilters();
 
         // Totals by type and status for the period (same filters as the list).
-        $summary = [];
-        foreach ($this->reportRecords($f, false)->select('fr.record_type, fr.approval_status, COUNT(*) AS n, COALESCE(SUM(fr.amount), 0) AS total', false)
-                     ->groupBy('fr.record_type, fr.approval_status')->get()->getResultArray() as $row) {
-            $summary[$row['record_type']][$row['approval_status']] = ['count' => (int) $row['n'], 'amount' => (float) $row['total']];
+        $data = ['f' => $f, 'summary' => $this->reportSummary($f), 'previous' => null];
+
+        if ($f['category'] === 'summary') {
+            // Period to compare with on each tile: the same dates last year or last
+            // month for those presets, otherwise the same number of days just before.
+            if ($f['period'] !== 'all') {
+                if ($f['period'] === 'year' || $f['period'] === 'month') {
+                    $prevFrom = self::sameDayBack($f['from'], $f['period']);
+                    $prevTo   = self::sameDayBack($f['to'], $f['period']);
+                } else {
+                    $days     = (int) ((strtotime($f['to']) - strtotime($f['from'])) / 86400) + 1;
+                    $prevTo   = date('Y-m-d', strtotime($f['from'] . ' -1 day'));
+                    $prevFrom = date('Y-m-d', strtotime($prevTo . ' -' . ($days - 1) . ' days'));
+                }
+                $data['previous'] = ['from' => $prevFrom, 'to' => $prevTo, 'summary' => $this->reportSummary(['from' => $prevFrom, 'to' => $prevTo] + $f)];
+            }
+            $data['trend'] = $this->reportTrend($f);
         }
-
-        $data = ['f' => $f, 'summary' => $summary];
-
         if ($f['category'] === 'transactions') {
             $data['records'] = $this->reportRecords($f)->orderBy('fr.transaction_date', 'DESC')->orderBy('fr.financial_record_id', 'DESC')
                 ->limit(500)->get()->getResultArray();
@@ -1444,6 +1454,85 @@ class Admin extends BaseController
         }
 
         return view('admin/reports', $data);
+    }
+
+    /** The same calendar day one month or year earlier, clamped to that month's length (Mar 31 → Feb 28). */
+    private static function sameDayBack(string $date, string $unit): string
+    {
+        $t     = strtotime($date);
+        $first = strtotime("first day of -1 {$unit}", $t);
+
+        return date('Y-m-', $first) . sprintf('%02d', min((int) date('j', $t), (int) date('t', $first)));
+    }
+
+    /** @return array<string, array<string, array{count: int, amount: float}>> type => status => totals */
+    private function reportSummary(array $f): array
+    {
+        $summary = [];
+        foreach ($this->reportRecords($f, false)->select('fr.record_type, fr.approval_status, COUNT(*) AS n, COALESCE(SUM(fr.amount), 0) AS total', false)
+                     ->groupBy('fr.record_type, fr.approval_status')->get()->getResultArray() as $row) {
+            $summary[$row['record_type']][$row['approval_status']] = ['count' => (int) $row['n'], 'amount' => (float) $row['total']];
+        }
+
+        return $summary;
+    }
+
+    /**
+     * Amount per type in day, week, month or year buckets across the period.
+     * Uses the chosen status, or Approved when no status is picked, so pending
+     * and rejected amounts never inflate the trend.
+     *
+     * @return array{unit: string, status: string, buckets: list<array{from: string, to: string, label: string, values: array<string, float>}>}
+     */
+    private function reportTrend(array $f): array
+    {
+        $status = $f['status'] !== '' ? $f['status'] : 'Approved';
+        $from   = $f['from'];
+        if ($f['period'] === 'all') {
+            $first = $this->reportRecords(['status' => $status] + $f, false)->select('MIN(fr.transaction_date) AS d', false)->get()->getRow('d');
+            $from  = $first ?: $f['to'];
+        }
+
+        $days = (int) ((strtotime($f['to']) - strtotime($from)) / 86400) + 1;
+        $unit = $days <= 31 ? 'day' : ($days <= 120 ? 'week' : ($days <= 1100 ? 'month' : 'year'));
+        // Fixed SQL per unit; nothing here comes from the request.
+        $key = [
+            'day'   => "DATE_FORMAT(fr.transaction_date, '%Y-%m-%d')",
+            'week'  => "DATE_FORMAT(DATE_SUB(fr.transaction_date, INTERVAL WEEKDAY(fr.transaction_date) DAY), '%Y-%m-%d')",
+            'month' => "DATE_FORMAT(fr.transaction_date, '%Y-%m-01')",
+            'year'  => "DATE_FORMAT(fr.transaction_date, '%Y-01-01')",
+        ][$unit];
+
+        $sums = [];
+        foreach ($this->reportRecords(['from' => $from, 'status' => $status] + $f, false)
+                     ->select("{$key} AS b, fr.record_type, COALESCE(SUM(fr.amount), 0) AS total", false)
+                     ->groupBy('b, fr.record_type')->get()->getResultArray() as $row) {
+            $sums[$row['b']][$row['record_type']] = (float) $row['total'];
+        }
+
+        $start = match ($unit) {
+            'week'  => date('Y-m-d', strtotime($from . ' -' . (date('N', strtotime($from)) - 1) . ' days')),
+            'month' => date('Y-m-01', strtotime($from)),
+            'year'  => date('Y-01-01', strtotime($from)),
+            default => $from,
+        };
+        $step   = ['day' => '+1 day', 'week' => '+1 week', 'month' => '+1 month', 'year' => '+1 year'][$unit];
+        $format = ['day' => 'M j', 'week' => 'M j', 'month' => 'M Y', 'year' => 'Y'][$unit];
+
+        $buckets = [];
+        for ($t = strtotime($start); $t <= strtotime($f['to']); $t = strtotime($step, $t)) {
+            $b    = date('Y-m-d', $t);
+            $end  = date('Y-m-d', strtotime($step . ' -1 day', $t));
+            $buckets[] = [
+                // Clamp to the report period so a drill-down never leaves it.
+                'from'   => max($b, $from),
+                'to'     => min($end, $f['to']),
+                'label'  => ($unit === 'week' ? 'Week of ' : '') . date($format, $t),
+                'values' => array_map(fn($type) => $sums[$b][$type] ?? 0.0, array_combine($f['types'], $f['types'])),
+            ];
+        }
+
+        return ['unit' => $unit, 'status' => $status, 'buckets' => $buckets];
     }
 
     /** GET: the filtered transactions as a CSV file. */

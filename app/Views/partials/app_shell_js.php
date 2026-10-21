@@ -29,25 +29,29 @@
 
     // Label every cell with its column name so wide tables can stack into
     // cards on phones (see .table-stack in glc.css). Opt out with data-no-stack.
-    document.querySelectorAll('.table-responsive > table').forEach(function (table) {
-        if (table.hasAttribute('data-no-stack') || !table.tHead) return;
-        var head = table.tHead.rows[table.tHead.rows.length - 1];
-        if (!head || [].some.call(head.cells, function (c) { return c.colSpan > 1; })) return;
-        var labels = [].map.call(head.cells, function (c) { return c.textContent.trim(); });
-        function label() {
-            [].forEach.call(table.tBodies, function (tbody) {
-                [].forEach.call(tbody.rows, function (row) {
-                    if (row.cells.length === 1 && row.cells[0].colSpan > 1) return;
-                    [].forEach.call(row.cells, function (cell, i) {
-                        if (!cell.hasAttribute('data-label')) cell.setAttribute('data-label', labels[i] || '');
+    // Pages that swap content in call window.glcStackTables(container) again.
+    window.glcStackTables = function (root) {
+        (root || document).querySelectorAll('.table-responsive > table').forEach(function (table) {
+            if (table.classList.contains('table-stack') || table.hasAttribute('data-no-stack') || !table.tHead) return;
+            var head = table.tHead.rows[table.tHead.rows.length - 1];
+            if (!head || [].some.call(head.cells, function (c) { return c.colSpan > 1; })) return;
+            var labels = [].map.call(head.cells, function (c) { return c.textContent.trim(); });
+            function label() {
+                [].concat([].slice.call(table.tBodies), table.tFoot ? [table.tFoot] : []).forEach(function (section) {
+                    [].forEach.call(section.rows, function (row) {
+                        if (row.cells.length === 1 && row.cells[0].colSpan > 1) return;
+                        [].forEach.call(row.cells, function (cell, i) {
+                            if (!cell.hasAttribute('data-label')) cell.setAttribute('data-label', labels[i] || '');
+                        });
                     });
                 });
-            });
-        }
-        label();
-        // Some pages fill rows in later with JavaScript.
-        new MutationObserver(label).observe(table, { childList: true, subtree: true });
-        table.classList.add('table-stack');
-    });
+            }
+            label();
+            // Some pages fill rows in later with JavaScript.
+            new MutationObserver(label).observe(table, { childList: true, subtree: true });
+            table.classList.add('table-stack');
+        });
+    };
+    window.glcStackTables();
 })();
 </script>

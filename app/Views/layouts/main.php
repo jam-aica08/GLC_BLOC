@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>GLC-BLOC Admin Panel</title>
     <?= view('partials/app_head') ?>
-    <?php if (preg_match('#/(dashboard|analytics)$#', '/' . uri_string())): ?>
+    <?php if (preg_match('#/(dashboard|analytics|reports)$#', '/' . uri_string())): ?>
     <!-- Chart.js CDN (only the pages with charts need it) -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <?php endif; ?>

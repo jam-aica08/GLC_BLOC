@@ -357,7 +357,7 @@ code { color: var(--glc-text); }
     .table-stack { border-collapse: separate; }
     .table-stack thead { display: none; }
     .table-stack, .table-stack tbody { display: block; width: 100%; }
-    .table-stack tbody tr {
+    .table-stack tbody tr, .table-stack tfoot tr {
         display: block;
         border: 1px solid var(--glc-border);
         border-radius: 12px;
@@ -365,7 +365,7 @@ code { color: var(--glc-text); }
         padding: 8px 12px;
         margin: 10px;
     }
-    .table-stack tbody tr > * {
+    .table-stack tbody tr > *, .table-stack tfoot tr > * {
         display: flex;
         justify-content: space-between;
         align-items: center;
@@ -378,7 +378,7 @@ code { color: var(--glc-text); }
         white-space: normal;
         min-width: 0;
     }
-    .table-stack tbody tr > *::before {
+    .table-stack tbody tr > *::before, .table-stack tfoot tr > *::before {
         content: attr(data-label);
         flex: 0 0 38%;
         text-align: left;
@@ -388,15 +388,14 @@ code { color: var(--glc-text); }
         letter-spacing: .04em;
         color: var(--glc-muted);
     }
-    .table-stack tbody tr > :not([data-label])::before,
-    .table-stack tbody tr > [data-label=""]::before { content: none; }
-    .table-stack tbody tr > :not([data-label]),
-    .table-stack tbody tr > [data-label=""] { justify-content: flex-end; flex-wrap: wrap; }
+    .table-stack tr > :not([data-label])::before,
+    .table-stack tr > [data-label=""]::before { content: none; }
+    .table-stack tr > :not([data-label]),
+    .table-stack tr > [data-label=""] { justify-content: flex-end; flex-wrap: wrap; }
     .table-stack tbody tr > [colspan] { justify-content: center; text-align: center; }
     .table-stack tbody tr > * > .d-flex { justify-content: flex-end; flex-wrap: wrap; }
     .table-stack tfoot { display: block; }
-    .table-stack tfoot tr { display: flex; flex-wrap: wrap; justify-content: space-between; padding: 8px 22px; }
-    .table-stack tfoot tr > * { border: 0; padding: 2px 0; }
+    .table-stack tfoot tr { background: #f8f9fd; }
     .table-responsive:has(> .table-stack) { overflow: visible; }
 
     /* Large dialogs use the whole screen on phones. */
