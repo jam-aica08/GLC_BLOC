@@ -82,7 +82,7 @@ class DemoLoad extends BaseCommand
 
         // Dividends for each finished year that earned loan interest.
         $dividends = new DividendService($db);
-        for ($year = 2024; $year < (int) date('Y'); $year++) {
+        for ($year = 2022; $year < (int) date('Y'); $year++) {
             $plan = $dividends->plan($year);
             if ($plan['errors'] !== [] || $plan['existing'] || $plan['legacy_paid']) {
                 continue;

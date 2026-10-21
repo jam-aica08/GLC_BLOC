@@ -30,12 +30,23 @@ class DemoData
         mt_srand($seed);
         $today   = $today ?? date('Y-m-d');
         $todayTs = strtotime($today);
-        $first   = strtotime('2024-01-08');
         $out     = ['Members' => [], 'Accounts' => [], 'Contributions' => [], 'Loans' => [], 'Loan Payments' => []];
         $used    = [];
         $loanSvc = new LoanService();
         $acctNo  = 0;
         $loanNo  = 0;
+
+        // A quarter are founding members who joined during 2022 with Pioneer
+        // accounts; the rest joined from 2023 on, more slowly over time.
+        $founders = max(1, (int) round($members / 4));
+        $joins    = [];
+        for ($i = 0; $i < $members; $i++) {
+            [$from, $to] = $i < $founders
+                ? [strtotime('2022-01-10'), strtotime('2022-12-15')]
+                : [strtotime('2023-01-09'), strtotime('-40 days', $todayTs)];
+            $joins[] = $from + (int) (pow(mt_rand(0, 1000) / 1000, $i < $founders ? 1 : 1.3) * ($to - $from));
+        }
+        sort($joins);
 
         for ($i = 1; $i <= $members; $i++) {
             do {
@@ -44,9 +55,9 @@ class DemoData
             } while (isset($used["$fn $ln"]));
             $used["$fn $ln"] = true;
 
-            // Earlier members joined as Pioneers; joining slows down over time.
-            $joinTs = $first + (int) (pow(mt_rand(0, 1000) / 1000, 1.3) * (strtotime('-40 days', $todayTs) - $first));
-            $join   = date('Y-m-d', $joinTs);
+            $founder = $i <= $founders;
+            $joinTs  = $joins[$i - 1];
+            $join    = date('Y-m-d', $joinTs);
             $email  = strtolower(str_replace(' ', '', $fn) . '.' . str_replace(' ', '', $ln)) . '@example.com';
             $ref    = sprintf('M%03d', $i);
             $out['Members'][] = [
@@ -55,7 +66,7 @@ class DemoData
                 'membership_date' => $join, 'status' => $i % 23 === 0 ? 'Inactive' : 'Active',
             ];
 
-            $accounts = [[$join, $joinTs < strtotime('2024-10-01') || mt_rand(1, 100) <= 25 ? 'Pioneer' : 'Basic']];
+            $accounts = [[$join, $founder ? 'Pioneer' : 'Basic']];
             if (mt_rand(1, 100) <= 15 && $joinTs < strtotime('-8 months', $todayTs)) {
                 $secondTs   = strtotime('+' . mt_rand(4, 8) . ' months', $joinTs);
                 $accounts[] = [date('Y-m-d', min($secondTs, strtotime('-30 days', $todayTs))), 'Basic'];
@@ -67,7 +78,7 @@ class DemoData
 
                 // Behaviour of this account: most pay every month, some fall behind, a few never finish joining.
                 $roll     = mt_rand(1, 100);
-                $style    = $roll <= 6 ? 'unfinished' : ($roll <= 18 ? 'behind' : 'regular');
+                $style    = $roll <= 6 && ! $founder ? 'unfinished' : ($roll <= 18 ? 'behind' : 'regular');
                 $startTs  = strtotime($start);
                 $paid     = [];   // date => amount, to size loans later
 
