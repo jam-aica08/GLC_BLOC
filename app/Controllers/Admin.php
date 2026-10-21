@@ -10,6 +10,7 @@ use App\Models\FinancialRecordModel;
 use App\Models\LoanModel;
 use App\Models\LoanInstallmentModel;
 use App\Services\LedgerService;
+use App\Services\Notifier;
 use App\Services\LoanService;
 use App\Services\AnalyticsService;
 
@@ -363,6 +364,29 @@ class Admin extends BaseController
     }
 
     /**
+     * POST: send an announcement to every active member's notifications.
+     */
+    public function announce()
+    {
+        $this->requireAdmin();
+
+        if (! $this->request->is('post')) {
+            return redirect()->to('/admin/members');
+        }
+
+        $title   = trim((string) $this->request->getPost('title'));
+        $message = trim((string) $this->request->getPost('message'));
+        if ($title === '' || $message === '' || mb_strlen($title) > 150 || mb_strlen($message) > 500) {
+            session()->setFlashdata('error', 'Enter a title (up to 150 characters) and a message (up to 500 characters).');
+            return redirect()->to('/admin/members');
+        }
+
+        $count = Notifier::announce($title, $message);
+        session()->setFlashdata('success', "Announcement \"{$title}\" sent to {$count} active member(s).");
+        return redirect()->to('/admin/members');
+    }
+
+    /**
      * POST: set member status to Inactive.
      */
     public function deactivateMember(int $id)
@@ -418,10 +442,12 @@ class Admin extends BaseController
         $db = db_connect();
 
         $query = $db->table('contributions c')
-                    ->select("c.contribution_id AS id, c.contribution_period, c.amount, c.payment_date, c.payment_status, c.created_at, ca.account_number, ca.account_type, m.member_number, CONCAT(m.first_name, ' ', m.last_name) AS member_name, fr.approval_status, fr.first_approved_by, fr.second_approved_by")
+                    ->select("c.contribution_id AS id, c.contribution_period, c.amount, c.payment_date, c.payment_status, c.created_at, ca.account_number, ca.account_type, m.member_number, CONCAT(m.first_name, ' ', m.last_name) AS member_name, fr.approval_status, fr.first_approved_by, fr.second_approved_by, COALESCE(u2.username, u1.username) AS approver_name, COALESCE(fr.second_approval_date, fr.first_approval_date) AS approved_at")
                     ->join('cooperative_accounts ca', 'ca.account_id = c.account_id', 'left')
                     ->join('members m', 'm.member_id = ca.member_id', 'left')
                     ->join('financial_records fr', 'fr.financial_record_id = c.financial_record_id', 'left')
+                    ->join('users u1', 'u1.user_id = fr.first_approved_by', 'left')
+                    ->join('users u2', 'u2.user_id = fr.second_approved_by', 'left')
                     ->orderBy('c.created_at', 'DESC');
 
         if ($filterStatus !== '') {
@@ -443,11 +469,7 @@ class Admin extends BaseController
     }
 
     /**
-     * POST: two-tier approval for a contribution (Fix 4.7).
-     *
-     * Tier 1: set first_approved_by
-     * Tier 2: set second_approved_by (must be a DIFFERENT user — Fix 4.7),
-     *         mark Approved, write ledger entry.
+     * POST: approve a contribution. One administrator's approval is final.
      */
     public function approveContribution(int $id)
     {
@@ -457,118 +479,17 @@ class Admin extends BaseController
             return redirect()->to('/admin/contributions');
         }
 
-        $currentUserId = (int) session()->get('user_id');
-        $db            = db_connect();
-        $frModel       = model(FinancialRecordModel::class);
+        $contribution = db_connect()->table('contributions')->where('contribution_id', $id)->get()->getRowArray();
+        [$ok, $message] = $contribution
+            ? $this->approveRecord((int) $contribution['financial_record_id'])
+            : [false, 'Contribution not found.'];
 
-        $db->transStart();
-
-        // Load the contribution
-        $contribution = $db->table('contributions')
-                           ->where('contribution_id', $id)
-                           ->get()
-                           ->getRowArray();
-
-        if (! $contribution) {
-            $db->transRollback();
-            session()->setFlashdata('error', 'Contribution not found.');
-            return redirect()->to('/admin/contributions');
-        }
-
-        $frId = (int) $contribution['financial_record_id'];
-        $fr   = $frModel->find($frId);
-
-        if (! $fr) {
-            $db->transRollback();
-            session()->setFlashdata('error', 'Financial record not found.');
-            return redirect()->to('/admin/contributions');
-        }
-
-        if ($fr['approval_status'] !== 'Pending') {
-            $db->transRollback();
-            session()->setFlashdata('error', 'Contribution is no longer pending.');
-            return redirect()->to('/admin/contributions');
-        }
-
-        $now = date('Y-m-d H:i:s');
-
-        if (empty($fr['first_approved_by'])) {
-            // --- Tier 1 ---------------------------------------------------------
-            $affected = $db->table('financial_records')
-                           ->where('financial_record_id', $frId)
-                           ->where('first_approved_by IS NULL')          // concurrent guard
-                           ->update([
-                               'first_approved_by'   => $currentUserId,
-                               'first_approval_date' => $now,
-                               'updated_at'          => $now,
-                           ]);
-
-            if (! $db->affectedRows()) {
-                $db->transRollback();
-                session()->setFlashdata('error', 'Concurrent approval detected. Please reload.');
-                return redirect()->to('/admin/contributions');
-            }
-
-            $db->transComplete();
-            session()->setFlashdata('success', 'First approval recorded.');
-
-        } elseif (empty($fr['second_approved_by'])) {
-            // --- Tier 2 ---------------------------------------------------------
-            // Fix 4.7: second approver must differ from first approver
-            if ((int) $fr['first_approved_by'] === $currentUserId) {
-                $db->transRollback();
-                session()->setFlashdata('error', 'You cannot provide both approvals for the same contribution.');
-                return redirect()->to('/admin/contributions');
-            }
-
-            // Atomic update with concurrent-approval guard
-            $db->table('financial_records')
-               ->where('financial_record_id', $frId)
-               ->where('second_approved_by IS NULL')
-               ->where('approval_status', 'Pending')
-               ->update([
-                   'second_approved_by'   => $currentUserId,
-                   'second_approval_date' => $now,
-                   'approval_status'      => 'Approved',
-                   'updated_at'           => $now,
-               ]);
-
-            if (! $db->affectedRows()) {
-                $db->transRollback();
-                session()->setFlashdata('error', 'Concurrent approval detected. Please reload.');
-                return redirect()->to('/admin/contributions');
-            }
-
-            $this->applyApprovedRecord($fr);
-
-            $db->transComplete();
-
-            if (! $db->transStatus()) {
-                session()->setFlashdata('error', 'Database error during approval.');
-                return redirect()->to('/admin/contributions');
-            }
-
-            // Write ledger entry (outside the DB transaction — ledger has its own integrity)
-            $frFresh = $frModel->find($frId);
-            try {
-                $ledgerService = new LedgerService();
-                $ledgerService->createEntry($frId, $frFresh);
-            } catch (\Throwable $e) {
-                log_message('error', 'LedgerService::createEntry failed for FR #' . $frId . ': ' . $e->getMessage());
-            }
-
-            session()->setFlashdata('success', 'Contribution fully approved and ledger entry created.');
-
-        } else {
-            $db->transRollback();
-            session()->setFlashdata('error', 'Contribution has already been approved by two approvers.');
-        }
-
+        session()->setFlashdata($ok ? 'success' : 'error', $message);
         return redirect()->to('/admin/contributions');
     }
 
     /**
-     * POST: reject a contribution.
+     * POST: reject a contribution that is still waiting for approval.
      */
     public function rejectContribution(int $id)
     {
@@ -578,32 +499,12 @@ class Admin extends BaseController
             return redirect()->to('/admin/contributions');
         }
 
-        $db    = db_connect();
-        $frModel = model(FinancialRecordModel::class);
-        $now   = date('Y-m-d H:i:s');
+        $contribution = db_connect()->table('contributions')->where('contribution_id', $id)->get()->getRowArray();
+        [$ok, $message] = $contribution
+            ? $this->rejectRecord((int) $contribution['financial_record_id'])
+            : [false, 'Contribution not found.'];
 
-        $contribution = $db->table('contributions')
-                           ->where('contribution_id', $id)
-                           ->get()
-                           ->getRowArray();
-
-        if (! $contribution) {
-            session()->setFlashdata('error', 'Contribution not found.');
-            return redirect()->to('/admin/contributions');
-        }
-
-        $frId = (int) $contribution['financial_record_id'];
-
-        $db->transStart();
-
-        $frModel->update($frId, ['approval_status' => 'Rejected', 'updated_at' => $now]);
-        $db->table('contributions')
-           ->where('contribution_id', $id)
-           ->update(['payment_status' => 'Rejected', 'updated_at' => $now]);
-
-        $db->transComplete();
-
-        session()->setFlashdata('success', 'Contribution rejected.');
+        session()->setFlashdata($ok ? 'success' : 'error', $message);
         return redirect()->to('/admin/contributions');
     }
 
@@ -698,13 +599,20 @@ class Admin extends BaseController
 
         $db->transStart();
 
-        // Update loan
-        $loanModel->update($id, [
+        // Only a loan that is still Pending can be approved, so a second click
+        // cannot create the installments twice.
+        $db->table('loans')->where('loan_id', $id)->where('loan_status', 'Pending')->update([
             'loan_status'   => 'Active',
             'approval_date' => $today,
             'release_date'  => $releaseDate,
             'approved_by'   => $currentUserId,
+            'updated_at'    => $now,
         ]);
+        if ($db->affectedRows() < 1) {
+            $db->transRollback();
+            session()->setFlashdata('error', 'This loan was just approved or rejected by another administrator.');
+            return redirect()->to('/admin/loans');
+        }
 
         // Generate installments
         $installmentData = $loanService->calculateInstallments([
@@ -734,8 +642,6 @@ class Admin extends BaseController
             'processed_by'    => $currentUserId,
             'first_approved_by'  => $currentUserId,
             'first_approval_date'=> $now,
-            'second_approved_by' => $currentUserId,
-            'second_approval_date'=> $now,
             'reference_id'    => $id,
         ]);
 
@@ -756,6 +662,10 @@ class Admin extends BaseController
                 log_message('error', 'LedgerService::createEntry failed for loan disbursement FR #' . $frId . ': ' . $e->getMessage());
             }
         }
+
+        Notifier::toAccountOwner((int) $loan['account_id'], 'loan', 'Loan approved',
+            'Your loan #' . $id . ' of PHP ' . number_format((float) $loan['loan_amount'], 2) . ' was approved. Your monthly schedule is ready.',
+            'member/loans', 'loan-approved-' . $id);
 
         session()->setFlashdata('success', 'Loan approved and installments generated.');
         return redirect()->to('/admin/loans');
@@ -780,7 +690,15 @@ class Admin extends BaseController
             return redirect()->to('/admin/loans');
         }
 
-        $loanModel->update($id, ['loan_status' => 'Rejected']);
+        db_connect()->table('loans')->where('loan_id', $id)->where('loan_status', 'Pending')->update(['loan_status' => 'Rejected', 'updated_at' => date('Y-m-d H:i:s')]);
+        if (db_connect()->affectedRows() < 1) {
+            session()->setFlashdata('error', 'This loan was just approved or rejected by another administrator.');
+            return redirect()->to('/admin/loans');
+        }
+
+        Notifier::toAccountOwner((int) $loan['account_id'], 'loan', 'Loan application rejected',
+            'Your loan application #' . $id . ' of PHP ' . number_format((float) $loan['loan_amount'], 2) . ' was rejected.',
+            'member/loans', 'loan-rejected-' . $id);
 
         session()->setFlashdata('success', 'Loan rejected.');
         return redirect()->to('/admin/loans');
@@ -798,9 +716,10 @@ class Admin extends BaseController
         $db       = db_connect();
 
         $query = $db->table('loan_payments lp')
-                    ->select("lp.payment_id AS id, lp.loan_id, lp.amount_paid, lp.payment_date, lp.payment_status AS status, lp.financial_record_id, l.loan_amount, l.loan_status, m.member_number, ca.account_number, CONCAT(m.first_name, ' ', m.last_name) AS member_name, (SELECT COALESCE(SUM(li.amount_paid), 0) FROM loan_installments li WHERE li.loan_id = l.loan_id) AS total_paid, (l.loan_amount + l.interest_amount) AS total_payable, fr.first_approved_by, u1.username AS approver1_name, (SELECT GROUP_CONCAT(CONCAT('Month ', li2.installment_number, ': ₱', FORMAT(lpi.amount_applied, 2)) ORDER BY li2.installment_number SEPARATOR ', ') FROM loan_payment_installments lpi JOIN loan_installments li2 ON li2.installment_id = lpi.installment_id WHERE lpi.payment_id = lp.payment_id) AS months", false)
+                    ->select("lp.payment_id AS id, lp.loan_id, lp.amount_paid, lp.payment_date, lp.payment_status AS status, lp.financial_record_id, l.loan_amount, l.loan_status, m.member_number, ca.account_number, CONCAT(m.first_name, ' ', m.last_name) AS member_name, (SELECT COALESCE(SUM(li.amount_paid), 0) FROM loan_installments li WHERE li.loan_id = l.loan_id) AS total_paid, (l.loan_amount + l.interest_amount) AS total_payable, fr.first_approved_by, COALESCE(u2.username, u1.username) AS approver_name, COALESCE(fr.second_approval_date, fr.first_approval_date) AS approved_at, (SELECT GROUP_CONCAT(CONCAT('Month ', li2.installment_number, ': ₱', FORMAT(lpi.amount_applied, 2)) ORDER BY li2.installment_number SEPARATOR ', ') FROM loan_payment_installments lpi JOIN loan_installments li2 ON li2.installment_id = lpi.installment_id WHERE lpi.payment_id = lp.payment_id) AS months", false)
                     ->join('financial_records fr', 'fr.financial_record_id = lp.financial_record_id', 'left')
                     ->join('users u1', 'u1.user_id = fr.first_approved_by', 'left')
+                    ->join('users u2', 'u2.user_id = fr.second_approved_by', 'left')
                     ->join('loans l', 'l.loan_id = lp.loan_id', 'left')
                     ->join('cooperative_accounts ca', 'ca.account_id = l.account_id', 'left')
                     ->join('members m', 'm.member_id = ca.member_id', 'left')
@@ -825,9 +744,8 @@ class Admin extends BaseController
     }
 
     /**
-     * POST: two-tier approval for a loan payment.
-     * On final approval: mark installments Paid, check if loan fully paid,
-     * write ledger entry.
+     * POST: approve a loan payment. One administrator's approval is final:
+     * the payment is applied to its installments and added to the ledger.
      */
     public function approvePayment(int $id)
     {
@@ -837,132 +755,186 @@ class Admin extends BaseController
             return redirect()->to('/admin/payments');
         }
 
-        $currentUserId = (int) session()->get('user_id');
-        $db            = db_connect();
-        $frModel       = model(FinancialRecordModel::class);
-        $now           = date('Y-m-d H:i:s');
-
-        $payment = $db->table('loan_payments')
-                      ->where('payment_id', $id)
-                      ->get()
-                      ->getRowArray();
-
-        if (! $payment) {
-            session()->setFlashdata('error', 'Payment not found.');
-            return redirect()->to('/admin/payments');
-        }
-
-        if ($payment['payment_status'] !== 'Pending') {
-            session()->setFlashdata('error', 'Payment is no longer pending.');
-            return redirect()->to('/admin/payments');
-        }
-
-        if ($problem = $this->paymentOverBalance($payment)) {
-            session()->setFlashdata('error', $problem);
+        $db      = db_connect();
+        $payment = $db->table('loan_payments')->where('payment_id', $id)->get()->getRowArray();
+        if (! $payment || $payment['payment_status'] !== 'Pending') {
+            session()->setFlashdata('error', 'This payment is no longer waiting for approval.');
             return redirect()->to('/admin/payments');
         }
 
         $frId = (int) $payment['financial_record_id'];
-        $fr   = $frId ? $frModel->find($frId) : null;
-
-        // If no FR attached yet, create one
-        if (! $fr) {
+        if (! $frId || ! model(FinancialRecordModel::class)->find($frId)) {
+            // Older payments may lack a financial record; create it so the approval is recorded.
             $loan = $db->table('loans')->where('loan_id', $payment['loan_id'])->get()->getRowArray();
-            $frId = (int) $frModel->insert([
-                'account_id'      => $loan['account_id'],
-                'record_type'     => 'Loan Payment',
-                'transaction_date'=> $payment['payment_date'],
-                'amount'          => $payment['amount_paid'],
-                'approval_status' => 'Pending',
-                'processed_by'    => null,
-                'reference_id'    => $payment['loan_id'],
+            $frId = (int) model(FinancialRecordModel::class)->insert([
+                'account_id'       => $loan['account_id'],
+                'record_type'      => 'Loan Payment',
+                'transaction_date' => $payment['payment_date'],
+                'amount'           => $payment['amount_paid'],
+                'approval_status'  => 'Pending',
+                'processed_by'     => null,
+                'reference_id'     => $payment['loan_id'],
             ]);
-            $db->table('loan_payments')
-               ->where('payment_id', $id)
-               ->update(['financial_record_id' => $frId]);
-            $fr = $frModel->find($frId);
+            $db->table('loan_payments')->where('payment_id', $id)->update(['financial_record_id' => $frId]);
         }
 
-        $db->transStart();
-
-        if (empty($fr['first_approved_by'])) {
-            // Tier 1
-            $db->table('financial_records')
-               ->where('financial_record_id', $frId)
-               ->where('first_approved_by IS NULL')
-               ->update([
-                   'first_approved_by'   => $currentUserId,
-                   'first_approval_date' => $now,
-                   'updated_at'          => $now,
-               ]);
-
-            if (! $db->affectedRows()) {
-                $db->transRollback();
-                session()->setFlashdata('error', 'Concurrent approval detected.');
-                return redirect()->to('/admin/payments');
-            }
-
-            $db->transComplete();
-            session()->setFlashdata('success', 'First approval recorded for payment.');
-            return redirect()->to('/admin/payments');
-        }
-
-        if (! empty($fr['second_approved_by'])) {
-            $db->transRollback();
-            session()->setFlashdata('error', 'Payment already fully approved.');
-            return redirect()->to('/admin/payments');
-        }
-
-        // Fix 4.7: second approver must differ
-        if ((int) $fr['first_approved_by'] === $currentUserId) {
-            $db->transRollback();
-            session()->setFlashdata('error', 'You cannot provide both approvals for the same payment.');
-            return redirect()->to('/admin/payments');
-        }
-
-        // Tier 2 — full approval
-        $db->table('financial_records')
-           ->where('financial_record_id', $frId)
-           ->where('second_approved_by IS NULL')
-           ->where('approval_status', 'Pending')
-           ->update([
-               'second_approved_by'   => $currentUserId,
-               'second_approval_date' => $now,
-               'approval_status'      => 'Approved',
-               'processed_by'         => $currentUserId,
-               'updated_at'           => $now,
-           ]);
-
-        if (! $db->affectedRows()) {
-            $db->transRollback();
-            session()->setFlashdata('error', 'Concurrent approval detected.');
-            return redirect()->to('/admin/payments');
-        }
-
-        $this->applyLoanPayment($payment);
-
-        $db->transComplete();
-
-        if (! $db->transStatus()) {
-            session()->setFlashdata('error', 'Database error during payment approval.');
-            return redirect()->to('/admin/payments');
-        }
-
-        // Ledger entry
-        $frFresh = $frModel->find($frId);
-        try {
-            $ledgerService = new LedgerService();
-            $ledgerService->createEntry($frId, $frFresh);
-        } catch (\Throwable $e) {
-            log_message('error', 'LedgerService::createEntry failed for payment FR #' . $frId . ': ' . $e->getMessage());
-        }
-
-        session()->setFlashdata('success', 'Payment fully approved and ledger entry created.');
+        [$ok, $message] = $this->approveRecord($frId);
+        session()->setFlashdata($ok ? 'success' : 'error', $message);
         return redirect()->to('/admin/payments');
     }
 
     /**
-     * Once a financial record has both approvals, bring its source row in line:
+     * Approve a Pending financial record. One administrator is enough; the
+     * update only succeeds while the record is still Pending, so a second
+     * click or a second administrator cannot approve or apply it twice.
+     *
+     * @return array{0: bool, 1: string} [ok, message]
+     */
+    private function approveRecord(int $frId): array
+    {
+        $db      = db_connect();
+        $frModel = model(FinancialRecordModel::class);
+        $adminId = (int) session()->get('user_id');
+        $now     = date('Y-m-d H:i:s');
+
+        $fr = $frId ? $frModel->find($frId) : null;
+        if (! $fr || $fr['approval_status'] !== 'Pending') {
+            return [false, 'This record is no longer waiting for approval.'];
+        }
+        if ($fr['record_type'] === 'Dividend') {
+            return [false, 'Dividends are approved as a whole distribution on the Dividends page.'];
+        }
+        if ($fr['record_type'] === 'Loan Payment') {
+            $payment = $db->table('loan_payments')->where('financial_record_id', $frId)->get()->getRowArray();
+            if ($payment && ($problem = $this->paymentOverBalance($payment))) {
+                return [false, $problem];
+            }
+        }
+
+        $account = $db->table('cooperative_accounts')->where('account_id', $fr['account_id'])->get()->getRowArray();
+
+        $db->transBegin();
+        try {
+            // A record half-approved under the old two-step rule keeps its first approver.
+            $tier = empty($fr['first_approved_by']) ? 'first' : 'second';
+            $db->table('financial_records')
+               ->where('financial_record_id', $frId)
+               ->where('approval_status', 'Pending')
+               ->update([
+                   "{$tier}_approved_by"   => $adminId,
+                   "{$tier}_approval_date" => $now,
+                   'approval_status'       => 'Approved',
+                   'updated_at'            => $now,
+               ]);
+            if ($db->affectedRows() < 1) {
+                throw new \DomainException('This record was just approved or rejected by another administrator. Reload the page.');
+            }
+
+            $this->applyApprovedRecord($fr);
+
+            if ($db->transStatus() === false) {
+                throw new \RuntimeException('The database refused the approval.');
+            }
+            $db->transCommit();
+        } catch (\DomainException $e) {
+            $db->transRollback();
+            return [false, $e->getMessage()];
+        } catch (\Throwable $e) {
+            $db->transRollback();
+            log_message('error', 'approveRecord #' . $frId . ' failed: ' . $e->getMessage());
+            return [false, 'Could not approve the record. Nothing was changed.'];
+        }
+
+        // Ledger entry, once per record.
+        if (! $db->table('blockchain_ledger')->where('financial_record_id', $frId)->countAllResults()) {
+            try {
+                (new LedgerService())->createEntry($frId, $frModel->find($frId));
+            } catch (\Throwable $e) {
+                log_message('error', 'LedgerService::createEntry failed for FR #' . $frId . ': ' . $e->getMessage());
+            }
+        }
+
+        $this->notifyRecord($fr, 'approved', $account);
+
+        $label = ['Contribution' => 'Contribution', 'Loan Payment' => 'Payment'][$fr['record_type']] ?? 'Financial record';
+        return [true, "{$label} approved and recorded in the blockchain ledger."];
+    }
+
+    /**
+     * Reject a Pending financial record and its contribution or loan payment.
+     *
+     * @return array{0: bool, 1: string} [ok, message]
+     */
+    private function rejectRecord(int $frId): array
+    {
+        $db  = db_connect();
+        $now = date('Y-m-d H:i:s');
+        $fr  = $frId ? model(FinancialRecordModel::class)->find($frId) : null;
+
+        if (! $fr || $fr['approval_status'] !== 'Pending') {
+            return [false, 'This record is no longer waiting for approval.'];
+        }
+        if ($fr['record_type'] === 'Dividend') {
+            return [false, 'Dividends are rejected as a whole distribution on the Dividends page.'];
+        }
+
+        $db->transStart();
+        $db->table('financial_records')
+           ->where('financial_record_id', $frId)->where('approval_status', 'Pending')
+           ->update(['approval_status' => 'Rejected', 'updated_at' => $now]);
+        $changed = $db->affectedRows() > 0;
+        $source  = ['Contribution' => 'contributions', 'Loan Payment' => 'loan_payments'][$fr['record_type']] ?? null;
+        if ($changed && $source) {
+            $db->table($source)
+               ->where('financial_record_id', $frId)->where('payment_status', 'Pending')
+               ->update(['payment_status' => 'Rejected', 'updated_at' => $now]);
+        }
+        $db->transComplete();
+
+        if (! $changed || ! $db->transStatus()) {
+            return [false, 'This record is no longer waiting for approval.'];
+        }
+
+        $this->notifyRecord($fr, 'rejected');
+
+        $label = ['Contribution' => 'Contribution', 'Loan Payment' => 'Payment'][$fr['record_type']] ?? 'Financial record';
+        return [true, "{$label} rejected."];
+    }
+
+    /** Tell the member about an approved or rejected contribution or loan payment. */
+    private function notifyRecord(array $fr, string $decision, ?array $accountBefore = null): void
+    {
+        $db     = db_connect();
+        $frId   = (int) $fr['financial_record_id'];
+        $amount = 'PHP ' . number_format((float) $fr['amount'], 2);
+        $title  = ucfirst($decision);
+
+        if ($fr['record_type'] === 'Contribution') {
+            $c = $db->table('contributions c')->select('c.contribution_id, c.contribution_period, ca.account_number, ca.account_id, ca.account_status')
+                    ->join('cooperative_accounts ca', 'ca.account_id = c.account_id')
+                    ->where('c.financial_record_id', $frId)->get()->getRowArray();
+            if (! $c) {
+                return;
+            }
+            Notifier::toAccountOwner((int) $c['account_id'], 'contribution', "Contribution {$decision}",
+                "Your contribution of {$amount} for {$c['contribution_period']} on account {$c['account_number']} was {$decision}.",
+                'member/contributions', "contribution-{$decision}-{$c['contribution_id']}");
+            if ($decision === 'approved' && ($accountBefore['account_status'] ?? '') === 'Pending' && $c['account_status'] === 'Active') {
+                Notifier::toAccountOwner((int) $c['account_id'], 'account', 'Account activated',
+                    "Account {$c['account_number']} is now active.", 'member/profile', "account-active-{$c['account_id']}");
+            }
+        } elseif ($fr['record_type'] === 'Loan Payment') {
+            $p = $db->table('loan_payments')->where('financial_record_id', $frId)->get()->getRowArray();
+            if ($p) {
+                Notifier::toAccountOwner((int) $fr['account_id'], 'payment', "Loan payment {$decision}",
+                    "Your payment of {$amount} for loan #{$p['loan_id']} was {$decision}.",
+                    'member/loans', "payment-{$decision}-{$p['payment_id']}");
+            }
+        }
+    }
+
+    /**
+     * Once a financial record is approved, bring its source row in line:
      * contributions become Approved (and may complete an account's joining),
      * loan payments are applied to their installments.
      */
@@ -1019,7 +991,7 @@ class Admin extends BaseController
     }
 
     /**
-     * POST: reject a loan payment.
+     * POST: reject a loan payment that is still waiting for approval.
      */
     public function rejectPayment(int $id)
     {
@@ -1029,25 +1001,22 @@ class Admin extends BaseController
             return redirect()->to('/admin/payments');
         }
 
-        $db  = db_connect();
-        $now = date('Y-m-d H:i:s');
-
+        $db      = db_connect();
         $payment = $db->table('loan_payments')->where('payment_id', $id)->get()->getRowArray();
         if (! $payment || $payment['payment_status'] !== 'Pending') {
-            session()->setFlashdata('error', 'Payment not found or is not pending.');
+            session()->setFlashdata('error', 'This payment is no longer waiting for approval.');
             return redirect()->to('/admin/payments');
         }
 
-        $db->table('loan_payments')
-           ->where('payment_id', $id)
-           ->update(['payment_status' => 'Rejected', 'updated_at' => $now]);
-
         if ($payment['financial_record_id']) {
-            $frModel = model(FinancialRecordModel::class);
-            $frModel->update($payment['financial_record_id'], ['approval_status' => 'Rejected', 'updated_at' => $now]);
+            [$ok, $message] = $this->rejectRecord((int) $payment['financial_record_id']);
+        } else {
+            $db->table('loan_payments')->where('payment_id', $id)->where('payment_status', 'Pending')
+               ->update(['payment_status' => 'Rejected', 'updated_at' => date('Y-m-d H:i:s')]);
+            [$ok, $message] = [$db->affectedRows() > 0, 'Payment rejected.'];
         }
 
-        session()->setFlashdata('success', 'Payment rejected.');
+        session()->setFlashdata($ok ? 'success' : 'error', $message);
         return redirect()->to('/admin/payments');
     }
 
@@ -1061,7 +1030,7 @@ class Admin extends BaseController
 
         $db      = db_connect();
         $records = $db->table('financial_records fr')
-                      ->select("fr.financial_record_id AS id, fr.record_type AS transaction_type, fr.amount, fr.transaction_date, fr.approval_status, fr.created_at, fr.first_approved_by AS approver1_id, fr.first_approval_date AS approved_at_1, fr.second_approved_by, fr.second_approval_date AS approved_at_2, ca.account_number, m.member_number, CONCAT(m.first_name, ' ', m.last_name) AS member_name, u1.username AS approver1_name, u2.username AS approver2_name, (CASE WHEN fr.second_approved_by IS NOT NULL THEN 2 WHEN fr.first_approved_by IS NOT NULL THEN 1 ELSE 0 END) AS approval_count")
+                      ->select("fr.financial_record_id AS id, fr.record_type AS transaction_type, fr.amount, fr.transaction_date, fr.approval_status, fr.created_at, fr.first_approved_by AS approver1_id, fr.first_approval_date AS approved_at_1, fr.second_approved_by, fr.second_approval_date AS approved_at_2, ca.account_number, m.member_number, CONCAT(m.first_name, ' ', m.last_name) AS member_name, COALESCE(u2.username, u1.username) AS approver_name, COALESCE(fr.second_approval_date, fr.first_approval_date) AS approved_at")
                       ->join('cooperative_accounts ca', 'ca.account_id = fr.account_id', 'left')
                       ->join('members m', 'm.member_id = ca.member_id', 'left')
                       ->join('users u1', 'u1.user_id = fr.first_approved_by', 'left')
@@ -1074,7 +1043,7 @@ class Admin extends BaseController
     }
 
     /**
-     * POST: two-tier approval for a financial record with ledger entry on final approval.
+     * POST: approve a financial record (one administrator is enough).
      */
     public function approveFinancialRecord(int $id)
     {
@@ -1084,110 +1053,8 @@ class Admin extends BaseController
             return redirect()->to('/admin/financial-records');
         }
 
-        $currentUserId = (int) session()->get('user_id');
-        $frModel       = model(FinancialRecordModel::class);
-        $db            = db_connect();
-        $now           = date('Y-m-d H:i:s');
-
-        $fr = $frModel->find($id);
-        if (! $fr) {
-            session()->setFlashdata('error', 'Financial record not found.');
-            return redirect()->to('/admin/financial-records');
-        }
-
-        if ($fr['approval_status'] !== 'Pending') {
-            session()->setFlashdata('error', 'Record is no longer pending.');
-            return redirect()->to('/admin/financial-records');
-        }
-
-        if ($fr['record_type'] === 'Dividend') {
-            session()->setFlashdata('error', 'Dividends are approved as a whole distribution on the Dividends page.');
-            return redirect()->to('/admin/financial-records');
-        }
-
-        if ($fr['record_type'] === 'Loan Payment') {
-            $payment = $db->table('loan_payments')->where('financial_record_id', $id)->get()->getRowArray();
-            if ($payment && ($problem = $this->paymentOverBalance($payment))) {
-                session()->setFlashdata('error', $problem);
-                return redirect()->to('/admin/financial-records');
-            }
-        }
-
-        $db->transStart();
-
-        if (empty($fr['first_approved_by'])) {
-            // Tier 1
-            $db->table('financial_records')
-               ->where('financial_record_id', $id)
-               ->where('first_approved_by IS NULL')
-               ->update([
-                   'first_approved_by'   => $currentUserId,
-                   'first_approval_date' => $now,
-                   'updated_at'          => $now,
-               ]);
-
-            if (! $db->affectedRows()) {
-                $db->transRollback();
-                session()->setFlashdata('error', 'Concurrent approval detected.');
-                return redirect()->to('/admin/financial-records');
-            }
-
-            $db->transComplete();
-            session()->setFlashdata('success', 'First approval recorded.');
-            return redirect()->to('/admin/financial-records');
-        }
-
-        if (! empty($fr['second_approved_by'])) {
-            $db->transRollback();
-            session()->setFlashdata('error', 'Record has already been fully approved.');
-            return redirect()->to('/admin/financial-records');
-        }
-
-        // Fix 4.7: second approver must differ
-        if ((int) $fr['first_approved_by'] === $currentUserId) {
-            $db->transRollback();
-            session()->setFlashdata('error', 'You cannot provide both approvals for the same record.');
-            return redirect()->to('/admin/financial-records');
-        }
-
-        // Tier 2
-        $db->table('financial_records')
-           ->where('financial_record_id', $id)
-           ->where('second_approved_by IS NULL')
-           ->where('approval_status', 'Pending')
-           ->update([
-               'second_approved_by'   => $currentUserId,
-               'second_approval_date' => $now,
-               'approval_status'      => 'Approved',
-               'processed_by'         => $currentUserId,
-               'updated_at'           => $now,
-           ]);
-
-        if (! $db->affectedRows()) {
-            $db->transRollback();
-            session()->setFlashdata('error', 'Concurrent approval detected.');
-            return redirect()->to('/admin/financial-records');
-        }
-
-        $this->applyApprovedRecord($fr);
-
-        $db->transComplete();
-
-        if (! $db->transStatus()) {
-            session()->setFlashdata('error', 'Database error during approval.');
-            return redirect()->to('/admin/financial-records');
-        }
-
-        // Ledger entry
-        $frFresh = $frModel->find($id);
-        try {
-            $ledgerService = new LedgerService();
-            $ledgerService->createEntry($id, $frFresh);
-        } catch (\Throwable $e) {
-            log_message('error', 'LedgerService::createEntry failed for FR #' . $id . ': ' . $e->getMessage());
-        }
-
-        session()->setFlashdata('success', 'Financial record fully approved and ledger entry created.');
+        [$ok, $message] = $this->approveRecord($id);
+        session()->setFlashdata($ok ? 'success' : 'error', $message);
         return redirect()->to('/admin/financial-records');
     }
 
@@ -1202,31 +1069,8 @@ class Admin extends BaseController
             return redirect()->to('/admin/financial-records');
         }
 
-        $frModel = model(FinancialRecordModel::class);
-        $fr      = $frModel->find($id);
-
-        if (! $fr || $fr['approval_status'] !== 'Pending') {
-            session()->setFlashdata('error', 'Record not found or is not pending.');
-            return redirect()->to('/admin/financial-records');
-        }
-
-        if ($fr['record_type'] === 'Dividend') {
-            session()->setFlashdata('error', 'Dividends are rejected as a whole distribution on the Dividends page.');
-            return redirect()->to('/admin/financial-records');
-        }
-
-        $now = date('Y-m-d H:i:s');
-        $frModel->update($id, ['approval_status' => 'Rejected', 'updated_at' => $now]);
-
-        $source = ['Contribution' => 'contributions', 'Loan Payment' => 'loan_payments'][$fr['record_type']] ?? null;
-        if ($source) {
-            db_connect()->table($source)
-                        ->where('financial_record_id', $id)
-                        ->where('payment_status', 'Pending')
-                        ->update(['payment_status' => 'Rejected', 'updated_at' => $now]);
-        }
-
-        session()->setFlashdata('success', 'Financial record rejected.');
+        [$ok, $message] = $this->rejectRecord($id);
+        session()->setFlashdata($ok ? 'success' : 'error', $message);
         return redirect()->to('/admin/financial-records');
     }
 
@@ -1252,7 +1096,7 @@ class Admin extends BaseController
 
     /**
      * POST: create the year's distribution as a Pending batch after the
-     * administrator confirmed the figures. Two administrators then approve it.
+     * administrator confirmed the figures. An administrator then approves it.
      */
     public function distributeDividends()
     {
@@ -1272,12 +1116,12 @@ class Admin extends BaseController
         );
 
         session()->setFlashdata($error ? 'error' : 'success', $error
-            ?? "Distribution #{$id} for {$year} was created and is waiting for approval by two administrators.");
+            ?? "Distribution #{$id} for {$year} was created and is waiting for approval.");
 
         return redirect()->to('/admin/dividends?year=' . $year);
     }
 
-    /** POST: first or second approval of a distribution batch. */
+    /** POST: approve a distribution batch (one administrator is enough). */
     public function approveDividendDistribution(int $id)
     {
         $this->requireAdmin();
@@ -1307,6 +1151,65 @@ class Admin extends BaseController
             : 'This distribution is no longer waiting for approval.');
 
         return redirect()->to('/admin/dividends?year=' . (int) $this->request->getPost('year'));
+    }
+
+    // =========================================================================
+    // Audit Logs (super admin only)
+    // =========================================================================
+
+    /** The signed-in administrator is the super admin (checked in the database, not just the session). */
+    private function isSuperAdmin(): bool
+    {
+        $db = db_connect();
+        if (! $db->fieldExists('is_super_admin', 'users')) {
+            return false;
+        }
+
+        return (bool) ($db->table('users')->select('is_super_admin')
+            ->where('user_id', (int) session()->get('user_id'))->get()->getRowArray()['is_super_admin'] ?? false);
+    }
+
+    public function auditLogs()
+    {
+        $this->requireAdmin();
+
+        if (! $this->isSuperAdmin()) {
+            session()->setFlashdata('error', 'Only the super administrator can view the audit logs.');
+            return redirect()->to('/admin/dashboard');
+        }
+        if (! \App\Libraries\AuditLog::available()) {
+            session()->setFlashdata('error', 'Audit logs need a database update. Open Settings and apply database updates.');
+            return redirect()->to('/admin/settings');
+        }
+
+        $filters = [
+            'user'   => trim((string) $this->request->getGet('user')),
+            'action' => trim((string) $this->request->getGet('action')),
+            'result' => (string) $this->request->getGet('result'),
+            'from'   => (string) $this->request->getGet('from'),
+            'to'     => (string) $this->request->getGet('to'),
+        ];
+
+        $query = db_connect()->table('audit_logs')->orderBy('created_at', 'DESC')->orderBy('audit_id', 'DESC');
+        if ($filters['user'] !== '') {
+            $query->like('username', $filters['user']);
+        }
+        if ($filters['action'] !== '') {
+            $query->like('action', $filters['action']);
+        }
+        if (in_array($filters['result'], ['Success', 'Failed'], true)) {
+            $query->where('result', $filters['result']);
+        }
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $filters['from'])) {
+            $query->where('created_at >=', $filters['from'] . ' 00:00:00');
+        }
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $filters['to'])) {
+            $query->where('created_at <=', $filters['to'] . ' 23:59:59');
+        }
+
+        [$logs, $page] = $this->paginate($query);
+
+        return view('admin/audit_logs', ['logs' => $logs, 'page' => $page, 'filters' => $filters]);
     }
 
     // =========================================================================
@@ -1372,48 +1275,136 @@ class Admin extends BaseController
     public function analytics(): string
     {
         $this->requireAdmin();
-        return view('admin/analytics');
+        return view('admin/analytics', ['activityUrl' => 'admin/analytics/activity']);
     }
 
     // =========================================================================
     // Reports
     // =========================================================================
 
+    /** Report filters from the query string, with safe defaults. */
+    private function reportFilters(): array
+    {
+        $get    = fn($k) => trim((string) $this->request->getGet($k));
+        $preset = $get('period') ?: 'year';
+        $date   = fn($v) => preg_match('/^\d{4}-\d{2}-\d{2}$/', $v) ? $v : null;
+
+        [$from, $to] = match ($preset) {
+            'month'  => [date('Y-m-01'), date('Y-m-d')],
+            '30days' => [date('Y-m-d', strtotime('-29 days')), date('Y-m-d')],
+            'all'    => ['2000-01-01', date('Y-m-d')],
+            'custom' => [$date($get('from')) ?? date('Y-01-01'), $date($get('to')) ?? date('Y-m-d')],
+            default  => [date('Y-01-01'), date('Y-m-d')],
+        };
+        if ($from > $to) {
+            [$from, $to] = [$to, $from];
+        }
+
+        $types    = ['Contribution', 'Loan Disbursement', 'Loan Payment', 'Dividend'];
+        $category = in_array($get('category'), ['summary', 'transactions', 'membership', 'ledger'], true) ? $get('category') : 'summary';
+
+        return [
+            'period'   => in_array($preset, ['month', 'year', '30days', 'all', 'custom'], true) ? $preset : 'year',
+            'from'     => $from,
+            'to'       => $to,
+            'category' => $category,
+            'type'     => in_array($get('type'), $types, true) ? $get('type') : '',
+            'status'   => in_array($get('status'), ['Pending', 'Approved', 'Rejected'], true) ? $get('status') : '',
+            'types'    => $types,
+        ];
+    }
+
+    /** Financial records matching the report filters. */
+    private function reportRecords(array $f, bool $withColumns = true): \CodeIgniter\Database\BaseBuilder
+    {
+        $q = db_connect()->table('financial_records fr');
+        if ($withColumns) {
+            $q->select("fr.financial_record_id, fr.record_type, fr.transaction_date, fr.amount, fr.approval_status, ca.account_number, m.member_number, CONCAT(m.first_name, ' ', m.last_name) AS member_name", false);
+        }
+        $q->join('cooperative_accounts ca', 'ca.account_id = fr.account_id', 'left')
+            ->join('members m', 'm.member_id = ca.member_id', 'left')
+            ->where('fr.transaction_date >=', $f['from'])
+            ->where('fr.transaction_date <=', $f['to']);
+        if ($f['type'] !== '') {
+            $q->where('fr.record_type', $f['type']);
+        }
+        if ($f['status'] !== '') {
+            $q->where('fr.approval_status', $f['status']);
+        }
+
+        return $q;
+    }
+
     public function reports(): string
     {
         $this->requireAdmin();
 
         $db = db_connect();
+        $f  = $this->reportFilters();
 
-        $totalMembers       = $db->table('members')->countAllResults();
-        $activeMembers      = $db->table('members')->where('membership_status', 'Active')->countAllResults();
-        $totalContributions = (float) ($db->table('financial_records')
-            ->where('record_type', 'Contribution')->where('approval_status', 'Approved')
-            ->selectSum('amount')->get()->getRowArray()['amount'] ?? 0);
-        $activeLoans        = $db->table('loans')->where('loan_status', 'Active')->countAllResults();
-        $totalLoanAmount    = (float) ($db->table('financial_records')
-            ->where('record_type', 'Loan Disbursement')->where('approval_status', 'Approved')
-            ->selectSum('amount')->get()->getRowArray()['amount'] ?? 0);
-        $totalPayments      = (float) ($db->table('financial_records')
-            ->where('record_type', 'Loan Payment')->where('approval_status', 'Approved')
-            ->selectSum('amount')->get()->getRowArray()['amount'] ?? 0);
-        $totalDividends     = (float) ($db->table('financial_records')
-            ->where('record_type', 'Dividend')->where('approval_status', 'Approved')
-            ->selectSum('amount')->get()->getRowArray()['amount'] ?? 0);
-        $ledgerCount        = $db->table('blockchain_ledger')->countAllResults();
-        $tamperedCount      = $db->table('blockchain_ledger')->where('verification_status', 'Tampered')->countAllResults();
+        // Totals by type and status for the period (same filters as the list).
+        $summary = [];
+        foreach ($this->reportRecords($f, false)->select('fr.record_type, fr.approval_status, COUNT(*) AS n, COALESCE(SUM(fr.amount), 0) AS total', false)
+                     ->groupBy('fr.record_type, fr.approval_status')->get()->getResultArray() as $row) {
+            $summary[$row['record_type']][$row['approval_status']] = ['count' => (int) $row['n'], 'amount' => (float) $row['total']];
+        }
 
-        return view('admin/reports', [
-            'totalMembers'       => $totalMembers,
-            'activeMembers'      => $activeMembers,
-            'totalContributions' => $totalContributions,
-            'activeLoans'        => $activeLoans,
-            'totalLoanAmount'    => $totalLoanAmount,
-            'totalPayments'      => $totalPayments,
-            'totalDividends'     => $totalDividends,
-            'ledgerCount'        => $ledgerCount,
-            'tamperedCount'      => $tamperedCount,
-        ]);
+        $data = ['f' => $f, 'summary' => $summary];
+
+        if ($f['category'] === 'transactions') {
+            $data['records'] = $this->reportRecords($f)->orderBy('fr.transaction_date', 'DESC')->orderBy('fr.financial_record_id', 'DESC')
+                ->limit(500)->get()->getResultArray();
+        }
+        if ($f['category'] === 'membership') {
+            $data['membership'] = [
+                'members'        => $db->table('members')->countAllResults(),
+                'active_members' => $db->table('members')->where('membership_status', 'Active')->countAllResults(),
+                'new_members'    => $db->table('members')->where('membership_date >=', $f['from'])->where('membership_date <=', $f['to'])->countAllResults(),
+                'accounts'       => $db->table('cooperative_accounts')->select('account_type, account_status, COUNT(*) AS n')
+                                       ->groupBy('account_type, account_status')->get()->getResultArray(),
+                'opened'         => $db->table('cooperative_accounts')->where('account_start_date >=', $f['from'])->where('account_start_date <=', $f['to'])->countAllResults(),
+            ];
+        }
+        if ($f['category'] === 'ledger') {
+            $data['ledger'] = [
+                'entries'  => $db->table('blockchain_ledger')->where('recorded_at >=', $f['from'] . ' 00:00:00')->where('recorded_at <=', $f['to'] . ' 23:59:59')->countAllResults(),
+                'tampered' => $db->table('blockchain_ledger')->where('verification_status', 'Tampered')->countAllResults(),
+                'total'    => $db->table('blockchain_ledger')->countAllResults(),
+            ];
+        }
+
+        return view('admin/reports', $data);
+    }
+
+    /** GET: the filtered transactions as a CSV file. */
+    public function exportReport()
+    {
+        $this->requireAdmin();
+
+        $f    = $this->reportFilters();
+        $rows = $this->reportRecords($f)->orderBy('fr.transaction_date', 'ASC')->orderBy('fr.financial_record_id', 'ASC')->get()->getResultArray();
+
+        $out = fopen('php://temp', 'w+');
+        fputcsv($out, ['Record ID', 'Date', 'Type', 'Status', 'Amount (PHP)', 'Member #', 'Member', 'Account #']);
+        foreach ($rows as $r) {
+            fputcsv($out, [$r['financial_record_id'], $r['transaction_date'], $r['record_type'], $r['approval_status'],
+                number_format((float) $r['amount'], 2, '.', ''), $r['member_number'], $r['member_name'], $r['account_number']]);
+        }
+        rewind($out);
+        $csv = stream_get_contents($out);
+        fclose($out);
+
+        \App\Libraries\AuditLog::record('Exported report', null, null, "Transactions {$f['from']} to {$f['to']}, " . count($rows) . ' row(s)');
+
+        return $this->response->download("glc-bloc-report-{$f['from']}-to-{$f['to']}.csv", $csv)->setContentType('text/csv');
+    }
+
+    /** GET: approved activity for a time range (JSON). */
+    public function analyticsActivity()
+    {
+        $this->requireAdmin();
+
+        return $this->response->setJSON((new AnalyticsService())->activity((string) $this->request->getGet('range')));
     }
 
     /**

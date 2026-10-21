@@ -52,7 +52,7 @@ $peso    = fn($n) => '₱' . number_format((float) $n, 2);
                 <th class="text-end">Amount Due</th>
                 <th class="text-end">Paid</th>
                 <th class="text-end">Balance</th>
-                <?php if ($canPay): ?><th class="text-end" style="width:140px;">Amount to Pay</th><?php endif; ?>
+                <?php if ($canPay): ?><th class="text-end" style="min-width:190px;">Amount to Pay (₱)</th><?php endif; ?>
                 <th>Status</th>
             </tr>
         </thead>
@@ -80,13 +80,19 @@ $peso    = fn($n) => '₱' . number_format((float) $n, 2);
                     <?php if ($canPay): ?>
                         <td class="text-end">
                             <?php if ($row['is_open']): ?>
-                                <input type="number" class="form-control form-control-sm text-end js-pay-amount" name="amounts[<?= $id ?>]"
-                                       step="0.01" min="0.01" max="<?= esc(number_format($row['owed'], 2, '.', '')) ?>"
-                                       data-owed="<?= esc(number_format($row['owed'], 2, '.', '')) ?>"
-                                       data-month="<?= (int) $row['installment_number'] ?>"
-                                       data-next-month="<?= esc($row['next_month'] ?? '') ?>"
-                                       data-due="<?= esc(date('M j', strtotime($row['due_date']))) ?>"
-                                       aria-label="Amount to pay for Month <?= (int) $row['installment_number'] ?>" disabled>
+                                <div class="input-group input-group-sm has-validation">
+                                    <span class="input-group-text">₱</span>
+                                    <input type="number" inputmode="decimal" class="form-control text-end js-pay-amount" name="amounts[<?= $id ?>]"
+                                           id="amount-<?= (int) $loanId ?>-<?= $id ?>"
+                                           step="0.01" min="0.01" max="<?= esc(number_format($row['owed'], 2, '.', '')) ?>"
+                                           data-owed="<?= esc(number_format($row['owed'], 2, '.', '')) ?>"
+                                           data-month="<?= (int) $row['installment_number'] ?>"
+                                           data-next-month="<?= esc($row['next_month'] ?? '') ?>"
+                                           data-due="<?= esc(date('M j', strtotime($row['due_date']))) ?>"
+                                           aria-label="Amount to pay for Month <?= (int) $row['installment_number'] ?>, in pesos"
+                                           aria-describedby="amount-error-<?= (int) $loanId ?>-<?= $id ?>" placeholder="0.00" disabled>
+                                    <div class="invalid-feedback text-start" id="amount-error-<?= (int) $loanId ?>-<?= $id ?>"></div>
+                                </div>
                             <?php endif; ?>
                         </td>
                     <?php endif; ?>
@@ -98,12 +104,12 @@ $peso    = fn($n) => '₱' . number_format((float) $n, 2);
 </div>
 
 <?php if ($canPay): ?>
-    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 border-top pt-3">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 border-top pt-3 mt-3">
         <div>
             <div class="fw-semibold">Total to pay: <span class="fs-5 js-pay-total">₱0.00</span></div>
             <div class="small text-muted js-pay-note" aria-live="polite"></div>
         </div>
-        <button type="submit" class="btn btn-warning js-pay-submit" disabled>
+        <button type="submit" class="btn btn-warning px-4 py-2 js-pay-submit" disabled>
             <i class="fas fa-paper-plane me-1"></i>Submit Payment
         </button>
     </div>

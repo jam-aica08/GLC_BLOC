@@ -43,6 +43,11 @@ class GlcBlocSeeder extends Seeder
             'password_hash'  => password_hash('Admin@123', PASSWORD_BCRYPT),
             'account_status' => 'Active',
         ]);
+
+        // The original administrator is the super admin (the only one who can read the audit logs).
+        if ($this->db->fieldExists('is_super_admin', 'users')) {
+            $this->db->table('users')->where('username', 'admin')->update(['is_super_admin' => 1]);
+        }
     }
 
     private function seedSampleData(): void

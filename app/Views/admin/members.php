@@ -41,9 +41,38 @@
     </div>
 </form>
 
+<!-- Announcement to every active member -->
+<div class="d-flex justify-content-end mb-3">
+    <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#announceModal">
+        <i class="fa-solid fa-bullhorn me-1"></i>Post Announcement
+    </button>
+</div>
+<div class="modal fade" id="announceModal" tabindex="-1" aria-labelledby="announceModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <form class="modal-content" method="post" action="<?= base_url('admin/members/announce') ?>">
+            <?= csrf_field() ?>
+            <div class="modal-header" style="background:#1a1a2e;">
+                <h5 class="modal-title text-white" id="announceModalLabel"><i class="fa-solid fa-bullhorn me-2" style="color:#f0a500;"></i>Post Announcement</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <p class="small text-muted">Appears in the notifications of every active member.</p>
+                <label for="ann_title" class="form-label fw-semibold small">Title</label>
+                <input type="text" id="ann_title" name="title" class="form-control mb-3" maxlength="150" required>
+                <label for="ann_message" class="form-label fw-semibold small">Message</label>
+                <textarea id="ann_message" name="message" class="form-control" rows="4" maxlength="500" required></textarea>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn text-white" style="background:#1a1a2e;"><i class="fa-solid fa-paper-plane me-1"></i>Send</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <!-- Account requests from members -->
 <?php if (! empty($accountRequests)): ?>
-<div class="card mb-3 border-warning" id="account-requests" data-no-search>
+<div class="card mb-3 border-warning" id="account-requests">
     <div class="card-header d-flex justify-content-between align-items-center bg-warning-subtle">
         <span class="fw-semibold"><i class="fa-solid fa-inbox me-2"></i>Account Requests</span>
         <span class="badge bg-warning text-dark"><?= count($accountRequests) ?> waiting</span>

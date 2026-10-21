@@ -8,7 +8,7 @@
 
 <?= view('partials/flash') ?>
 
-<div class="card shadow-sm">
+<div class="card shadow-sm" data-search>
     <div class="card-header d-flex justify-content-between align-items-center bg-white">
         <span class="fw-semibold">Payment History</span>
         <span class="badge bg-secondary"><?= count($payments) ?> record(s)</span>

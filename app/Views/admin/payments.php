@@ -45,7 +45,7 @@
 </div>
 
 <!-- Payments Table -->
-<div class="card" data-no-search>
+<div class="card">
     <div class="card-header d-flex justify-content-between align-items-center">
         <span><i class="fa-solid fa-money-bill-wave me-2" style="color:#f0a500;"></i>Payment Records</span>
         <span class="badge bg-secondary"><?= (int) $page['total'] ?> record(s)</span>
@@ -83,8 +83,6 @@
                                 $label = 'Paid'; $badge = 'bg-success';
                             } elseif ($status === 'Rejected') {
                                 $label = 'Rejected'; $badge = 'bg-danger';
-                            } elseif (! empty($payment['first_approved_by'])) {
-                                $label = 'Needs 2nd Approval'; $badge = 'bg-info text-dark';
                             } else {
                                 $label = 'Pending'; $badge = 'bg-warning text-dark';
                             }
@@ -105,8 +103,8 @@
                             <td class="py-3 text-end <?= $balance > 0 ? 'text-danger' : 'text-success' ?>">&#8369;<?= number_format($balance, 2) ?></td>
                             <td class="py-3">
                                 <span class="badge <?= $badge ?>"><?= esc($label) ?></span>
-                                <?php if (! empty($payment['approver1_name']) && $status === 'Pending'): ?>
-                                    <div class="small text-muted">1st: <?= esc($payment['approver1_name']) ?></div>
+                                <?php if ($status === 'Approved'): ?>
+                                    <?= view('partials/approved_by', ['name' => $payment['approver_name'] ?? null, 'at' => $payment['approved_at'] ?? null]) ?>
                                 <?php endif; ?>
                             </td>
                             <td class="py-3 text-center">
@@ -115,7 +113,7 @@
                                         <form action="<?= base_url('admin/payments/approve/' . (int) $payment['id']) ?>" method="post">
                                             <?= csrf_field() ?>
                                             <button type="submit" class="btn btn-sm btn-success text-nowrap" onclick="return confirm('Approve this payment?')">
-                                                <i class="fa-solid fa-check me-1"></i><?= empty($payment['first_approved_by']) ? 'Approve' : 'Final Approve' ?>
+                                                <i class="fa-solid fa-check me-1"></i>Approve
                                             </button>
                                         </form>
                                         <form action="<?= base_url('admin/payments/reject/' . (int) $payment['id']) ?>" method="post">

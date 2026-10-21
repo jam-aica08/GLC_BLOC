@@ -112,7 +112,15 @@ class AccountRequestService
         ]);
         $db->transComplete();
 
-        return $db->transStatus() ? [$accountNumber, null] : [null, 'Could not open the account. Please try again.'];
+        if (! $db->transStatus()) {
+            return [null, 'Could not open the account. Please try again.'];
+        }
+        Notifier::toMember((int) $request['member_id'], 'account', 'Account request approved',
+            "Your {$request['account_type']} account {$accountNumber} is open. Pay PHP "
+            . number_format(CooperativeAccountModel::joinAmount(), 2) . ' (January to ' . date('F') . ') to activate it.',
+            'member/contributions', 'request-approved-' . $requestId);
+
+        return [$accountNumber, null];
     }
 
     public function reject(int $requestId, int $adminId): bool
@@ -124,6 +132,13 @@ class AccountRequestService
             'updated_at'  => date('Y-m-d H:i:s'),
         ]);
 
-        return $this->db()->affectedRows() > 0;
+        $rejected = $this->db()->affectedRows() > 0;
+        if ($rejected) {
+            $row = $this->db()->table('account_requests')->where('request_id', $requestId)->get()->getRowArray();
+            Notifier::toMember((int) $row['member_id'], 'account', 'Account request rejected',
+                "Your request for a {$row['account_type']} account was rejected.", 'member/profile', 'request-rejected-' . $requestId);
+        }
+
+        return $rejected;
     }
 }
