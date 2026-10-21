@@ -1,5 +1,10 @@
 <?php $this->extend('layouts/main'); ?>
 <?php $this->section('content'); ?>
+<?php
+$peso     = fn($n, $d = 2) => '₱' . number_format((float) $n, $d);
+$canPlan  = $available && $plan['errors'] === [] && ! $plan['existing'] && ! $plan['legacy_paid'];
+$me       = (int) session()->get('user_id');
+?>
 
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h4 class="mb-0"><i class="fas fa-coins me-2 text-warning"></i>Dividends</h4>
@@ -20,34 +25,111 @@
         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     </div>
 <?php endif; ?>
+<?php if (! $available): ?>
+    <div class="alert alert-warning">Distributions need a database update.
+        <a href="<?= base_url('admin/settings') ?>" class="alert-link">Open Settings → Apply Database Updates</a>.</div>
+<?php endif; ?>
 
 <div class="card shadow-sm mb-4">
     <div class="card-body">
         <form method="get" class="d-flex flex-wrap align-items-end gap-3 mb-3">
             <div>
-                <label class="form-label small fw-semibold mb-1">Year</label>
-                <input type="number" name="year" class="form-control form-control-sm" style="width:110px"
-                       value="<?= esc($year) ?>" min="2020" max="2100">
+                <label for="year" class="form-label small fw-semibold mb-1">Year</label>
+                <input type="number" id="year" name="year" class="form-control form-control-sm" style="width:110px"
+                       value="<?= esc($year) ?>" min="2000" max="<?= date('Y') ?>" required>
             </div>
             <button class="btn btn-outline-secondary btn-sm">Calculate</button>
         </form>
         <div class="row g-3 text-center">
             <div class="col-sm-4">
                 <div class="text-muted small">Profit Pool <?= esc($year) ?> (auto)</div>
-                <div class="fw-bold fs-5">₱<?= number_format($plan['profit_pool'], 2) ?></div>
+                <div class="fw-bold fs-5"><?= $peso($plan['profit_pool']) ?></div>
                 <div class="text-muted small">Interest earned on loans approved this year</div>
             </div>
             <div class="col-sm-4">
                 <div class="text-muted small">Basic share (<?= $plan['basic_count'] ?> accounts)</div>
-                <div class="fw-bold fs-5">₱<?= number_format($plan['basic_share'], 2) ?></div>
+                <div class="fw-bold fs-5"><?= $peso($plan['basic_share']) ?></div>
+                <?php if ($plan['basic_share'] > 0): ?><div class="text-muted small">exact <?= $peso($plan['basic_share'], 6) ?></div><?php endif; ?>
             </div>
             <div class="col-sm-4">
                 <div class="text-muted small">Pioneer share (<?= $plan['pioneer_count'] ?> accounts, +2%)</div>
-                <div class="fw-bold fs-5">₱<?= number_format($plan['pioneer_share'], 2) ?></div>
+                <div class="fw-bold fs-5"><?= $peso($plan['pioneer_share']) ?></div>
+                <?php if ($plan['pioneer_share'] > 0): ?>
+                    <div class="text-muted small"><?= $plan['pioneer_count'] ? 'exact ' . $peso($plan['pioneer_share'], 6) : 'Rate only — no Pioneer accounts to pay' ?></div>
+                <?php endif; ?>
             </div>
         </div>
+        <?php if ($plan['errors'] !== []): ?>
+            <div class="alert alert-warning small mb-0 mt-3"><?= esc(implode(' ', $plan['errors'])) ?></div>
+        <?php elseif ($plan['existing']): ?>
+            <div class="alert alert-info small mb-0 mt-3">Dividends for <?= esc($year) ?> are already
+                <?= $plan['existing']['status'] === 'Approved' ? 'distributed' : 'waiting for approval' ?> (distribution #<?= (int) $plan['existing']['distribution_id'] ?>).</div>
+        <?php elseif ($plan['legacy_paid']): ?>
+            <div class="alert alert-info small mb-0 mt-3">Dividends for <?= esc($year) ?> were already recorded.</div>
+        <?php else: ?>
+            <div class="text-muted small mt-3 text-center">
+                Weighted accounts: <?= $plan['basic_count'] ?> × 1.00 + <?= $plan['pioneer_count'] ?> × 1.02 = <?= rtrim(rtrim(number_format($plan['total_weight'], 4), '0'), '.') ?>
+                · Total to distribute: <?= $peso($plan['total_distributed']) ?>
+            </div>
+        <?php endif; ?>
     </div>
 </div>
+
+<?php if (! empty($distributions)): ?>
+<div class="card shadow-sm mb-4" data-no-search>
+    <div class="card-header bg-white fw-semibold"><i class="fas fa-layer-group me-2 text-warning"></i>Distributions</div>
+    <div class="table-responsive">
+        <table class="table align-middle mb-0" style="font-size:.875rem;">
+            <thead class="table-light">
+                <tr><th>#</th><th>Year</th><th class="text-end">Profit Pool</th><th>Accounts</th><th class="text-end">Basic / Pioneer share</th><th class="text-end">Total</th><th>Approvals</th><th>Status</th><th></th></tr>
+            </thead>
+            <tbody>
+                <?php foreach ($distributions as $dist): ?>
+                    <?php
+                        $status = $dist['status'];
+                        $label  = $status === 'Pending' ? (empty($dist['first_approved_by']) ? 'Waiting for 1st approval' : 'Needs 2nd approval') : ($status === 'Approved' ? 'Distributed' : 'Rejected');
+                        $badge  = ['Pending' => empty($dist['first_approved_by']) ? 'bg-warning text-dark' : 'bg-info text-dark', 'Approved' => 'bg-success', 'Rejected' => 'bg-danger'][$status];
+                    ?>
+                    <tr>
+                        <td><code>#<?= (int) $dist['distribution_id'] ?></code></td>
+                        <td><a href="<?= base_url('admin/dividends?year=' . (int) $dist['distribution_year']) ?>"><?= (int) $dist['distribution_year'] ?></a></td>
+                        <td class="text-end"><?= $peso($dist['profit_pool']) ?></td>
+                        <td><?= (int) $dist['basic_count'] ?> Basic, <?= (int) $dist['pioneer_count'] ?> Pioneer</td>
+                        <td class="text-end"><?= $peso($dist['basic_share']) ?> / <?= $peso($dist['pioneer_share']) ?></td>
+                        <td class="text-end fw-semibold"><?= $peso($dist['total_distributed']) ?></td>
+                        <td class="small text-muted">
+                            Created by <?= esc($dist['created_by_name'] ?? '—') ?>
+                            <?php if ($dist['first_approver']): ?><br>1st: <?= esc($dist['first_approver']) ?><?php endif; ?>
+                            <?php if ($dist['second_approver']): ?><br>2nd: <?= esc($dist['second_approver']) ?><?php endif; ?>
+                            <?php if ($dist['rejected_by_name']): ?><br>Rejected by <?= esc($dist['rejected_by_name']) ?><?php endif; ?>
+                        </td>
+                        <td><span class="badge <?= $badge ?>"><?= esc($label) ?></span></td>
+                        <td class="text-end">
+                            <?php if ($status === 'Pending'): ?>
+                                <div class="d-inline-flex gap-1">
+                                    <?php if ((int) $dist['first_approved_by'] !== $me): ?>
+                                        <form method="post" action="<?= base_url('admin/dividends/' . (int) $dist['distribution_id'] . '/approve') ?>">
+                                            <?= csrf_field() ?><input type="hidden" name="year" value="<?= (int) $dist['distribution_year'] ?>">
+                                            <button class="btn btn-sm btn-success"><i class="fa-solid fa-check me-1"></i><?= empty($dist['first_approved_by']) ? 'Approve' : 'Final Approve' ?></button>
+                                        </form>
+                                    <?php else: ?>
+                                        <span class="small text-muted align-self-center">Waiting for another admin</span>
+                                    <?php endif; ?>
+                                    <form method="post" action="<?= base_url('admin/dividends/' . (int) $dist['distribution_id'] . '/reject') ?>">
+                                        <?= csrf_field() ?><input type="hidden" name="year" value="<?= (int) $dist['distribution_year'] ?>">
+                                        <button class="btn btn-sm btn-outline-danger"><i class="fa-solid fa-xmark me-1"></i>Reject</button>
+                                    </form>
+                                </div>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+    <div class="card-footer bg-white small text-muted">A distribution is recorded and added to the blockchain ledger only after two different administrators approve it.</div>
+</div>
+<?php endif; ?>
 
 <div class="card shadow-sm">
     <div class="card-body p-0">
@@ -67,23 +149,29 @@
                 </thead>
                 <tbody>
                     <?php if (empty($dividends)): ?>
-                        <tr><td colspan="8" class="text-center py-4 text-muted">No dividend records found.</td></tr>
+                        <tr><td colspan="8" class="text-center py-4 text-muted">No dividend records for <?= esc($year) ?>.</td></tr>
                     <?php else: ?>
                         <?php foreach ($dividends as $d): ?>
                             <tr>
-                                <td><?= esc($d['dividend_id']) ?></td>
-                                <td><?= esc($d['account_number'] ?? $d['account_id']) ?></td>
+                                <td>
+                                    <?= esc($d['dividend_id']) ?>
+                                    <?php if (! empty($d['distribution_id'])): ?><div class="small text-muted">Distribution #<?= (int) $d['distribution_id'] ?></div><?php endif; ?>
+                                </td>
+                                <td>
+                                    <?= esc($d['account_number'] ?? $d['account_id']) ?> <span class="small text-muted"><?= esc($d['account_type'] ?? '') ?></span>
+                                    <div class="small text-muted"><?= esc($d['member_name'] ?? '') ?></div>
+                                </td>
                                 <td><?= esc($d['distribution_year']) ?></td>
-                                <td>₱<?= number_format($d['profit_pool'], 2) ?></td>
-                                <td>₱<?= number_format($d['dividend_per_account'], 2) ?></td>
-                                <td>₱<?= number_format($d['dividend_amount'], 2) ?></td>
+                                <td><?= $peso($d['profit_pool']) ?></td>
+                                <td><?= $peso($d['dividend_per_account']) ?></td>
+                                <td class="fw-semibold"><?= $peso($d['dividend_amount']) ?></td>
                                 <td><?= esc($d['distribution_date']) ?></td>
                                 <td>
                                     <?php
-                                    $badges = ['Pending'=>'warning','Approved'=>'info','Distributed'=>'success'];
+                                    $badges = ['Pending' => 'warning text-dark', 'Approved' => 'info', 'Distributed' => 'success', 'Rejected' => 'danger'];
                                     $b = $badges[$d['dividend_status']] ?? 'secondary';
                                     ?>
-                                    <span class="badge bg-<?= $b ?>"><?= esc($d['dividend_status']) ?></span>
+                                    <span class="badge bg-<?= $b ?>"><?= esc($d['dividend_status'] === 'Pending' ? 'Waiting for approval' : $d['dividend_status']) ?></span>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
@@ -94,32 +182,46 @@
     </div>
 </div>
 
-<!-- Distribute Modal -->
-<div class="modal fade" id="distributeModal" tabindex="-1">
+<!-- Distribute Modal: review the figures, then confirm -->
+<div class="modal fade" id="distributeModal" tabindex="-1" aria-labelledby="distributeModalLabel">
     <div class="modal-dialog">
         <div class="modal-content">
-            <form method="post" action="<?= base_url('admin/dividends/distribute') ?>">
+            <form method="post" action="<?= base_url('admin/dividends/distribute') ?>" onsubmit="this.querySelector('[type=submit]').disabled = true;">
                 <?= csrf_field() ?>
                 <input type="hidden" name="distribution_year" value="<?= esc($year) ?>">
+                <input type="hidden" name="expected_pool" value="<?= esc(number_format($plan['profit_pool'], 2, '.', '')) ?>">
+                <input type="hidden" name="expected_accounts" value="<?= count($plan['accounts']) ?>">
                 <div class="modal-header">
-                    <h5 class="modal-title"><i class="fas fa-coins me-2"></i>Distribute <?= esc($year) ?> Dividends</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    <h5 class="modal-title" id="distributeModalLabel"><i class="fas fa-coins me-2"></i>Distribute <?= esc($year) ?> Dividends</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <p class="mb-2">The profit pool, ₱<?= number_format($plan['profit_pool'], 2) ?>, will be divided among
-                       <?= $plan['basic_count'] + $plan['pioneer_count'] ?> active accounts.</p>
-                    <ul class="small mb-3">
-                        <li><?= $plan['basic_count'] ?> Basic × ₱<?= number_format($plan['basic_share'], 2) ?></li>
-                        <li><?= $plan['pioneer_count'] ?> Pioneer × ₱<?= number_format($plan['pioneer_share'], 2) ?> (2% more)</li>
-                    </ul>
-                    <label class="form-label fw-semibold">Distribution Date</label>
-                    <input type="date" name="distribution_date" class="form-control"
-                           value="<?= date('Y-m-d') ?>" required>
+                    <?php if (! $canPlan): ?>
+                        <div class="alert alert-warning small mb-0">
+                            <?php if (! $available): ?>Apply Database Updates in Settings first.
+                            <?php elseif ($plan['errors'] !== []): ?><?= esc(implode(' ', $plan['errors'])) ?>
+                            <?php else: ?>Dividends for <?= esc($year) ?> have already been distributed or are waiting for approval.<?php endif; ?>
+                        </div>
+                    <?php else: ?>
+                        <table class="table table-sm mb-3" data-no-search>
+                            <tbody>
+                                <tr><th class="fw-normal text-muted">Profit pool</th><td class="text-end fw-semibold"><?= $peso($plan['profit_pool']) ?></td></tr>
+                                <tr><th class="fw-normal text-muted">Basic accounts</th><td class="text-end"><?= $plan['basic_count'] ?> × <?= $peso($plan['basic_share']) ?></td></tr>
+                                <tr><th class="fw-normal text-muted">Pioneer accounts (+2%)</th><td class="text-end"><?= $plan['pioneer_count'] ?> × <?= $peso($plan['pioneer_share']) ?></td></tr>
+                                <tr><th class="fw-normal text-muted">Weighted accounts</th><td class="text-end"><?= rtrim(rtrim(number_format($plan['total_weight'], 4), '0'), '.') ?></td></tr>
+                                <tr><th>Total to distribute</th><td class="text-end fw-bold"><?= $peso($plan['total_distributed']) ?></td></tr>
+                            </tbody>
+                        </table>
+                        <p class="small text-muted">Amounts are rounded to the centavo; any leftover centavos go to the accounts with the largest remainders, so the total equals the pool exactly.
+                            The distribution is saved as <strong>waiting for approval</strong>; two different administrators must approve it before it is recorded.</p>
+                        <label for="distribution_date" class="form-label fw-semibold">Distribution Date</label>
+                        <input type="date" id="distribution_date" name="distribution_date" class="form-control" value="<?= date('Y-m-d') ?>" required>
+                    <?php endif; ?>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-warning btn-sm" <?= $plan['profit_pool'] > 0 ? '' : 'disabled' ?>>
-                        <i class="fas fa-coins me-1"></i>Distribute
+                    <button type="submit" class="btn btn-warning btn-sm" <?= $canPlan ? '' : 'disabled' ?>>
+                        <i class="fas fa-coins me-1"></i>Confirm Distribution
                     </button>
                 </div>
             </form>

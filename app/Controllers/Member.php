@@ -531,6 +531,7 @@ class Member extends BaseController
                             ->select('d.*, ca.account_number')
                             ->join('cooperative_accounts ca', 'ca.account_id = d.account_id', 'left')
                             ->whereIn('d.account_id', $accountIds)
+                            ->where('d.dividend_status !=', 'Rejected')
                             ->orderBy('d.distribution_year', 'DESC')
                             ->orderBy('d.created_at', 'DESC')
                             ->get()
