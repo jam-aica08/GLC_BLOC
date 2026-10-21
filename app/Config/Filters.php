@@ -23,6 +23,7 @@ class Filters extends BaseConfig
         ],
         'after' => [
             'toolbar',
+            'appheaders',   // browser security headers (clickjacking, sniffing, referrer)
             // 'honeypot',
             // 'secureheaders',
         ],
@@ -53,5 +54,6 @@ class Filters extends BaseConfig
         'secureheaders' => SecureHeaders::class,
         'auth'          => \App\Filters\AuthFilter::class,
         'audit'         => \App\Filters\AuditFilter::class,
+        'appheaders'    => \App\Filters\SecurityHeaders::class,
     ];
 }

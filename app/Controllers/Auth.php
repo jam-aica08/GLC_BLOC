@@ -2,7 +2,9 @@
 
 namespace App\Controllers;
 
+use App\Libraries\AccountAccess;
 use App\Libraries\AuditLog;
+use App\Libraries\LoginThrottle;
 use App\Models\UserModel;
 
 /**
@@ -70,6 +72,16 @@ class Auth extends BaseController
             return redirect()->to('/login');
         }
 
+        // Too many recent failures for this username or address: refuse before checking the password.
+        $wait = LoginThrottle::minutesLeft($username, (string) $this->request->getIPAddress());
+        if ($wait > 0) {
+            AuditLog::record('Login throttled', null, null, 'Sign-in refused after repeated failed attempts.', false,
+                ['user_id' => null, 'username' => $username, 'role' => null]);
+            $this->clearAuth();
+            session()->setFlashdata('error', "Too many failed sign-in attempts. Try again in {$wait} minute" . ($wait === 1 ? '' : 's') . '.');
+            return redirect()->to('/login');
+        }
+
         // Fetch the user record
         $userModel = model(UserModel::class);
         $user      = $userModel->where('username', $username)
@@ -82,6 +94,15 @@ class Auth extends BaseController
                 ['user_id' => $user['user_id'] ?? null, 'username' => $username, 'role' => null]);
             $this->clearAuth();
             session()->setFlashdata('error', 'Invalid username or password.');
+            return redirect()->to('/login');
+        }
+
+        // A deactivated membership cannot sign in either.
+        if (! AccountAccess::allowed((int) $user['user_id'])) {
+            AuditLog::record('Failed login', 'user', $user['user_id'], 'Account is not active.', false,
+                ['user_id' => $user['user_id'], 'username' => $username, 'role' => null]);
+            $this->clearAuth();
+            session()->setFlashdata('error', 'This account is not active. Please contact the cooperative office.');
             return redirect()->to('/login');
         }
 

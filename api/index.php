@@ -17,6 +17,13 @@ if (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https') {
     $_SERVER['HTTPS'] = 'on';
 }
 
+// The visitor's address, which Vercel's edge always sets (clients cannot
+// supply it). Without this every request looks like it came from the proxy,
+// which would make per-address login limits and audit-log IPs useless.
+if (filter_var($_SERVER['HTTP_X_REAL_IP'] ?? '', FILTER_VALIDATE_IP)) {
+    $_SERVER['REMOTE_ADDR'] = $_SERVER['HTTP_X_REAL_IP'];
+}
+
 $writable = '/tmp/writable';
 foreach (['cache', 'logs', 'session', 'uploads', 'debugbar'] as $dir) {
     if (! is_dir($writable . '/' . $dir)) {

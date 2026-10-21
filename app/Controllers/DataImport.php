@@ -60,8 +60,9 @@ class DataImport extends BaseController
         try {
             $check = $service->validate($service->read($file->getTempName()));
         } catch (\Throwable $e) {
+            // Details (paths, library errors) go to the log, not the page.
             log_message('error', 'Import read failed: ' . $e->getMessage());
-            $result['errors'][] = ['sheet' => '', 'row' => 0, 'column' => '', 'message' => 'The file could not be read as an Excel workbook: ' . $e->getMessage()];
+            $result['errors'][] = ['sheet' => '', 'row' => 0, 'column' => '', 'message' => 'This file could not be read as an Excel workbook. Open it in Excel, save it as "Excel Workbook (.xlsx)" and try again.'];
             return view('admin/import', ['result' => $result]);
         }
 
@@ -74,7 +75,7 @@ class DataImport extends BaseController
                     fn($k, $v) => "{$v} {$k}", array_keys($result['done']['counts']), $result['done']['counts'])));
             } catch (\Throwable $e) {
                 log_message('error', 'Import failed: ' . $e->getMessage());
-                $result['errors'][] = ['sheet' => '', 'row' => 0, 'column' => '', 'message' => 'The import stopped and nothing was saved: ' . $e->getMessage()];
+                $result['errors'][] = ['sheet' => '', 'row' => 0, 'column' => '', 'message' => 'The import stopped and nothing was saved. Please try again; if it keeps failing, the details are in the server log (' . date('Y-m-d H:i') . ').'];
             }
         }
 

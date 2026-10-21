@@ -74,7 +74,7 @@ $sumOf = function (array $s, array $typeList, string $status = 'Approved'): arra
     .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
     .cell-link { color: inherit; text-decoration: none; display: inline-block; padding: 2px 6px; margin: -2px -6px; border-radius: 6px; }
     .cell-link:hover, .cell-link:focus-visible { background: rgba(var(--glc-indigo-rgb), .07); color: var(--glc-indigo); }
-    .cell-link.zero { color: #a3a6bd; }
+    .cell-link.zero { color: #6b6f8a; }
 
     .sort-btn { background: none; border: 0; padding: 0; font: inherit; color: inherit; text-transform: inherit; letter-spacing: inherit; display: inline-flex; gap: 4px; align-items: center; }
     .sort-btn i { opacity: .35; font-size: .7rem; }

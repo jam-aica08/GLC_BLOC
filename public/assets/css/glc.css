@@ -101,6 +101,10 @@ code { color: var(--glc-text); }
     --bs-btn-focus-shadow-rgb: var(--glc-indigo-rgb);
 }
 
+/* Outline buttons dark enough to read on white and on the page background (WCAG AA). */
+.btn-outline-secondary { --bs-btn-color: #565e64; --bs-btn-border-color: #8f959b; }
+.btn-outline-warning { --bs-btn-color: #8a6800; --bs-btn-hover-color: #1f1500; --bs-btn-active-color: #1f1500; }
+
 /* Main call to action: the logo gradient. */
 .btn-gradient {
     color: #fff;
@@ -215,7 +219,7 @@ code { color: var(--glc-text); }
 #sidebar nav { overflow-y: auto; overscroll-behavior: contain; padding: 4px 12px 12px; }
 
 #sidebar .nav-section-title {
-    color: #9a9db5;
+    color: #6b6f8a;
     font-size: .68rem;
     font-weight: 700;
     text-transform: uppercase;
@@ -253,7 +257,7 @@ code { color: var(--glc-text); }
 }
 #sidebar .nav-link:focus-visible { outline: 2px solid rgba(var(--glc-indigo-rgb), .5); outline-offset: 1px; }
 
-.sidebar-footer { border-top: 1px solid var(--glc-border); padding: 12px 20px; font-size: .72rem; color: #9a9db5; text-align: center; }
+.sidebar-footer { border-top: 1px solid var(--glc-border); padding: 12px 20px; font-size: .72rem; color: #6b6f8a; text-align: center; }
 
 #main-content {
     margin-left: var(--glc-sidebar-w);
@@ -394,6 +398,12 @@ code { color: var(--glc-text); }
         white-space: normal;
         min-width: 0;
     }
+    .table td, .table th { overflow-wrap: anywhere; }
+
+    /* Long emails, hashes and account numbers wrap inside the card instead of widening the page. */
+    .table-stack tbody tr > *, .table-stack tfoot tr > * { overflow-wrap: anywhere; }
+    .table-stack tbody tr > * > *, .table-stack tfoot tr > * > * { min-width: 0; max-width: 100%; }
+    .table-stack .text-nowrap, .table-stack code { white-space: normal !important; }
     .table-stack tbody tr > *::before, .table-stack tfoot tr > *::before {
         content: attr(data-label);
         flex: 0 0 38%;
@@ -422,6 +432,15 @@ code { color: var(--glc-text); }
     .modal-footer > .btn { flex: 1 1 auto; }
 
     .notif-menu.show { position: fixed !important; inset: 64px 12px auto 12px !important; transform: none !important; width: auto; }
+}
+
+/* Narrow phones: each value gets the full card width under its label. */
+@media (max-width: 480px) {
+    .table-stack tbody tr > *, .table-stack tfoot tr > * { flex-direction: column; align-items: flex-start; text-align: left; gap: 2px; }
+    .table-stack tbody tr > *::before, .table-stack tfoot tr > *::before { flex: none; }
+    .table-stack tbody tr > :not([data-label]), .table-stack tbody tr > [data-label=""] { flex-direction: row; justify-content: flex-start; }
+    .table-stack tbody tr > [colspan] { align-items: center; }
+    .table-stack tbody tr > * > .d-flex { justify-content: flex-start; }
 }
 
 @media (max-width: 575.98px) {

@@ -101,7 +101,7 @@ $glcNav = [
             </div>
             <div class="dropdown">
                 <button class="profile-toggle dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Open profile menu">
-                    <span class="user-avatar"><?= esc(strtoupper(substr(session()->get('username') ?? 'A', 0, 1))) ?></span>
+                    <span class="user-avatar"><?= esc(mb_strtoupper(mb_substr(session()->get('username') ?? 'A', 0, 1))) ?></span>
                     <span class="user-name d-none d-sm-inline">
                         <strong><?= esc(session()->get('username') ?? 'Admin') ?></strong>
                         <br><small class="text-muted"><?= session()->get('is_super_admin') ? 'Super Admin' : 'Admin' ?></small>

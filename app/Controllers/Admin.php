@@ -407,8 +407,10 @@ class Admin extends BaseController
             return redirect()->to('/admin/members');
         }
 
+        // The login goes with the membership: signed-in sessions end on their next request.
         $memberModel->update($id, ['membership_status' => 'Inactive']);
-        session()->setFlashdata('success', 'Member deactivated.');
+        db_connect()->table('users')->where('user_id', (int) $memberModel->find($id)['user_id'])->update(['account_status' => 'Inactive']);
+        session()->setFlashdata('success', 'Member deactivated. They can no longer sign in.');
         return redirect()->to('/admin/members');
     }
 
@@ -430,7 +432,8 @@ class Admin extends BaseController
         }
 
         $memberModel->update($id, ['membership_status' => 'Active']);
-        session()->setFlashdata('success', 'Member reactivated.');
+        db_connect()->table('users')->where('user_id', (int) $memberModel->find($id)['user_id'])->update(['account_status' => 'Active']);
+        session()->setFlashdata('success', 'Member reactivated. They can sign in again.');
         return redirect()->to('/admin/members');
     }
 
@@ -1044,10 +1047,14 @@ class Admin extends BaseController
                       ->join('users u1', 'u1.user_id = fr.first_approved_by', 'left')
                       ->join('users u2', 'u2.user_id = fr.second_approved_by', 'left')
                       ->orderBy('fr.created_at', 'DESC')
-                      ->get()
-                      ->getResultArray();
+                      ->orderBy('fr.financial_record_id', 'DESC');
 
-        return view('admin/financial_records', ['financialRecords' => $records]);
+        // Paged like the other lists: this table grows with every transaction.
+        $search = trim((string) $this->request->getGet('q'));
+        $this->searchMemberColumns($records, $search, 'fr.financial_record_id');
+        [$records, $page] = $this->paginate($records);
+
+        return view('admin/financial_records', ['financialRecords' => $records, 'page' => $page, 'search' => $search]);
     }
 
     /**
@@ -1285,15 +1292,34 @@ class Admin extends BaseController
     {
         $this->requireAdmin();
 
-        $db      = db_connect();
-        $ledgerEntries = $db->table('blockchain_ledger bl')
-                      ->select('bl.ledger_id, bl.financial_record_id, bl.ledger_sequence AS sequence, bl.transaction_hash AS hash, bl.previous_hash, bl.recorded_at, bl.verification_status AS status, fr.record_type, fr.amount, fr.approval_status')
-                      ->join('financial_records fr', 'fr.financial_record_id = bl.financial_record_id', 'left')
-                      ->orderBy('bl.ledger_sequence', 'ASC')
-                      ->get()
-                      ->getResultArray();
+        $db = db_connect();
 
-        return view('admin/ledger', ['ledgerEntries' => $ledgerEntries]);
+        // Totals for the whole chain; the table itself is paged, newest block first.
+        $counts = ['Valid' => 0, 'Tampered' => 0];
+        foreach ($db->table('blockchain_ledger')->select('verification_status, COUNT(*) AS n')->groupBy('verification_status')->get()->getResultArray() as $row) {
+            $counts[$row['verification_status']] = (int) $row['n'];
+        }
+
+        $query = $db->table('blockchain_ledger bl')
+                    ->select('bl.ledger_id, bl.financial_record_id, bl.ledger_sequence AS sequence, bl.transaction_hash AS hash, bl.previous_hash, bl.recorded_at, bl.verification_status AS status, fr.record_type, fr.amount, fr.approval_status')
+                    ->join('financial_records fr', 'fr.financial_record_id = bl.financial_record_id', 'left')
+                    ->orderBy('bl.ledger_sequence', 'DESC');
+
+        // Search by block / record number, hash prefix or record type.
+        $search = trim((string) $this->request->getGet('q'));
+        if ($search !== '') {
+            $query->groupStart();
+            if (ctype_digit(ltrim($search, '#'))) {
+                $n = (int) ltrim($search, '#');
+                $query->where('bl.ledger_id', $n)->orWhere('bl.ledger_sequence', $n)->orWhere('bl.financial_record_id', $n);
+            } else {
+                $query->like('bl.transaction_hash', $search, 'after')->orLike('fr.record_type', $search);
+            }
+            $query->groupEnd();
+        }
+        [$ledgerEntries, $page] = $this->paginate($query);
+
+        return view('admin/ledger', ['ledgerEntries' => $ledgerEntries, 'page' => $page, 'search' => $search, 'counts' => $counts]);
     }
 
     /**
