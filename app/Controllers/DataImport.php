@@ -2,10 +2,12 @@
 
 namespace App\Controllers;
 
+use App\Libraries\AccountAccess;
 use App\Libraries\AuditLog;
 use App\Libraries\DemoData;
 use App\Libraries\ImportWorkbook;
 use App\Services\DataImportService;
+use CodeIgniter\HTTP\RedirectResponse;
 
 /**
  * Admin: bring a cooperative's existing records in from an Excel workbook.
@@ -14,26 +16,38 @@ class DataImport extends BaseController
 {
     private const MAX_UPLOAD_MB = 4;   // Vercel accepts request bodies up to 4.5 MB.
 
-    public function index(): string
+    /** Importing is for the super administrator only; everyone else is sent back. */
+    private function denied(): ?RedirectResponse
     {
-        return view('admin/import', ['result' => null]);
+        return AccountAccess::isSuperAdmin((int) session()->get('user_id'))
+            ? null
+            : redirect()->to('/admin/dashboard')->with('error', 'Only the super administrator can import data.');
+    }
+
+    public function index(): string|RedirectResponse
+    {
+        return $this->denied() ?? view('admin/import', ['result' => null]);
     }
 
     /** GET: the empty workbook to fill in. */
     public function template()
     {
-        return $this->download('glc-bloc-import-template.xlsx', []);
+        return $this->denied() ?? $this->download('glc-bloc-import-template.xlsx', []);
     }
 
     /** GET: the template filled with made-up demo records. */
     public function sample()
     {
-        return $this->download('glc-bloc-import-sample.xlsx', DemoData::build());
+        return $this->denied() ?? $this->download('glc-bloc-import-sample.xlsx', DemoData::build());
     }
 
     /** POST: check the uploaded workbook, and import it when asked and error-free. */
-    public function upload(): string
+    public function upload(): string|RedirectResponse
     {
+        if ($denied = $this->denied()) {
+            return $denied;
+        }
+
         $file   = $this->request->getFile('workbook');
         $import = $this->request->getPost('action') === 'import';
         $result = ['import' => $import, 'name' => $file?->getClientName() ?? '', 'errors' => [], 'warnings' => [], 'counts' => [], 'done' => null];
