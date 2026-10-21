@@ -268,10 +268,15 @@ class CooperativeAccountModel extends Model
             'amount'              => $amount,
             'payment_date'        => date('Y-m-d'),
             'payment_status'      => 'Pending',
-            'financial_record_id' => $this->db->insertID(),
+            'financial_record_id' => $frId = $this->db->insertID(),
             'created_at'          => $now,
             'updated_at'          => $now,
         ]);
+
+        $owner = $this->db->table($this->table)->select('member_id')->where('account_id', $accountId)->get()->getRowArray();
+        \App\Services\Notifier::toMember((int) ($owner['member_id'] ?? 0), 'contribution', 'Opening contribution recorded',
+            'An opening contribution of PHP ' . number_format($amount, 2) . " for account {$accountNumber} was recorded and is waiting for approval.",
+            'member/contributions', 'contribution-received-' . $frId);
     }
 
     /**

@@ -49,7 +49,7 @@
 </div>
 
 <!-- Loans Table -->
-<div class="card" data-no-search>
+<div class="card">
     <div class="card-header d-flex justify-content-between align-items-center">
         <span><i class="fa-solid fa-hand-holding-dollar me-2" style="color:#f0a500;"></i>Loan Applications</span>
         <span class="badge bg-secondary"><?= (int) $page['total'] ?> record(s)</span>

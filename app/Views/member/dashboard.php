@@ -20,6 +20,28 @@
     <p class="text-muted small mb-0">Your cooperative account summary.</p>
 </div>
 
+<!-- Notifications -->
+<div class="card shadow-sm mb-4" id="notifications" aria-labelledby="notif-title">
+    <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <span class="fw-semibold" id="notif-title">
+            <i class="fa-solid fa-bell me-2" style="color:#f0a500;"></i>Notifications
+            <?php if ($unreadCount): ?><span class="badge bg-danger ms-1" aria-label="<?= (int) $unreadCount ?> unread"><?= (int) $unreadCount ?></span><?php endif; ?>
+        </span>
+        <div class="d-flex gap-2">
+            <?php if ($unreadCount): ?>
+                <form method="post" action="<?= base_url('member/notifications/read-all') ?>">
+                    <?= csrf_field() ?><input type="hidden" name="next" value="dashboard">
+                    <button class="btn btn-sm btn-outline-secondary">Mark all as read</button>
+                </form>
+            <?php endif; ?>
+            <a href="<?= base_url('member/notifications') ?>" class="btn btn-sm btn-outline-secondary">View all</a>
+        </div>
+    </div>
+    <div style="max-height:320px; overflow-y:auto;">
+        <?= view('partials/notification_list', ['notifications' => $notifications, 'next' => 'dashboard']) ?>
+    </div>
+</div>
+
 <?php foreach (($accounts ?? []) as $acc): ?>
     <?php if (($acc['account_status'] ?? '') === 'Pending'): ?>
         <div class="alert alert-warning d-flex align-items-center gap-2" role="status">
@@ -36,7 +58,7 @@
 <?= view('partials/dashboard_overview', ['d' => $overview, 'isAdmin' => false]) ?>
 
 <!-- My accounts -->
-<div class="card dash-tile mt-3" data-no-search>
+<div class="card dash-tile mt-3">
     <div class="card-header bg-white d-flex justify-content-between align-items-center">
         <span class="fw-semibold"><i class="fa-solid fa-building-columns me-2" style="color:#f0a500;"></i>My Accounts</span>
         <a href="<?= base_url('member/profile') ?>" class="btn btn-sm btn-outline-secondary">Open another account</a>

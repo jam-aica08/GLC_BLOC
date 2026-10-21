@@ -16,7 +16,7 @@
 
 <?= view('partials/flash') ?>
 
-<div class="card shadow-sm" data-no-search>
+<div class="card shadow-sm">
     <div class="card-body" data-pay-container data-loan-id="<?= (int) $loan['loan_id'] ?>">
         <?= $panel ?>
     </div>

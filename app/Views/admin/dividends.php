@@ -3,7 +3,6 @@
 <?php
 $peso     = fn($n, $d = 2) => '₱' . number_format((float) $n, $d);
 $canPlan  = $available && $plan['errors'] === [] && ! $plan['existing'] && ! $plan['legacy_paid'];
-$me       = (int) session()->get('user_id');
 ?>
 
 <div class="d-flex justify-content-between align-items-center mb-4">
@@ -55,7 +54,7 @@ $me       = (int) session()->get('user_id');
                 <div class="text-muted small">Pioneer share (<?= $plan['pioneer_count'] ?> accounts, +2%)</div>
                 <div class="fw-bold fs-5"><?= $peso($plan['pioneer_share']) ?></div>
                 <?php if ($plan['pioneer_share'] > 0): ?>
-                    <div class="text-muted small"><?= $plan['pioneer_count'] ? 'exact ' . $peso($plan['pioneer_share'], 6) : 'Rate only — no Pioneer accounts to pay' ?></div>
+                    <div class="text-muted small"><?= $plan['pioneer_count'] ? 'exact ' . $peso($plan['pioneer_share'], 6) : 'Rate only — no Pioneer payouts due' ?></div>
                 <?php endif; ?>
             </div>
         </div>
@@ -68,15 +67,14 @@ $me       = (int) session()->get('user_id');
             <div class="alert alert-info small mb-0 mt-3">Dividends for <?= esc($year) ?> were already recorded.</div>
         <?php else: ?>
             <div class="text-muted small mt-3 text-center">
-                Weighted accounts: <?= $plan['basic_count'] ?> × 1.00 + <?= $plan['pioneer_count'] ?> × 1.02 = <?= rtrim(rtrim(number_format($plan['total_weight'], 4), '0'), '.') ?>
-                · Total to distribute: <?= $peso($plan['total_distributed']) ?>
+                Each Basic account counts as 1.00 share and each Pioneer account as 1.02 · Total to distribute: <?= $peso($plan['total_distributed']) ?>
             </div>
         <?php endif; ?>
     </div>
 </div>
 
 <?php if (! empty($distributions)): ?>
-<div class="card shadow-sm mb-4" data-no-search>
+<div class="card shadow-sm mb-4">
     <div class="card-header bg-white fw-semibold"><i class="fas fa-layer-group me-2 text-warning"></i>Distributions</div>
     <div class="table-responsive">
         <table class="table align-middle mb-0" style="font-size:.875rem;">
@@ -87,8 +85,8 @@ $me       = (int) session()->get('user_id');
                 <?php foreach ($distributions as $dist): ?>
                     <?php
                         $status = $dist['status'];
-                        $label  = $status === 'Pending' ? (empty($dist['first_approved_by']) ? 'Waiting for 1st approval' : 'Needs 2nd approval') : ($status === 'Approved' ? 'Distributed' : 'Rejected');
-                        $badge  = ['Pending' => empty($dist['first_approved_by']) ? 'bg-warning text-dark' : 'bg-info text-dark', 'Approved' => 'bg-success', 'Rejected' => 'bg-danger'][$status];
+                        $label  = ['Pending' => 'Waiting for approval', 'Approved' => 'Distributed', 'Rejected' => 'Rejected'][$status];
+                        $badge  = ['Pending' => 'bg-warning text-dark', 'Approved' => 'bg-success', 'Rejected' => 'bg-danger'][$status];
                     ?>
                     <tr>
                         <td><code>#<?= (int) $dist['distribution_id'] ?></code></td>
@@ -99,22 +97,17 @@ $me       = (int) session()->get('user_id');
                         <td class="text-end fw-semibold"><?= $peso($dist['total_distributed']) ?></td>
                         <td class="small text-muted">
                             Created by <?= esc($dist['created_by_name'] ?? '—') ?>
-                            <?php if ($dist['first_approver']): ?><br>1st: <?= esc($dist['first_approver']) ?><?php endif; ?>
-                            <?php if ($dist['second_approver']): ?><br>2nd: <?= esc($dist['second_approver']) ?><?php endif; ?>
+                            <?php if ($status === 'Approved'): ?><br>Approved by <?= esc($dist['approver_name'] ?? '—') ?><?= ! empty($dist['approved_at']) ? ', ' . esc(date('M j, Y g:i A', strtotime($dist['approved_at']))) : '' ?><?php endif; ?>
                             <?php if ($dist['rejected_by_name']): ?><br>Rejected by <?= esc($dist['rejected_by_name']) ?><?php endif; ?>
                         </td>
                         <td><span class="badge <?= $badge ?>"><?= esc($label) ?></span></td>
                         <td class="text-end">
                             <?php if ($status === 'Pending'): ?>
                                 <div class="d-inline-flex gap-1">
-                                    <?php if ((int) $dist['first_approved_by'] !== $me): ?>
-                                        <form method="post" action="<?= base_url('admin/dividends/' . (int) $dist['distribution_id'] . '/approve') ?>">
-                                            <?= csrf_field() ?><input type="hidden" name="year" value="<?= (int) $dist['distribution_year'] ?>">
-                                            <button class="btn btn-sm btn-success"><i class="fa-solid fa-check me-1"></i><?= empty($dist['first_approved_by']) ? 'Approve' : 'Final Approve' ?></button>
-                                        </form>
-                                    <?php else: ?>
-                                        <span class="small text-muted align-self-center">Waiting for another admin</span>
-                                    <?php endif; ?>
+                                    <form method="post" action="<?= base_url('admin/dividends/' . (int) $dist['distribution_id'] . '/approve') ?>">
+                                        <?= csrf_field() ?><input type="hidden" name="year" value="<?= (int) $dist['distribution_year'] ?>">
+                                        <button class="btn btn-sm btn-success"><i class="fa-solid fa-check me-1"></i>Approve</button>
+                                    </form>
                                     <form method="post" action="<?= base_url('admin/dividends/' . (int) $dist['distribution_id'] . '/reject') ?>">
                                         <?= csrf_field() ?><input type="hidden" name="year" value="<?= (int) $dist['distribution_year'] ?>">
                                         <button class="btn btn-sm btn-outline-danger"><i class="fa-solid fa-xmark me-1"></i>Reject</button>
@@ -127,7 +120,7 @@ $me       = (int) session()->get('user_id');
             </tbody>
         </table>
     </div>
-    <div class="card-footer bg-white small text-muted">A distribution is recorded and added to the blockchain ledger only after two different administrators approve it.</div>
+    <div class="card-footer bg-white small text-muted">A distribution is recorded and added to the blockchain ledger only after an administrator approves it.</div>
 </div>
 <?php endif; ?>
 
@@ -203,17 +196,16 @@ $me       = (int) session()->get('user_id');
                             <?php else: ?>Dividends for <?= esc($year) ?> have already been distributed or are waiting for approval.<?php endif; ?>
                         </div>
                     <?php else: ?>
-                        <table class="table table-sm mb-3" data-no-search>
+                        <table class="table table-sm mb-3">
                             <tbody>
                                 <tr><th class="fw-normal text-muted">Profit pool</th><td class="text-end fw-semibold"><?= $peso($plan['profit_pool']) ?></td></tr>
                                 <tr><th class="fw-normal text-muted">Basic accounts</th><td class="text-end"><?= $plan['basic_count'] ?> × <?= $peso($plan['basic_share']) ?></td></tr>
                                 <tr><th class="fw-normal text-muted">Pioneer accounts (+2%)</th><td class="text-end"><?= $plan['pioneer_count'] ?> × <?= $peso($plan['pioneer_share']) ?></td></tr>
-                                <tr><th class="fw-normal text-muted">Weighted accounts</th><td class="text-end"><?= rtrim(rtrim(number_format($plan['total_weight'], 4), '0'), '.') ?></td></tr>
                                 <tr><th>Total to distribute</th><td class="text-end fw-bold"><?= $peso($plan['total_distributed']) ?></td></tr>
                             </tbody>
                         </table>
                         <p class="small text-muted">Amounts are rounded to the centavo; any leftover centavos go to the accounts with the largest remainders, so the total equals the pool exactly.
-                            The distribution is saved as <strong>waiting for approval</strong>; two different administrators must approve it before it is recorded.</p>
+                            The distribution is saved as <strong>waiting for approval</strong>; an administrator must approve it before it is recorded.</p>
                         <label for="distribution_date" class="form-label fw-semibold">Distribution Date</label>
                         <input type="date" id="distribution_date" name="distribution_date" class="form-control" value="<?= date('Y-m-d') ?>" required>
                     <?php endif; ?>

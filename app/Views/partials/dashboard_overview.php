@@ -7,8 +7,7 @@
  */
 $peso  = fn($n) => ((float) $n < 0 ? '−' : '') . '₱' . number_format(abs((float) $n), 2);
 $who   = $isAdmin ? 'Cooperative' : 'My';
-$eye   = '<button type="button" class="btn btn-sm btn-link p-0 ms-1 text-muted js-amount-toggle" title="Hide amount" aria-label="Hide amount"><i class="fa-solid fa-eye-slash"></i></button>';
-$badge = ['Approved' => 'bg-success', 'Rejected' => 'bg-danger', 'Pending' => 'bg-warning text-dark', 'Needs 2nd approval' => 'bg-info text-dark'];
+$badge = ['Approved' => 'bg-success', 'Rejected' => 'bg-danger', 'Pending' => 'bg-warning text-dark'];
 $icons = ['Contribution' => 'fa-piggy-bank', 'Loan Disbursement' => 'fa-hand-holding-dollar', 'Loan Payment' => 'fa-money-bill-wave', 'Dividend' => 'fa-coins'];
 $loanLink = fn($loan) => $isAdmin ? base_url('admin/loans/' . (int) $loan['loan_id'] . '/schedule') : base_url('member/loans');
 ?>
@@ -17,57 +16,78 @@ $loanLink = fn($loan) => $isAdmin ? base_url('admin/loans/' . (int) $loan['loan_
     .dash-tile .label { font-size: .8rem; color: #6c757d; }
     .dash-tile .value { font-size: 1.45rem; font-weight: 700; line-height: 1.2; }
     .dash-equity { background: #1a1a2e; color: #fff; }
-    .dash-equity .label, .dash-equity .js-amount-toggle { color: #c9d1d9 !important; }
+    .dash-equity .label { color: #c9d1d9 !important; }
     .dash-equity .value { color: #f0a500; font-size: 1.7rem; }
-    .amounts-hidden .js-amount-blur { filter: blur(7px); pointer-events: none; user-select: none; }
 </style>
 
 <!-- Equity and totals -->
 <div class="row g-3 mb-4">
     <div class="col-md-6 col-xl-3">
         <div class="card dash-tile dash-equity h-100"><div class="card-body">
-            <div class="label"><i class="fa-solid fa-scale-balanced me-1"></i><?= $who ?> Total Equity <?= $eye ?></div>
-            <div class="value js-amount"><?= $peso($d['equity']) ?></div>
+            <div class="label"><i class="fa-solid fa-scale-balanced me-1"></i><?= $who ?> Total Equity</div>
+            <div class="value"><?= $peso($d['equity']) ?></div>
             <div class="small mt-2" style="color:#c9d1d9;">Contributions + dividends received</div>
-            <div class="small" style="color:#c9d1d9;">Net after unpaid loans: <span class="fw-semibold text-white text-nowrap js-amount"><?= $peso($d['netPosition']) ?></span></div>
+            <div class="small" style="color:#c9d1d9;">Net after unpaid loans: <span class="fw-semibold text-white text-nowrap"><?= $peso($d['netPosition']) ?></span></div>
         </div></div>
     </div>
     <div class="col-md-6 col-xl-3">
-        <div class="card dash-tile h-100" data-no-search><div class="card-body">
-            <div class="label"><i class="fa-solid fa-piggy-bank me-1 text-success"></i>Total Contributions <?= $eye ?></div>
-            <div class="value text-success js-amount"><?= $peso($d['contributions']) ?></div>
+        <div class="card dash-tile h-100"><div class="card-body">
+            <div class="label"><i class="fa-solid fa-piggy-bank me-1 text-success"></i>Total Contributions</div>
+            <div class="value text-success"><?= $peso($d['contributions']) ?></div>
             <a class="small" href="<?= base_url(($isAdmin ? 'admin' : 'member') . '/contributions') ?>">View contributions</a>
         </div></div>
     </div>
     <div class="col-md-6 col-xl-3">
-        <div class="card dash-tile h-100" data-no-search><div class="card-body">
+        <div class="card dash-tile h-100"><div class="card-body">
             <div class="label"><i class="fa-solid fa-hand-holding-dollar me-1 text-primary"></i>Active Loans</div>
             <div class="value"><?= count($d['activeLoans']) ?></div>
-            <div class="small text-muted">Unpaid balance: <span class="fw-semibold text-danger js-amount"><?= $peso($d['loanBalance']) ?></span></div>
+            <div class="small text-muted">Unpaid balance: <span class="fw-semibold text-danger"><?= $peso($d['loanBalance']) ?></span></div>
         </div></div>
     </div>
     <div class="col-md-6 col-xl-3">
-        <div class="card dash-tile h-100" data-no-search><div class="card-body">
+        <div class="card dash-tile h-100"><div class="card-body">
             <div class="label"><i class="fa-solid fa-coins me-1 text-info"></i>Dividends Received</div>
-            <div class="value js-amount"><?= $peso($d['dividends']) ?></div>
+            <div class="value"><?= $peso($d['dividends']) ?></div>
             <a class="small" href="<?= base_url(($isAdmin ? 'admin' : 'member') . '/dividends') ?>">View dividends</a>
         </div></div>
+    </div>
+</div>
+
+<!-- This year's dividend estimate: same calculation as the Dividends page -->
+<?php $dp = $d['dividendPlan']; ?>
+<div class="card dash-tile mb-4">
+    <div class="card-body d-flex flex-wrap gap-4 align-items-center justify-content-between">
+        <div>
+            <div class="fw-semibold"><i class="fa-solid fa-coins me-2" style="color:#f0a500;"></i><?= (int) $dp['year'] ?> Dividends (estimate)</div>
+            <div class="small text-muted">Profit pool <?= $peso($dp['profit_pool']) ?> · <?= $dp['basic_count'] ?> Basic, <?= $dp['pioneer_count'] ?> Pioneer active account(s)</div>
+        </div>
+        <div class="d-flex flex-wrap gap-4">
+            <div>
+                <div class="small text-muted">Basic Share per Account</div>
+                <div class="fw-bold fs-5"><?= $peso($dp['basic_share']) ?></div>
+            </div>
+            <div>
+                <div class="small text-muted">Pioneer Share per Account (+2%)</div>
+                <div class="fw-bold fs-5"><?= $peso($dp['pioneer_share']) ?></div>
+                <?php if (! $dp['pioneer_count'] && $dp['pioneer_share'] > 0): ?><div class="small text-muted">Rate only — no Pioneer payouts due</div><?php endif; ?>
+            </div>
+        </div>
     </div>
 </div>
 
 <!-- Analytics + financial records summary -->
 <div class="row g-3 mb-4">
     <div class="col-lg-8">
-        <div class="card dash-tile h-100" data-no-search>
+        <div class="card dash-tile h-100">
             <div class="card-header bg-white d-flex justify-content-between align-items-center">
                 <span class="fw-semibold"><i class="fa-solid fa-chart-column me-2" style="color:#f0a500;"></i>Contributions per Month <span class="text-muted fw-normal small">(month paid for, last 12 months)</span></span>
                 <a href="<?= base_url(($isAdmin ? 'admin' : 'member') . '/analytics') ?>" class="btn btn-sm btn-outline-secondary">Full analytics</a>
             </div>
             <div class="card-body">
-                <div class="js-amount-blur" style="position:relative;height:240px;">
+                <div style="position:relative;height:240px;">
                     <canvas id="dashContribChart" role="img" aria-label="Approved contributions per month for the last 12 months"></canvas>
                 </div>
-                <details class="small mt-2 js-amount-blur">
+                <details class="small mt-2">
                     <summary class="text-muted">Show as table</summary>
                     <table class="table table-sm mb-0 mt-2">
                         <thead><tr><th>Month</th><th class="text-end">Contributions</th></tr></thead>
@@ -82,7 +102,7 @@ $loanLink = fn($loan) => $isAdmin ? base_url('admin/loans/' . (int) $loan['loan_
         </div>
     </div>
     <div class="col-lg-4">
-        <div class="card dash-tile h-100" data-no-search>
+        <div class="card dash-tile h-100">
             <div class="card-header bg-white d-flex justify-content-between align-items-center">
                 <span class="fw-semibold"><i class="fa-solid fa-file-invoice-dollar me-2" style="color:#f0a500;"></i>Financial Records</span>
                 <?php if ($isAdmin): ?><a href="<?= base_url('admin/financial-records') ?>" class="btn btn-sm btn-outline-secondary">View all</a><?php endif; ?>
@@ -94,7 +114,7 @@ $loanLink = fn($loan) => $isAdmin ? base_url('admin/loans/' . (int) $loan['loan_
                             <div class="fw-semibold small"><i class="fa-solid <?= $icons[$r['type']] ?> me-2 text-muted"></i><?= esc($r['type']) ?></div>
                             <div class="small text-muted"><?= $r['approved_count'] ?> approved<?= $r['pending_count'] ? ' · <span class="text-warning-emphasis fw-semibold">' . $r['pending_count'] . ' pending</span>' : '' ?></div>
                         </div>
-                        <span class="fw-semibold small js-amount"><?= $peso($r['approved_amount']) ?></span>
+                        <span class="fw-semibold small"><?= $peso($r['approved_amount']) ?></span>
                     </li>
                 <?php endforeach; ?>
             </ul>
@@ -105,7 +125,7 @@ $loanLink = fn($loan) => $isAdmin ? base_url('admin/loans/' . (int) $loan['loan_
 <!-- Active loans + recent activity -->
 <div class="row g-3">
     <div class="col-lg-7">
-        <div class="card dash-tile" data-no-search>
+        <div class="card dash-tile">
             <div class="card-header bg-white d-flex justify-content-between align-items-center">
                 <span class="fw-semibold"><i class="fa-solid fa-hand-holding-dollar me-2" style="color:#f0a500;"></i>Active Loans</span>
                 <a href="<?= base_url(($isAdmin ? 'admin' : 'member') . '/loans') ?>" class="btn btn-sm btn-outline-secondary">All loans</a>
@@ -133,9 +153,9 @@ $loanLink = fn($loan) => $isAdmin ? base_url('admin/loans/' . (int) $loan['loan_
                                     <div class="fw-semibold">#<?= (int) $loan['loan_id'] ?> · <?= esc($isAdmin ? $loan['member_name'] : $loan['account_number']) ?></div>
                                     <div class="small text-muted"><?= esc($isAdmin ? $loan['account_number'] . ' · ' : '') ?><?= (int) $loan['loan_term_months'] ?> months</div>
                                 </td>
-                                <td class="text-end js-amount"><?= $peso($loan['total']) ?></td>
-                                <td class="text-end text-success js-amount"><?= $peso($loan['paid']) ?></td>
-                                <td class="text-end fw-semibold text-danger js-amount"><?= $peso($loan['balance']) ?></td>
+                                <td class="text-end"><?= $peso($loan['total']) ?></td>
+                                <td class="text-end text-success"><?= $peso($loan['paid']) ?></td>
+                                <td class="text-end fw-semibold text-danger"><?= $peso($loan['balance']) ?></td>
                                 <td class="<?= $overdue ? 'text-danger fw-semibold' : '' ?>">
                                     <?= $loan['next_due_date'] ? esc(date('M j, Y', strtotime($loan['next_due_date']))) : '—' ?>
                                     <?php if ($overdue): ?><div class="small"><i class="fa-solid fa-triangle-exclamation me-1"></i>Past due</div><?php endif; ?>
@@ -149,7 +169,7 @@ $loanLink = fn($loan) => $isAdmin ? base_url('admin/loans/' . (int) $loan['loan_
         </div>
     </div>
     <div class="col-lg-5">
-        <div class="card dash-tile" data-no-search>
+        <div class="card dash-tile">
             <div class="card-header bg-white fw-semibold"><i class="fa-solid fa-clock-rotate-left me-2" style="color:#f0a500;"></i>Recent Activity</div>
             <ul class="list-group list-group-flush">
                 <?php if (empty($d['recent'])): ?>
@@ -162,7 +182,7 @@ $loanLink = fn($loan) => $isAdmin ? base_url('admin/loans/' . (int) $loan['loan_
                             <div class="text-muted"><?= esc($isAdmin ? ($r['member_name'] ?? '—') . ' · ' : '') ?><?= esc($r['account_number'] ?? '') ?> · <?= esc(date('M j, Y', strtotime($r['transaction_date'] ?: $r['created_at']))) ?></div>
                         </div>
                         <div class="text-end small">
-                            <div class="fw-semibold js-amount"><?= $peso($r['amount']) ?></div>
+                            <div class="fw-semibold"><?= $peso($r['amount']) ?></div>
                             <span class="badge <?= $badge[$r['status_label']] ?? 'bg-secondary' ?>"><?= esc($r['status_label']) ?></span>
                         </div>
                     </li>

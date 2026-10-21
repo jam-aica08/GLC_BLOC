@@ -6,7 +6,7 @@
     <a href="<?= base_url('admin/loans') ?>" class="btn btn-outline-secondary btn-sm"><i class="fas fa-arrow-left me-1"></i>Back to Loans</a>
 </div>
 
-<div class="card shadow-sm" data-no-search><div class="card-body">
+<div class="card shadow-sm"><div class="card-body">
 <?= view('admin/loan_schedule_body', ['loan' => $loan, 'schedule' => $schedule]) ?>
 </div></div>
 

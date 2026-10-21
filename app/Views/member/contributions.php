@@ -33,8 +33,8 @@
     <div class="col-sm-4">
         <div class="card text-center">
             <div class="card-body py-3">
-                <div class="text-muted small">Total Paid <button type="button" class="btn btn-sm btn-link p-0 ms-1 text-muted js-amount-toggle" title="Hide amount" aria-label="Hide amount"><i class="fa-solid fa-eye-slash"></i></button></div>
-                <div class="fw-bold fs-5 text-success js-amount">&#8369;<?= number_format($totalPaid ?? 0, 2) ?></div>
+                <div class="text-muted small">Total Paid</div>
+                <div class="fw-bold fs-5 text-success">&#8369;<?= number_format($totalPaid ?? 0, 2) ?></div>
             </div>
         </div>
     </div>
@@ -96,7 +96,7 @@
 </div>
 
 <!-- Contributions History Table -->
-<div class="card">
+<div class="card" data-search>
     <div class="card-header d-flex justify-content-between align-items-center">
         <span><i class="fa-solid fa-piggy-bank me-2" style="color:#f0a500;"></i>Contribution History</span>
         <span class="badge bg-secondary"><?= count($contributions ?? []) ?> record(s)</span>

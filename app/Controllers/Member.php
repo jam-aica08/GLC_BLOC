@@ -72,6 +72,8 @@ class Member extends BaseController
         unset($acc);
 
         return view('member/dashboard', [
+            'notifications' => \App\Services\Notifier::latest($memberId, 6),
+            'unreadCount'   => \App\Services\Notifier::unreadCount($memberId),
             'accounts' => $accounts,
             'overview' => (new \App\Services\DashboardService())->build(array_map('intval', $accountIds)),
         ]);
@@ -217,6 +219,10 @@ class Member extends BaseController
             session()->setFlashdata('error', 'Failed to submit contribution. Please try again.');
             return redirect()->to('/member/contributions');
         }
+
+        \App\Services\Notifier::toMember($memberId, 'contribution', 'Contribution received',
+            'Your contribution of PHP ' . number_format($amount, 2) . ' for ' . ($period ?: date('Y-m')) . ' on account '
+            . $account['account_number'] . ' is waiting for approval.', 'member/contributions', 'contribution-received-' . $frId);
 
         session()->setFlashdata('success', 'Contribution submitted and pending approval.');
         return redirect()->to('/member/contributions');
@@ -506,6 +512,10 @@ class Member extends BaseController
             return $this->paymentResponse($loanId, $loan['loan_status'], false, 'Failed to submit payment. Please try again.');
         }
 
+        \App\Services\Notifier::toMember($memberId, 'payment', 'Loan payment received',
+            'Your payment of PHP ' . number_format($total, 2) . ' for loan #' . $loanId . ' is waiting for approval.',
+            'member/loans', 'payment-received-' . $paymentId);
+
         return $this->paymentResponse($loanId, $loan['loan_status'], true,
             'Payment of PHP ' . number_format($total, 2) . ' submitted and waiting for approval.');
     }
@@ -647,6 +657,39 @@ class Member extends BaseController
         return redirect()->to('/member/profile');
     }
 
+    /** POST: mark one of the member's own notifications as read. */
+    public function readNotification(int $id)
+    {
+        $memberId = $this->requireMember();
+        if ($this->request->is('post')) {
+            \App\Services\Notifier::markRead($memberId, $id);
+        }
+
+        return redirect()->to($this->request->getPost('next') === 'notifications' ? '/member/notifications' : '/member/dashboard');
+    }
+
+    /** POST: mark all of the member's notifications as read. */
+    public function readAllNotifications()
+    {
+        $memberId = $this->requireMember();
+        if ($this->request->is('post')) {
+            \App\Services\Notifier::markRead($memberId);
+        }
+
+        return redirect()->to($this->request->getPost('next') === 'notifications' ? '/member/notifications' : '/member/dashboard');
+    }
+
+    /** GET: every notification of the signed-in member. */
+    public function notifications(): string
+    {
+        $memberId = $this->requireMember();
+
+        return view('member/notifications', [
+            'notifications' => \App\Services\Notifier::latest($memberId, 200),
+            'unread'        => \App\Services\Notifier::unreadCount($memberId),
+        ]);
+    }
+
     public function payments(): string
     {
         $memberId = $this->requireMember();
@@ -671,7 +714,15 @@ class Member extends BaseController
     public function analytics(): string
     {
         $this->requireMember();
-        return view('admin/analytics', ['layout' => 'layouts/member_main', 'dataUrl' => 'member/analytics/data']);
+        return view('admin/analytics', ['layout' => 'layouts/member_main', 'dataUrl' => 'member/analytics/data', 'activityUrl' => 'member/analytics/activity']);
+    }
+
+    /** GET: cooperative activity for a time range (JSON), same figures as the admin view. */
+    public function analyticsActivity()
+    {
+        $this->requireMember();
+
+        return $this->response->setJSON((new \App\Services\AnalyticsService())->activity((string) $this->request->getGet('range')));
     }
 
     public function analyticsData()
