@@ -23,6 +23,7 @@ class DataReset
         'blockchain_ledger',
         'financial_records',
         'analytics_snapshots',
+        'admin_notifications',  // they point at the records deleted above
     ];
 
     /**

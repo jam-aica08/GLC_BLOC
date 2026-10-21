@@ -221,6 +221,9 @@ class Member extends BaseController
         \App\Services\Notifier::toMember($memberId, 'contribution', 'Contribution received',
             'Your contribution of PHP ' . number_format($amount, 2) . ' for ' . ($period ?: date('Y-m')) . ' on account '
             . $account['account_number'] . ' is waiting for approval.', 'member/contributions', 'contribution-received-' . $frId);
+        \App\Services\Notifier::toAdmins('contribution', 'Contribution to review',
+            $this->memberName($memberId) . ' paid PHP ' . number_format($amount, 2) . ' for ' . ($period ?: date('Y-m')) . ' on account '
+            . $account['account_number'] . '.', 'admin/contributions', 'review-record-' . $frId);
 
         session()->setFlashdata('success', 'Contribution submitted and pending approval.');
         return redirect()->to('/member/contributions');
@@ -343,7 +346,7 @@ class Member extends BaseController
         $today          = date('Y-m-d');
 
         $loanModel = model(LoanModel::class);
-        $loanModel->insert([
+        $loanId = $loanModel->insert([
             'account_id'          => $accountId,
             'total_contributions' => $maxLimit / 2,   // the 1× base
             'maximum_loan_limit'  => $maxLimit,
@@ -354,6 +357,12 @@ class Member extends BaseController
             'application_date'    => $today,
             'loan_status'         => 'Pending',
         ]);
+
+        if ($loanId) {
+            \App\Services\Notifier::toAdmins('loan', 'Loan application to review',
+                $this->memberName($memberId) . ' applied for a loan of PHP ' . number_format($loanAmount, 2) . ' over ' . $termMonths
+                . ' months on account ' . $account['account_number'] . '.', 'admin/loans', 'review-loan-' . $loanId);
+        }
 
         session()->setFlashdata('success', 'Loan application submitted and pending approval.');
         return redirect()->to('/member/loans');
@@ -513,6 +522,11 @@ class Member extends BaseController
         \App\Services\Notifier::toMember($memberId, 'payment', 'Loan payment received',
             'Your payment of PHP ' . number_format($total, 2) . ' for loan #' . $loanId . ' is waiting for approval.',
             'member/loans', 'payment-received-' . $paymentId);
+        if ($frId) {
+            \App\Services\Notifier::toAdmins('payment', 'Loan payment to review',
+                $this->memberName($memberId) . ' paid PHP ' . number_format($total, 2) . ' for loan #' . $loanId . '.',
+                'admin/payments', 'review-record-' . $frId);
+        }
 
         return $this->paymentResponse($loanId, $loan['loan_status'], true,
             'Payment of PHP ' . number_format($total, 2) . ' submitted and waiting for approval.');
@@ -649,10 +663,20 @@ class Member extends BaseController
             return redirect()->to('/member/profile');
         }
 
-        $requests->create($memberId, $accountType);
+        $requestId = $requests->create($memberId, $accountType);
+        \App\Services\Notifier::toAdmins('account', 'Account request to review',
+            $this->memberName($memberId) . " asked for a new {$accountType} account.", 'admin/members', 'review-request-' . $requestId);
 
         session()->setFlashdata('success', "Your request for a {$accountType} account was sent. You can pay for it once an admin approves it.");
         return redirect()->to('/member/profile');
+    }
+
+    /** "First Last (M-0001)" for administrator notifications. */
+    private function memberName(int $memberId): string
+    {
+        $m = model(MemberModel::class)->find($memberId);
+
+        return $m ? trim($m['first_name'] . ' ' . $m['last_name']) . ' (' . $m['member_number'] . ')' : 'A member';
     }
 
     /** Where to go after marking notifications read: the member page they were on. */
