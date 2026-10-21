@@ -156,6 +156,19 @@
             font-size: 0.85rem;
         }
 
+        /* Readable, near-black text everywhere. Colour stays on badges, alerts,
+           buttons, icons and validation messages, which carry status. */
+        body, h1, h2, h3, h4, h5, h6, .form-label, .card, .modal-content, .dropdown-menu { color: #16161d; }
+        .table { --bs-table-color: #16161d; --bs-table-hover-color: #16161d; }
+        code { color: #16161d; }
+        :is(.text-success, .text-danger, .text-primary, .text-info, .text-warning):not(i):not(.badge):not(.invalid-feedback) { color: #16161d !important; }
+        /* Profile dropdown */
+        .profile-toggle { background: none; border: 0; display: flex; align-items: center; gap: 10px; padding: 4px 6px; border-radius: 8px; color: inherit; text-align: left; }
+        .profile-toggle:hover, .profile-toggle:focus-visible { background: rgba(26,26,46,0.06); }
+        .profile-menu .dropdown-item { display: flex; align-items: center; gap: 10px; padding: 8px 16px; }
+        .profile-menu .dropdown-item i { width: 16px; text-align: center; color: #1a1a2e; }
+        .profile-menu button.dropdown-item { color: #b02a37; }
+        .profile-menu button.dropdown-item i { color: #b02a37; }
         .btn-logout {
             background-color: transparent;
             border: 1px solid #dc3545;
@@ -257,14 +270,9 @@
         </a>
 
         <a href="<?= base_url('admin/reports') ?>" class="nav-link <?= (strpos(uri_string(), 'admin/reports') === 0) ? 'active' : '' ?>">
-            <i class="fa-solid fa-file-chart-column"></i> Reports
+            <i class="fa-solid fa-file-lines"></i> Reports
         </a>
 
-        <div class="nav-section-title">Account</div>
-
-        <a href="<?= base_url('admin/settings') ?>" class="nav-link <?= (strpos(uri_string(), 'admin/settings') === 0) ? 'active' : '' ?>">
-            <i class="fa-solid fa-gear"></i> Settings
-        </a>
     </nav>
 
     <div class="p-3 border-top" style="border-color: rgba(255,255,255,0.1) !important;">
@@ -283,19 +291,28 @@
             Guyo &amp; Liding Cooperative
         </div>
         <div class="user-info">
-            <div class="user-avatar">
-                <?= strtoupper(substr(session()->get('username') ?? 'A', 0, 1)) ?>
-            </div>
-            <span class="user-name">
-                <strong><?= esc(session()->get('username') ?? 'Admin') ?></strong>
-                <br><small class="text-muted"><?= esc(session()->get('role') ?? 'Administrator') ?></small>
-            </span>
-            <form action="<?= base_url('logout') ?>" method="post" class="d-inline">
-                <?= csrf_field() ?>
-                <button type="submit" class="btn btn-logout">
-                    <i class="fa-solid fa-right-from-bracket me-1"></i> Logout
+            <div class="dropdown">
+                <button class="profile-toggle dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Open profile menu">
+                    <span class="user-avatar"><?= strtoupper(substr(session()->get('username') ?? 'A', 0, 1)) ?></span>
+                    <span class="user-name">
+                        <strong><?= esc(session()->get('username') ?? 'Admin') ?></strong>
+                        <br><small class="text-muted"><?= session()->get('is_super_admin') ? 'Super Admin' : 'Admin' ?></small>
+                    </span>
                 </button>
-            </form>
+                <ul class="dropdown-menu dropdown-menu-end profile-menu shadow-sm">
+                    <li><a class="dropdown-item" href="<?= base_url('admin/settings') ?>"><i class="fa-solid fa-gear"></i>Settings</a></li>
+                    <?php if (session()->get('is_super_admin')): ?>
+                        <li><a class="dropdown-item" href="<?= base_url('admin/audit-logs') ?>"><i class="fa-solid fa-clipboard-list"></i>Audit Logs</a></li>
+                    <?php endif; ?>
+                    <li><hr class="dropdown-divider"></li>
+                    <li>
+                        <form action="<?= base_url('logout') ?>" method="post">
+                            <?= csrf_field() ?>
+                            <button type="submit" class="dropdown-item"><i class="fa-solid fa-right-from-bracket"></i>Logout</button>
+                        </form>
+                    </li>
+                </ul>
+            </div>
         </div>
     </div>
 
@@ -308,7 +325,6 @@
 <!-- Bootstrap 5 JS Bundle -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <?= view('partials/table_search') ?>
-<?= view('partials/amount_toggle') ?>
 <script>
     // Sidebar toggle for mobile
     const sidebarToggle = document.getElementById('sidebar-toggle');

@@ -2,6 +2,7 @@
 
 namespace App\Controllers;
 
+use App\Libraries\AuditLog;
 use App\Models\UserModel;
 
 /**
@@ -66,6 +67,9 @@ class Auth extends BaseController
                                ->first();
 
         if (! $user || ! password_verify($password, $user['password_hash'])) {
+            // Record the attempt (the username typed, never the password).
+            AuditLog::record('Failed login', 'user', $user['user_id'] ?? null, 'Invalid username or password.', false,
+                ['user_id' => $user['user_id'] ?? null, 'username' => $username, 'role' => null]);
             $this->clearAuth();
             session()->setFlashdata('error', 'Invalid username or password.');
             return redirect()->to('/login');
@@ -95,13 +99,16 @@ class Auth extends BaseController
         $session->regenerate(true);
 
         // Persist authentication data
+        $isSuper = strtolower($roleName) === 'admin' && ! empty($user['is_super_admin']);
         $session->set([
-            'user_id'   => $user['user_id'],
-            'username'  => $user['username'],
-            'role'      => $roleName,
-            'member_id' => $memberId,
-            'logged_in' => true,
+            'user_id'        => $user['user_id'],
+            'username'       => $user['username'],
+            'role'           => $roleName,
+            'member_id'      => $memberId,
+            'is_super_admin' => $isSuper,
+            'logged_in'      => true,
         ]);
+        AuditLog::record('Logged in', 'user', $user['user_id']);
 
         // Redirect to role dashboard
         if (strtolower($roleName) === 'admin') {
@@ -118,7 +125,7 @@ class Auth extends BaseController
     private function clearAuth(): void
     {
         $session = session();
-        $session->remove(['user_id', 'username', 'role', 'member_id', 'logged_in']);
+        $session->remove(['user_id', 'username', 'role', 'member_id', 'is_super_admin', 'logged_in']);
         $session->regenerate(true);
     }
 
@@ -139,6 +146,9 @@ class Auth extends BaseController
         }
 
         $session = session();
+        if ($session->get('user_id')) {
+            AuditLog::record('Logged out', 'user', $session->get('user_id'));
+        }
         $session->destroy();
 
         return redirect()->to('/login');

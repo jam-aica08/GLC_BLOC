@@ -53,7 +53,7 @@
 </div>
 
 <!-- Contributions Table -->
-<div class="card" data-no-search>
+<div class="card">
     <div class="card-header d-flex justify-content-between align-items-center">
         <span><i class="fa-solid fa-piggy-bank me-2" style="color:#f0a500;"></i>Contribution Records</span>
         <span class="badge bg-secondary"><?= (int) $page['total'] ?> record(s)</span>
@@ -92,39 +92,31 @@
                                 </span>
                             </td>
                             <td class="py-3">
-                                <?php
-                                    $appStatus = $contribution['approval_status'] ?? 'Pending';
-                                    $approver1 = $contribution['first_approved_by'] ?? null;
-                                    $approver2 = $contribution['second_approved_by'] ?? null;
-                                    if ($appStatus === 'Approved'): ?>
+                                <?php $appStatus = $contribution['approval_status'] ?? 'Pending'; ?>
+                                <?php if ($appStatus === 'Approved'): ?>
                                     <span class="badge bg-success">Approved</span>
+                                    <?= view('partials/approved_by', ['name' => $contribution['approver_name'] ?? null, 'at' => $contribution['approved_at'] ?? null]) ?>
                                 <?php elseif ($appStatus === 'Rejected'): ?>
                                     <span class="badge bg-danger">Rejected</span>
-                                <?php elseif ($approver1): ?>
-                                    <span class="badge bg-warning text-dark">1st Approved</span>
                                 <?php else: ?>
-                                    <span class="badge bg-secondary">Pending</span>
+                                    <span class="badge bg-warning text-dark">Pending</span>
                                 <?php endif; ?>
                             </td>
                             <td class="py-3 text-center">
-                                <?php if (in_array($appStatus, ['Pending']) && !$approver2): ?>
+                                <?php if ($appStatus === 'Pending'): ?>
                                     <div class="d-flex gap-1 justify-content-center">
                                         <form action="<?= base_url('admin/contributions/approve/' . ($contribution['id'] ?? 0)) ?>" method="post">
                                             <?= csrf_field() ?>
-                                            <button type="submit" class="btn btn-sm btn-success" title="Approve"
-                                                    onclick="return confirm('Approve this contribution?')">
-                                                <i class="fa-solid fa-check me-1"></i><?= $approver1 ? '2nd Approve' : 'Approve' ?>
+                                            <button type="submit" class="btn btn-sm btn-success" onclick="return confirm('Approve this contribution?')">
+                                                <i class="fa-solid fa-check me-1"></i>Approve
                                             </button>
                                         </form>
-                                        <?php if (!$approver1): ?>
                                         <form action="<?= base_url('admin/contributions/reject/' . ($contribution['id'] ?? 0)) ?>" method="post">
                                             <?= csrf_field() ?>
-                                            <button type="submit" class="btn btn-sm btn-danger" title="Reject"
-                                                    onclick="return confirm('Reject this contribution?')">
+                                            <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Reject this contribution?')">
                                                 <i class="fa-solid fa-xmark me-1"></i>Reject
                                             </button>
                                         </form>
-                                        <?php endif; ?>
                                     </div>
                                 <?php else: ?>
                                     <span class="text-muted small">—</span>

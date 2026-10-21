@@ -22,6 +22,7 @@ $routes->group('admin', ['filter' => 'auth:admin'], function ($routes) {
     $routes->post('members/deactivate/(:num)', 'Admin::deactivateMember/$1');
     $routes->post('members/reactivate/(:num)', 'Admin::reactivateMember/$1');
     $routes->post('members/(:num)/accounts/add', 'Admin::addAccount/$1');
+    $routes->post('members/announce', 'Admin::announce');
     $routes->post('members/requests/(:num)/approve', 'Admin::approveAccountRequest/$1');
     $routes->post('members/requests/(:num)/reject', 'Admin::rejectAccountRequest/$1');
 
@@ -56,12 +57,17 @@ $routes->group('admin', ['filter' => 'auth:admin'], function ($routes) {
     $routes->get('ledger', 'Admin::ledger');
     $routes->post('ledger/verify', 'Admin::verifyLedger');
 
+    // Audit logs (super admin only; read-only)
+    $routes->get('audit-logs', 'Admin::auditLogs');
+
     // Analytics
     $routes->get('analytics', 'Admin::analytics');
     $routes->get('analytics/data', 'Admin::analyticsData');
+    $routes->get('analytics/activity', 'Admin::analyticsActivity');
 
     // Reports
     $routes->get('reports', 'Admin::reports');
+    $routes->get('reports/export', 'Admin::exportReport');
 
     // Settings
     $routes->get('settings', 'Settings::index');
@@ -85,8 +91,12 @@ $routes->group('member', ['filter' => 'auth:member'], function ($routes) {
     $routes->get('profile', 'Member::profile');
     $routes->post('profile/accounts/add', 'Member::openAccount');
     $routes->get('payments', 'Member::payments');
+    $routes->get('notifications', 'Member::notifications');
+    $routes->post('notifications/(:num)/read', 'Member::readNotification/$1');
+    $routes->post('notifications/read-all', 'Member::readAllNotifications');
     $routes->get('analytics', 'Member::analytics');
     $routes->get('analytics/data', 'Member::analyticsData');
+    $routes->get('analytics/activity', 'Member::analyticsActivity');
     $routes->get('settings', 'Settings::index');
     $routes->post('settings/password', 'Settings::changePassword');
 });

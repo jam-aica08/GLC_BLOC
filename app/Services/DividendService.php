@@ -22,9 +22,9 @@ use CodeIgniter\Database\BaseConnection;
  * centavos left over go one each to the accounts with the largest remainders
  * (ties: lowest account ID), so the payouts add up to the pool exactly.
  *
- * A distribution is a batch (dividend_distributions) that needs two different
- * administrators to approve, like other financial records. Only the second
- * approval marks the dividends Distributed and adds them to the ledger.
+ * A distribution is a batch (dividend_distributions) that an administrator
+ * approves, like other financial records. Only the approval marks the
+ * dividends Distributed and adds them to the ledger.
  */
 class DividendService
 {
@@ -269,9 +269,10 @@ class DividendService
     }
 
     /**
-     * First or second approval of a Pending batch. The two approvals must come
-     * from different administrators. On the second, every record is approved,
-     * every dividend is Distributed and each record is added to the ledger.
+     * Approve a Pending batch. One administrator's approval is final: every
+     * record is approved, every dividend is Distributed, each record is added
+     * to the ledger once and each member is notified. The update only succeeds
+     * while the batch is Pending, so it cannot be approved twice.
      *
      * @return array{0: string, 1: bool} [message, ok]
      */
@@ -283,35 +284,19 @@ class DividendService
         }
         $now = date('Y-m-d H:i:s');
 
-        if (empty($batch['first_approved_by'])) {
-            $this->db->table('dividend_distributions')
-                ->where('distribution_id', $distributionId)->where('status', 'Pending')->where('first_approved_by IS NULL')
-                ->update(['first_approved_by' => $adminId, 'first_approval_date' => $now, 'updated_at' => $now]);
-            if ($this->db->affectedRows() < 1) {
-                return ['Another administrator approved this at the same time. Reload the page.', false];
-            }
-            $this->db->table('financial_records')
-                ->where('record_type', 'Dividend')->where('reference_id', $distributionId)->where('approval_status', 'Pending')
-                ->update(['first_approved_by' => $adminId, 'first_approval_date' => $now, 'updated_at' => $now]);
-
-            return ['First approval recorded. A different administrator must give the final approval.', true];
-        }
-
-        if ((int) $batch['first_approved_by'] === $adminId) {
-            return ['You gave the first approval. A different administrator must give the final approval.', false];
-        }
-
         $this->db->transBegin();
         try {
+            // A batch half-approved under the old two-step rule keeps its first approver.
+            $tier = empty($batch['first_approved_by']) ? 'first' : 'second';
             $this->db->table('dividend_distributions')
-                ->where('distribution_id', $distributionId)->where('status', 'Pending')->where('second_approved_by IS NULL')
-                ->update(['second_approved_by' => $adminId, 'second_approval_date' => $now, 'status' => 'Approved', 'updated_at' => $now]);
+                ->where('distribution_id', $distributionId)->where('status', 'Pending')
+                ->update(["{$tier}_approved_by" => $adminId, "{$tier}_approval_date" => $now, 'status' => 'Approved', 'updated_at' => $now]);
             if ($this->db->affectedRows() < 1) {
-                throw new \DomainException('Another administrator approved this at the same time. Reload the page.');
+                throw new \DomainException('This distribution was just approved or rejected by another administrator. Reload the page.');
             }
             $this->db->table('financial_records')
                 ->where('record_type', 'Dividend')->where('reference_id', $distributionId)->where('approval_status', 'Pending')
-                ->update(['second_approved_by' => $adminId, 'second_approval_date' => $now, 'approval_status' => 'Approved', 'updated_at' => $now]);
+                ->update(["{$tier}_approved_by" => $adminId, "{$tier}_approval_date" => $now, 'approval_status' => 'Approved', 'updated_at' => $now]);
             $this->db->table('dividends')
                 ->where('distribution_id', $distributionId)
                 ->update(['dividend_status' => 'Distributed', 'updated_at' => $now]);
@@ -331,7 +316,16 @@ class DividendService
 
         $this->addToLedger($distributionId);
 
-        return ['Distribution fully approved. Dividends are recorded and added to the blockchain ledger.', true];
+        $rows = $this->db->table('dividends d')->select('d.dividend_id, d.account_id, d.dividend_amount, ca.account_number')
+            ->join('cooperative_accounts ca', 'ca.account_id = d.account_id')
+            ->where('d.distribution_id', $distributionId)->get()->getResultArray();
+        foreach ($rows as $row) {
+            Notifier::toAccountOwner((int) $row['account_id'], 'dividend', 'Dividend distributed',
+                'You received a ' . $batch['distribution_year'] . ' dividend of PHP ' . number_format((float) $row['dividend_amount'], 2)
+                . ' on account ' . $row['account_number'] . '.', 'member/dividends', 'dividend-' . $row['dividend_id']);
+        }
+
+        return ['Distribution approved. Dividends are recorded and added to the blockchain ledger.', true];
     }
 
     /** Add each approved record of the batch to the ledger, once. */
@@ -388,7 +382,7 @@ class DividendService
         }
 
         return $this->db->table('dividend_distributions d')
-            ->select('d.*, uc.username AS created_by_name, u1.username AS first_approver, u2.username AS second_approver, ur.username AS rejected_by_name')
+            ->select('d.*, uc.username AS created_by_name, u1.username AS first_approver, u2.username AS second_approver, ur.username AS rejected_by_name, COALESCE(u2.username, u1.username) AS approver_name, COALESCE(d.second_approval_date, d.first_approval_date) AS approved_at')
             ->join('users uc', 'uc.user_id = d.created_by', 'left')
             ->join('users u1', 'u1.user_id = d.first_approved_by', 'left')
             ->join('users u2', 'u2.user_id = d.second_approved_by', 'left')

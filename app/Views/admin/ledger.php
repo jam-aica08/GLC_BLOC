@@ -2,8 +2,9 @@
 
 <?= $this->section('content') ?>
 
+<div class="mx-auto" style="max-width:1100px;">
 <!-- Page Header -->
-<div class="d-flex justify-content-between align-items-center mb-4">
+<div class="text-center mb-4 d-flex flex-column align-items-center gap-3">
     <div>
         <h4 class="mb-1 fw-bold">Blockchain Ledger</h4>
         <p class="text-muted mb-0 small">Immutable chain of financial records secured with cryptographic hashing.</p>
@@ -86,7 +87,7 @@
 </div>
 
 <!-- Ledger Table -->
-<div class="card">
+<div class="card" data-search>
     <div class="card-header d-flex justify-content-between align-items-center">
         <span><i class="fa-solid fa-link me-2" style="color:#f0a500;"></i>Ledger Chain</span>
         <span class="badge bg-secondary"><?= count($ledgerEntries ?? []) ?> block(s)</span>
@@ -96,9 +97,8 @@
             <table class="table table-hover align-middle mb-0" style="font-size:0.85rem;">
                 <thead style="background:#f8f9fa;">
                     <tr>
-                        <th class="px-4 py-3">Sequence</th>
-                        <th class="py-3">Ledger ID</th>
-                        <th class="py-3">Financial Record ID</th>
+                        <th class="px-4 py-3">Ledger ID</th>
+                        <th class="py-3">Record</th>
                         <th class="py-3">Hash</th>
                         <th class="py-3">Previous Hash</th>
                         <th class="py-3">Status</th>
@@ -110,22 +110,15 @@
                         <?php foreach ($ledgerEntries as $index => $entry): ?>
                         <?php $isValid = ($entry['status'] ?? 'Valid') === 'Valid'; ?>
                         <tr class="<?= $isValid ? '' : 'table-danger' ?>">
-                            <td class="px-4 py-3 fw-bold text-muted"><?= esc($entry['sequence'] ?? ($index + 1)) ?></td>
-                            <td class="py-3"><code><?= esc($entry['ledger_id'] ?? $entry['id'] ?? '-') ?></code></td>
+                            <td class="px-4 py-3"><code><?= esc($entry['ledger_id'] ?? $entry['id'] ?? '-') ?></code></td>
                             <td class="py-3">
-                                <a href="<?= base_url('admin/financial-records') ?>" class="text-decoration-none">
-                                    <code>#<?= esc($entry['financial_record_id'] ?? '-') ?></code>
-                                </a>
+                                <div><?= esc($entry['record_type'] ?? 'Record') ?> <code>#<?= esc($entry['financial_record_id'] ?? '-') ?></code></div>
+                                <?php if (isset($entry['amount'])): ?><div class="small text-muted">₱<?= number_format((float) $entry['amount'], 2) ?></div><?php endif; ?>
                             </td>
                             <td class="py-3">
-                                <code class="text-break" style="font-size:0.78rem;color:#0d6efd;">
-                                    <?= esc(substr($entry['hash'] ?? '', 0, 16)) ?>...
+                                <code class="text-break" style="font-size:0.78rem;" title="<?= esc($entry['hash'] ?? '') ?>" data-bs-toggle="tooltip">
+                                    <?= esc(substr($entry['hash'] ?? '', 0, 16)) ?>…
                                 </code>
-                                <button type="button" class="btn btn-link p-0 ms-1 small" style="color:#6c757d;"
-                                        data-bs-toggle="tooltip" data-bs-placement="top"
-                                        title="<?= esc($entry['hash'] ?? 'N/A') ?>">
-                                    <i class="fa-solid fa-eye"></i>
-                                </button>
                             </td>
                             <td class="py-3">
                                 <?php $prevHash = $entry['previous_hash'] ?? ''; ?>
@@ -153,7 +146,7 @@
                         <?php endforeach; ?>
                     <?php else: ?>
                         <tr>
-                            <td colspan="7" class="text-center py-5 text-muted">
+                            <td colspan="6" class="text-center py-5 text-muted">
                                 <i class="fa-solid fa-link fa-2x mb-3 d-block opacity-25"></i>
                                 No ledger entries yet. Approved financial records will appear here.
                             </td>
@@ -173,5 +166,7 @@
         });
     });
 </script>
+
+</div>
 
 <?= $this->endSection() ?>

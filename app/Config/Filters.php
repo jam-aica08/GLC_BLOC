@@ -37,6 +37,12 @@ class Filters extends BaseConfig
                 'member/*',
             ],
         ],
+        'audit' => [
+            'after' => [
+                'admin/*',
+                'member/*',
+            ],
+        ],
     ];
 
     public array $aliases = [
@@ -46,5 +52,6 @@ class Filters extends BaseConfig
         'invalidchars'  => InvalidChars::class,
         'secureheaders' => SecureHeaders::class,
         'auth'          => \App\Filters\AuthFilter::class,
+        'audit'         => \App\Filters\AuditFilter::class,
     ];
 }
