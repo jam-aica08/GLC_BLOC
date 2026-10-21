@@ -34,7 +34,7 @@
             <label for="f_to" class="form-label small fw-semibold mb-1">To</label>
             <input type="date" id="f_to" name="to" class="form-control form-control-sm" value="<?= esc($filters['to']) ?>">
         </div>
-        <button class="btn btn-sm text-white" style="background:#1a1a2e;">Apply</button>
+        <button class="btn btn-sm btn-brand">Apply</button>
         <a href="<?= base_url('admin/audit-logs') ?>" class="btn btn-sm btn-outline-secondary">Clear</a>
     </div>
 </form>

@@ -14,7 +14,7 @@
         <span class="input-group-text bg-white"><i class="fa-solid fa-magnifying-glass"></i></span>
         <input type="search" name="q" class="form-control" value="<?= esc($search ?? '') ?>" aria-label="Search"
                placeholder="<?= esc($placeholder) ?>">
-        <button class="btn text-white" style="background:#1a1a2e;" type="submit">Search</button>
+        <button class="btn btn-brand" type="submit">Search</button>
         <?php if (($search ?? '') !== ''): ?>
             <a class="btn btn-outline-secondary" href="<?= base_url($action . (($filterStatus ?? '') !== '' ? '?status=' . urlencode($filterStatus) : '')) ?>">Clear</a>
         <?php endif; ?>

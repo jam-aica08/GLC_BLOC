@@ -8,7 +8,7 @@
         <h4 class="mb-1 fw-bold">Members</h4>
         <p class="text-muted mb-0 small">Manage cooperative members and their accounts.</p>
     </div>
-    <button type="button" class="btn btn-sm text-white" style="background:#1a1a2e;"
+    <button type="button" class="btn btn-sm btn-brand"
             data-bs-toggle="modal" data-bs-target="#addMemberModal">
         <i class="fa-solid fa-user-plus me-2"></i>Add New Member
     </button>
@@ -34,7 +34,7 @@
         <span class="input-group-text bg-white"><i class="fa-solid fa-magnifying-glass"></i></span>
         <input type="search" name="q" class="form-control" value="<?= esc($search ?? '') ?>" aria-label="Search members"
                placeholder="Search by member ID, member #, name, account #, username or email">
-        <button class="btn text-white" style="background:#1a1a2e;" type="submit">Search</button>
+        <button class="btn btn-brand" type="submit">Search</button>
         <?php if (! empty($search)): ?>
             <a href="<?= base_url('admin/members') ?>" class="btn btn-outline-secondary">Clear</a>
         <?php endif; ?>
@@ -51,8 +51,8 @@
     <div class="modal-dialog modal-dialog-centered">
         <form class="modal-content" method="post" action="<?= base_url('admin/members/announce') ?>">
             <?= csrf_field() ?>
-            <div class="modal-header" style="background:#1a1a2e;">
-                <h5 class="modal-title text-white" id="announceModalLabel"><i class="fa-solid fa-bullhorn me-2" style="color:#f0a500;"></i>Post Announcement</h5>
+            <div class="modal-header modal-header-brand">
+                <h5 class="modal-title text-white" id="announceModalLabel"><i class="fa-solid fa-bullhorn me-2 glc-icon"></i>Post Announcement</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body p-4">
@@ -64,7 +64,7 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="submit" class="btn text-white" style="background:#1a1a2e;"><i class="fa-solid fa-paper-plane me-1"></i>Send</button>
+                <button type="submit" class="btn btn-brand"><i class="fa-solid fa-paper-plane me-1"></i>Send</button>
             </div>
         </form>
     </div>
@@ -119,7 +119,7 @@
 <!-- Members Table Card -->
 <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center">
-        <span><i class="fa-solid fa-users me-2" style="color:#f0a500;"></i>All Members</span>
+        <span><i class="fa-solid fa-users me-2 glc-icon"></i>All Members</span>
         <span class="badge bg-secondary"><?= count($members ?? []) ?> total</span>
     </div>
     <div class="card-body p-0">
@@ -146,7 +146,7 @@
                             <td class="py-3">
                                 <div class="d-flex align-items-center gap-2">
                                     <div class="rounded-circle d-flex align-items-center justify-content-center"
-                                         style="width:32px;height:32px;background:#1a1a2e;color:#f0a500;font-weight:700;font-size:0.8rem;flex-shrink:0;">
+                                         style="width:32px;height:32px;background:var(--glc-gradient-dark);color:#fff;font-weight:700;font-size:0.8rem;flex-shrink:0;">
                                         <?= strtoupper(substr($member['first_name'] ?? 'M', 0, 1)) ?>
                                     </div>
                                     <div>
@@ -232,9 +232,9 @@
 <div class="modal fade" id="addMemberModal" tabindex="-1" aria-labelledby="addMemberModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content">
-            <div class="modal-header" style="background:#1a1a2e;">
+            <div class="modal-header modal-header-brand">
                 <h5 class="modal-title text-white" id="addMemberModalLabel">
-                    <i class="fa-solid fa-user-plus me-2" style="color:#f0a500;"></i>Add New Member
+                    <i class="fa-solid fa-user-plus me-2 glc-icon"></i>Add New Member
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
@@ -287,7 +287,7 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn text-white" style="background:#1a1a2e;">
+                    <button type="submit" class="btn btn-brand">
                         <i class="fa-solid fa-user-plus me-2"></i>Add Member
                     </button>
                 </div>
@@ -300,9 +300,9 @@
 <div class="modal fade" id="addAccountModal" tabindex="-1" aria-labelledby="addAccountModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
-            <div class="modal-header" style="background:#1a1a2e;">
+            <div class="modal-header modal-header-brand">
                 <h5 class="modal-title text-white" id="addAccountModalLabel">
-                    <i class="fa-solid fa-wallet me-2" style="color:#f0a500;"></i>Add Account
+                    <i class="fa-solid fa-wallet me-2 glc-icon"></i>Add Account
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
@@ -324,7 +324,7 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn text-white" style="background:#1a1a2e;">
+                    <button type="submit" class="btn btn-brand">
                         <i class="fa-solid fa-plus me-2"></i>Open Account
                     </button>
                 </div>
@@ -337,9 +337,9 @@
 <div class="modal fade" id="viewAccountsModal" tabindex="-1" aria-labelledby="viewAccountsModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content">
-            <div class="modal-header" style="background:#1a1a2e;">
+            <div class="modal-header modal-header-brand">
                 <h5 class="modal-title text-white" id="viewAccountsModalLabel">
-                    <i class="fa-solid fa-wallet me-2" style="color:#f0a500;"></i><span id="viewAccountsName"></span> — Accounts
+                    <i class="fa-solid fa-wallet me-2 glc-icon"></i><span id="viewAccountsName"></span> — Accounts
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>

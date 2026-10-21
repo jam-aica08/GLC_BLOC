@@ -8,7 +8,7 @@
         <h4 class="mb-1 fw-bold">Analytics</h4>
         <p class="text-muted mb-0 small">Recent cooperative activity, plus the 12-month equity trend and forecast.</p>
     </div>
-    <span class="badge" style="background:#1a1a2e;color:#f0a500;padding:8px 14px;border-radius:8px;font-size:0.8rem;">
+    <span class="badge" style="background:var(--glc-gradient-dark);color:#fff;padding:8px 14px;border-radius:8px;font-size:0.8rem;">
         <i class="fa-solid fa-chart-line me-1"></i> Equity Trend &amp; Forecast
     </span>
 </div>
@@ -24,7 +24,7 @@
 <!-- Recent activity: time range + auto-refresh -->
 <div class="card mb-4" id="activity">
     <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-center gap-3">
-        <span class="fw-semibold"><i class="fa-solid fa-wave-square me-2" style="color:#f0a500;"></i>Activity</span>
+        <span class="fw-semibold"><i class="fa-solid fa-wave-square me-2 glc-icon"></i>Activity</span>
         <div class="d-flex flex-wrap gap-3 align-items-end">
             <div>
                 <label for="act_range" class="form-label small fw-semibold mb-1">Time range</label>
@@ -183,14 +183,14 @@
 <!-- Chart Card -->
 <div class="card mb-4">
     <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-        <span><i class="fa-solid fa-chart-line me-2" style="color:#f0a500;"></i>Cooperative Equity Over Time (12 months)</span>
+        <span><i class="fa-solid fa-chart-line me-2 glc-icon"></i>Cooperative Equity Over Time (12 months)</span>
         <div class="d-flex align-items-center gap-3 flex-wrap" style="font-size:0.82rem;">
             <span class="d-flex align-items-center gap-1">
-                <span style="display:inline-block;width:28px;height:3px;background:#1a1a2e;border-radius:2px;"></span>
+                <span style="display:inline-block;width:28px;height:3px;background:var(--glc-indigo);border-radius:2px;"></span>
                 Historical Equity
             </span>
             <span class="d-flex align-items-center gap-1">
-                <span style="display:inline-block;width:28px;height:3px;background:#f0a500;border-radius:2px;border-top:2px dashed #f0a500;"></span>
+                <span style="display:inline-block;width:28px;height:3px;background:var(--glc-pink);border-radius:2px;border-top:2px dashed var(--glc-pink);"></span>
                 Forecast (Estimate)
             </span>
         </div>
@@ -198,7 +198,7 @@
     <div class="card-body p-4">
         <!-- Disclaimer note -->
         <p class="text-muted small mb-3">
-            <i class="fa-solid fa-circle-info me-1" style="color:#f0a500;"></i>
+            <i class="fa-solid fa-circle-info me-1 glc-icon"></i>
             <em>Forecasts are estimates based on historical trends using linear regression.
             Actual results may vary depending on member activity and market conditions.</em>
         </p>
@@ -311,10 +311,10 @@ document.addEventListener('DOMContentLoaded', function () {
                     {
                         label: 'Historical Equity',
                         data: historicalData,
-                        borderColor: '#1a1a2e',
-                        backgroundColor: 'rgba(26,26,46,0.08)',
+                        borderColor: '#2622b0',
+                        backgroundColor: 'rgba(38,34,176,0.08)',
                         borderWidth: 2.5,
-                        pointBackgroundColor: '#1a1a2e',
+                        pointBackgroundColor: '#2622b0',
                         pointRadius: 4,
                         pointHoverRadius: 6,
                         tension: 0.3,
@@ -324,11 +324,11 @@ document.addEventListener('DOMContentLoaded', function () {
                     {
                         label: 'Forecast (Estimate)',
                         data: forecastData,
-                        borderColor: '#f0a500',
-                        backgroundColor: 'rgba(240,165,0,0.07)',
+                        borderColor: '#ff0a7e',
+                        backgroundColor: 'rgba(255,10,126,0.07)',
                         borderWidth: 2.5,
                         borderDash: [8, 4],
-                        pointBackgroundColor: '#f0a500',
+                        pointBackgroundColor: '#ff0a7e',
                         pointRadius: 4,
                         pointHoverRadius: 6,
                         pointStyle: 'triangle',

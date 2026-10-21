@@ -26,8 +26,8 @@
 
 <!-- Info Banner -->
 <div class="alert d-flex align-items-center gap-2 mb-3"
-     style="background:rgba(26,26,46,0.06);border:1px solid rgba(26,26,46,0.15);color:#1a1a2e;border-radius:10px;">
-    <i class="fa-solid fa-circle-info" style="color:#f0a500;"></i>
+     style="background:rgba(var(--glc-navy-rgb),0.06);border:1px solid rgba(var(--glc-navy-rgb),0.15);color:var(--glc-navy);border-radius:10px;">
+    <i class="fa-solid fa-circle-info glc-icon"></i>
     <span class="small">
         A record is posted to the blockchain ledger once <strong>one administrator approves it</strong>.
         Dividends are approved as a whole distribution on the Dividends page.
@@ -37,7 +37,7 @@
 <!-- Financial Records Table -->
 <div class="card" data-search>
     <div class="card-header d-flex justify-content-between align-items-center">
-        <span><i class="fa-solid fa-file-invoice-dollar me-2" style="color:#f0a500;"></i>Financial Records</span>
+        <span><i class="fa-solid fa-file-invoice-dollar me-2 glc-icon"></i>Financial Records</span>
         <span class="badge bg-secondary"><?= count($financialRecords ?? []) ?> record(s)</span>
     </div>
     <div class="card-body p-0">

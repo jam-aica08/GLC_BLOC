@@ -38,7 +38,7 @@
 <!-- My accounts -->
 <div class="card dash-tile mt-3">
     <div class="card-header bg-white d-flex justify-content-between align-items-center">
-        <span class="fw-semibold"><i class="fa-solid fa-building-columns me-2" style="color:#f0a500;"></i>My Accounts</span>
+        <span class="fw-semibold"><i class="fa-solid fa-building-columns me-2 glc-icon"></i>My Accounts</span>
         <a href="<?= base_url('member/profile') ?>" class="btn btn-sm btn-outline-secondary">Open another account</a>
     </div>
     <div class="table-responsive">

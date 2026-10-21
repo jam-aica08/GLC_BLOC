@@ -2,7 +2,7 @@
 <?= $this->section('content') ?>
 
 <div class="mb-4">
-    <h4 class="fw-bold mb-1"><i class="fas fa-user-circle me-2 text-warning"></i>My Profile</h4>
+    <h4 class="fw-bold mb-1"><i class="fas fa-user-circle me-2 glc-icon"></i>My Profile</h4>
 </div>
 
 <?= view('partials/flash') ?>
@@ -74,7 +74,7 @@
         <?php if (! empty($hasPendingRequest)): ?>
             <span class="small text-muted"><i class="fa-solid fa-hourglass-half me-1"></i>Request waiting for approval</span>
         <?php else: ?>
-            <button type="button" class="btn btn-sm text-white" style="background:#1a1a2e;" data-bs-toggle="modal" data-bs-target="#openAccountModal">
+            <button type="button" class="btn btn-sm btn-brand" data-bs-toggle="modal" data-bs-target="#openAccountModal">
                 <i class="fa-solid fa-plus me-1"></i>Request New Account
             </button>
         <?php endif; ?>
@@ -141,9 +141,9 @@
 <div class="modal fade" id="openAccountModal" tabindex="-1" aria-labelledby="openAccountModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
-            <div class="modal-header" style="background:#1a1a2e;">
+            <div class="modal-header modal-header-brand">
                 <h5 class="modal-title text-white" id="openAccountModalLabel">
-                    <i class="fa-solid fa-wallet me-2" style="color:#f0a500;"></i>Request New Account
+                    <i class="fa-solid fa-wallet me-2 glc-icon"></i>Request New Account
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
@@ -160,7 +160,7 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn text-white" style="background:#1a1a2e;">
+                    <button type="submit" class="btn btn-brand">
                         <i class="fa-solid fa-paper-plane me-2"></i>Send Request
                     </button>
                 </div>
