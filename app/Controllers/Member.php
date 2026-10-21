@@ -350,6 +350,21 @@ class Member extends BaseController
         $now            = date('Y-m-d H:i:s');
         $today          = date('Y-m-d');
 
+        // One open loan per member (pending, approved or active), checked under a
+        // lock on the member so two simultaneous applications cannot both pass.
+        $db->transBegin();
+        $db->query('SELECT member_id FROM members WHERE member_id = ? FOR UPDATE', [$memberId]);
+        $open = $db->table('loans l')
+                   ->join('cooperative_accounts ca', 'ca.account_id = l.account_id')
+                   ->where('ca.member_id', $memberId)
+                   ->whereIn('l.loan_status', ['Pending', 'Approved', 'Active'])
+                   ->countAllResults();
+        if ($open > 0) {
+            $db->transRollback();
+            session()->setFlashdata('error', 'You already have a loan that is pending or still being paid. You can apply again once it is settled.');
+            return redirect()->to('/member/loans');
+        }
+
         $loanModel = model(LoanModel::class);
         $loanId = $loanModel->insert([
             'account_id'          => $accountId,
@@ -362,6 +377,12 @@ class Member extends BaseController
             'application_date'    => $today,
             'loan_status'         => 'Pending',
         ]);
+        if (! $loanId || $db->transStatus() === false) {
+            $db->transRollback();
+            session()->setFlashdata('error', 'The loan application could not be saved. Please try again.');
+            return redirect()->to('/member/loans');
+        }
+        $db->transCommit();
 
         if ($loanId) {
             \App\Services\Notifier::toAdmins('loan', 'Loan application to review',

@@ -60,7 +60,7 @@
         <div class="card text-center">
             <div class="card-body py-3">
                 <div class="text-muted small">Total Entries</div>
-                <div class="fw-bold fs-4"><?= count($ledgerEntries ?? []) ?></div>
+                <div class="fw-bold fs-4"><?= array_sum($counts) ?></div>
             </div>
         </div>
     </div>
@@ -69,7 +69,7 @@
             <div class="card-body py-3">
                 <div class="text-muted small">Valid Entries</div>
                 <div class="fw-bold fs-4 text-success">
-                    <?= count(array_filter($ledgerEntries ?? [], fn($e) => ($e['status'] ?? 'Valid') === 'Valid')) ?>
+                    <?= (int) $counts['Valid'] ?>
                 </div>
             </div>
         </div>
@@ -79,18 +79,20 @@
             <div class="card-body py-3">
                 <div class="text-muted small">Tampered Entries</div>
                 <div class="fw-bold fs-4 text-danger">
-                    <?= count(array_filter($ledgerEntries ?? [], fn($e) => ($e['status'] ?? 'Valid') === 'Tampered')) ?>
+                    <?= (int) $counts['Tampered'] ?>
                 </div>
             </div>
         </div>
     </div>
 </div>
 
+<?= view('partials/list_search', ['action' => 'admin/ledger', 'search' => $search, 'filterStatus' => '', 'placeholder' => 'Search by ledger ID, record #, hash or type']) ?>
+
 <!-- Ledger Table -->
-<div class="card" data-search>
+<div class="card">
     <div class="card-header d-flex justify-content-between align-items-center">
         <span><i class="fa-solid fa-link me-2 glc-icon"></i>Ledger Chain</span>
-        <span class="badge bg-secondary"><?= count($ledgerEntries ?? []) ?> block(s)</span>
+        <span class="badge bg-secondary"><?= (int) $page['total'] ?> block(s)</span>
     </div>
     <div class="card-body p-0">
         <div class="table-responsive">
@@ -148,7 +150,7 @@
                         <tr>
                             <td colspan="6" class="text-center py-5 text-muted">
                                 <i class="fa-solid fa-link fa-2x mb-3 d-block opacity-25"></i>
-                                No ledger entries yet. Approved financial records will appear here.
+                                <?= $search !== '' ? 'No blocks match your search.' : 'No ledger entries yet. Approved financial records will appear here.' ?>
                             </td>
                         </tr>
                     <?php endif; ?>
@@ -156,6 +158,7 @@
             </table>
         </div>
     </div>
+    <?= view('partials/pager', ['page' => $page, 'action' => 'admin/ledger', 'query' => ['q' => $search]]) ?>
 </div>
 
 <script>

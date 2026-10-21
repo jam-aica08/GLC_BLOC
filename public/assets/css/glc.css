@@ -101,6 +101,10 @@ code { color: var(--glc-text); }
     --bs-btn-focus-shadow-rgb: var(--glc-indigo-rgb);
 }
 
+/* Outline buttons dark enough to read on white and on the page background (WCAG AA). */
+.btn-outline-secondary { --bs-btn-color: #565e64; --bs-btn-border-color: #8f959b; }
+.btn-outline-warning { --bs-btn-color: #8a6800; --bs-btn-hover-color: #1f1500; --bs-btn-active-color: #1f1500; }
+
 /* Main call to action: the logo gradient. */
 .btn-gradient {
     color: #fff;
@@ -215,7 +219,7 @@ code { color: var(--glc-text); }
 #sidebar nav { overflow-y: auto; overscroll-behavior: contain; padding: 4px 12px 12px; }
 
 #sidebar .nav-section-title {
-    color: #9a9db5;
+    color: #6b6f8a;
     font-size: .68rem;
     font-weight: 700;
     text-transform: uppercase;
@@ -253,7 +257,7 @@ code { color: var(--glc-text); }
 }
 #sidebar .nav-link:focus-visible { outline: 2px solid rgba(var(--glc-indigo-rgb), .5); outline-offset: 1px; }
 
-.sidebar-footer { border-top: 1px solid var(--glc-border); padding: 12px 20px; font-size: .72rem; color: #9a9db5; text-align: center; }
+.sidebar-footer { border-top: 1px solid var(--glc-border); padding: 12px 20px; font-size: .72rem; color: #6b6f8a; text-align: center; }
 
 #main-content {
     margin-left: var(--glc-sidebar-w);

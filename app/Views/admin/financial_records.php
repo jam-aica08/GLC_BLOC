@@ -34,11 +34,13 @@
     </span>
 </div>
 
+<?= view('partials/list_search', ['action' => 'admin/financial-records', 'search' => $search, 'filterStatus' => '', 'placeholder' => 'Search by member name, member #, account # or record ID']) ?>
+
 <!-- Financial Records Table -->
-<div class="card" data-search>
+<div class="card">
     <div class="card-header d-flex justify-content-between align-items-center">
         <span><i class="fa-solid fa-file-invoice-dollar me-2 glc-icon"></i>Financial Records</span>
-        <span class="badge bg-secondary"><?= count($financialRecords ?? []) ?> record(s)</span>
+        <span class="badge bg-secondary"><?= (int) $page['total'] ?> record(s)</span>
     </div>
     <div class="card-body p-0">
         <div class="table-responsive">
@@ -126,6 +128,7 @@
             </table>
         </div>
     </div>
+    <?= view('partials/pager', ['page' => $page, 'action' => 'admin/financial-records', 'query' => ['q' => $search]]) ?>
 </div>
 
 <?= $this->endSection() ?>

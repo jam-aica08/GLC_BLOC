@@ -147,7 +147,7 @@
                                 <div class="d-flex align-items-center gap-2">
                                     <div class="rounded-circle d-flex align-items-center justify-content-center"
                                          style="width:32px;height:32px;background:var(--glc-gradient-dark);color:#fff;font-weight:700;font-size:0.8rem;flex-shrink:0;">
-                                        <?= strtoupper(substr($member['first_name'] ?? 'M', 0, 1)) ?>
+                                        <?= esc(mb_strtoupper(mb_substr($member['first_name'] ?? 'M', 0, 1))) ?>
                                     </div>
                                     <div>
                                         <div class="fw-semibold"><?= esc(($member['first_name'] ?? '') . ' ' . ($member['last_name'] ?? '')) ?></div>
@@ -196,7 +196,7 @@
                                         <i class="fa-solid fa-plus me-1"></i>Add Account
                                     </button>
                                     <form action="<?= base_url('admin/members/deactivate/' . $member['id']) ?>" method="post"
-                                          onsubmit="return confirm('Deactivate member ' + <?= json_encode(($member['first_name'] ?? '') . ' ' . ($member['last_name'] ?? '')) ?> + '?')">
+                                          onsubmit="return confirm('Deactivate member <?= esc(($member['first_name'] ?? '') . ' ' . ($member['last_name'] ?? ''), 'js') ?>?')">
                                         <?= csrf_field() ?>
                                         <button type="submit" class="btn btn-sm btn-outline-danger" title="Deactivate">
                                             <i class="fa-solid fa-user-slash me-1"></i>Deactivate
@@ -204,7 +204,7 @@
                                     </form>
                                 <?php else: ?>
                                     <form action="<?= base_url('admin/members/reactivate/' . $member['id']) ?>" method="post"
-                                          onsubmit="return confirm('Reactivate member ' + <?= json_encode(($member['first_name'] ?? '') . ' ' . ($member['last_name'] ?? '')) ?> + '?')">
+                                          onsubmit="return confirm('Reactivate member <?= esc(($member['first_name'] ?? '') . ' ' . ($member['last_name'] ?? ''), 'js') ?>?')">
                                         <?= csrf_field() ?>
                                         <button type="submit" class="btn btn-sm btn-outline-success" title="Reactivate">
                                             <i class="fa-solid fa-user-check me-1"></i>Reactivate
