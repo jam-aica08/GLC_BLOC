@@ -50,6 +50,9 @@ class DatabaseUpdates
             } elseif ($db->table('users')->where('is_super_admin', 1)->countAllResults() === 0) {
                 $status['problems'][] = 'no super administrator is set';
             }
+            if (! $db->tableExists('admin_notifications', false)) {
+                $status['problems'][] = 'admin notifications table is missing';
+            }
         } catch (\Throwable $e) {
             log_message('error', 'DatabaseUpdates::status failed: ' . $e->getMessage());
             $status['error'] = $e->getMessage();
@@ -64,7 +67,7 @@ class DatabaseUpdates
      * installment carry-over (carried_over column, 'Partial' status),
      * account_requests table, dividend_distributions batches (with
      * dividends.distribution_id and a 'Rejected' dividend status), audit_logs,
-     * notifications and users.is_super_admin. Safe to run any number of times.
+     * notifications, admin_notifications and users.is_super_admin. Safe to run any number of times.
      */
     public static function repairSchema($db, $forge): void
     {
@@ -218,6 +221,28 @@ class DatabaseUpdates
             $forge->addUniqueKey(['member_id', 'event_key'], 'uq_notifications_event');
             $forge->addForeignKey('member_id', 'members', 'member_id', 'CASCADE', 'CASCADE', 'fk_notifications_member');
             $forge->createTable('notifications', true);
+        }
+
+        // Private updates for one administrator (new requests to review, ledger problems).
+        if (! $db->tableExists('admin_notifications', false)) {
+            $forge->addField([
+                'notification_id' => ['type' => 'BIGINT', 'unsigned' => true, 'auto_increment' => true],
+                'user_id'         => ['type' => 'INT', 'unsigned' => true],
+                'type'            => ['type' => 'VARCHAR', 'constraint' => 30],
+                'title'           => ['type' => 'VARCHAR', 'constraint' => 150],
+                'message'         => ['type' => 'VARCHAR', 'constraint' => 500],
+                'link'            => ['type' => 'VARCHAR', 'constraint' => 255, 'null' => true],
+                'event_key'       => ['type' => 'VARCHAR', 'constraint' => 100, 'null' => true],
+                'is_read'         => ['type' => 'TINYINT', 'constraint' => 1, 'default' => 0],
+                'read_at'         => ['type' => 'DATETIME', 'null' => true],
+                'created_at'      => ['type' => 'DATETIME'],
+            ]);
+            $forge->addKey('notification_id', true);
+            $forge->addKey(['user_id', 'is_read']);
+            $forge->addKey('event_key');
+            $forge->addUniqueKey(['user_id', 'event_key'], 'uq_admin_notifications_event');
+            $forge->addForeignKey('user_id', 'users', 'user_id', 'CASCADE', 'CASCADE', 'fk_admin_notifications_user');
+            $forge->createTable('admin_notifications', true);
         }
 
         $db->resetDataCache();
