@@ -8,14 +8,14 @@
     </div>
     <?php if ($unread): ?>
         <form method="post" action="<?= base_url('member/notifications/read-all') ?>">
-            <?= csrf_field() ?><input type="hidden" name="next" value="notifications">
+            <?= csrf_field() ?><input type="hidden" name="next" value="member/notifications">
             <button class="btn btn-sm btn-outline-secondary">Mark all as read</button>
         </form>
     <?php endif; ?>
 </div>
 
 <div class="card shadow-sm">
-    <?= view('partials/notification_list', ['notifications' => $notifications, 'next' => 'notifications']) ?>
+    <?= view('partials/notification_list', ['notifications' => $notifications, 'next' => 'member/notifications']) ?>
 </div>
 
 <?= $this->endSection() ?>

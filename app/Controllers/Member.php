@@ -72,8 +72,6 @@ class Member extends BaseController
         unset($acc);
 
         return view('member/dashboard', [
-            'notifications' => \App\Services\Notifier::latest($memberId, 6),
-            'unreadCount'   => \App\Services\Notifier::unreadCount($memberId),
             'accounts' => $accounts,
             'overview' => (new \App\Services\DashboardService())->build(array_map('intval', $accountIds)),
         ]);
@@ -657,6 +655,14 @@ class Member extends BaseController
         return redirect()->to('/member/profile');
     }
 
+    /** Where to go after marking notifications read: the member page they were on. */
+    private function backTo(): string
+    {
+        $next = trim((string) $this->request->getPost('next'), '/');
+
+        return preg_match('#^member(/[A-Za-z0-9_/-]*)?$#', $next) ? '/' . $next : '/member/dashboard';
+    }
+
     /** POST: mark one of the member's own notifications as read. */
     public function readNotification(int $id)
     {
@@ -665,7 +671,7 @@ class Member extends BaseController
             \App\Services\Notifier::markRead($memberId, $id);
         }
 
-        return redirect()->to($this->request->getPost('next') === 'notifications' ? '/member/notifications' : '/member/dashboard');
+        return redirect()->to($this->backTo());
     }
 
     /** POST: mark all of the member's notifications as read. */
@@ -676,7 +682,7 @@ class Member extends BaseController
             \App\Services\Notifier::markRead($memberId);
         }
 
-        return redirect()->to($this->request->getPost('next') === 'notifications' ? '/member/notifications' : '/member/dashboard');
+        return redirect()->to($this->backTo());
     }
 
     /** GET: every notification of the signed-in member. */
