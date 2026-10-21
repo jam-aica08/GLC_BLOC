@@ -29,6 +29,10 @@ final class AuthSecurityTest extends CIUnitTestCase
     protected function setUp(): void
     {
         if (config('Database')->tests['DBDriver'] !== 'MySQLi') {
+            // In CI these must run, never pass by being skipped.
+            if (getenv('CI')) {
+                $this->fail('CI must provide the MySQL test database (database_tests_* variables).');
+            }
             $this->markTestSkipped('Needs the MySQL test database (database.tests.*).');
         }
         parent::setUp();
