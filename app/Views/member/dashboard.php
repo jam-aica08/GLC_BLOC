@@ -20,19 +20,6 @@
     <p class="text-muted small mb-0">Your cooperative account summary.</p>
 </div>
 
-<?php foreach (($accounts ?? []) as $acc): ?>
-    <?php if (($acc['account_status'] ?? '') === 'Pending'): ?>
-        <div class="alert alert-warning d-flex align-items-center gap-2" role="status">
-            <i class="fa-solid fa-hourglass-half"></i>
-            <div>
-                Account <strong><?= esc($acc['account_number']) ?></strong> becomes active once
-                <strong>₱<?= number_format($acc['standing']['join_balance'] ?? 0, 2) ?></strong> more is contributed (and approved).
-                <a href="<?= base_url('member/contributions') ?>" class="alert-link">Contribute now</a>
-            </div>
-        </div>
-    <?php endif; ?>
-<?php endforeach; ?>
-
 <?= view('partials/dashboard_overview', ['d' => $overview, 'isAdmin' => false]) ?>
 
 <!-- My accounts -->
