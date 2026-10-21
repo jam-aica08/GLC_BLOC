@@ -49,6 +49,8 @@ $routes->group('admin', ['filter' => 'auth:admin'], function ($routes) {
     // Dividends
     $routes->get('dividends', 'Admin::dividends');
     $routes->post('dividends/distribute', 'Admin::distributeDividends');
+    $routes->post('dividends/(:num)/approve', 'Admin::approveDividendDistribution/$1');
+    $routes->post('dividends/(:num)/reject', 'Admin::rejectDividendDistribution/$1');
 
     // Blockchain ledger
     $routes->get('ledger', 'Admin::ledger');

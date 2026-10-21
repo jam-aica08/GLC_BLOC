@@ -42,6 +42,9 @@ class DatabaseUpdates
             if (! $db->tableExists('account_requests', false)) {
                 $status['problems'][] = 'account_requests table is missing';
             }
+            if (! $db->tableExists('dividend_distributions', false) || ! $db->fieldExists('distribution_id', 'dividends')) {
+                $status['problems'][] = 'dividend distribution batches are missing';
+            }
         } catch (\Throwable $e) {
             log_message('error', 'DatabaseUpdates::status failed: ' . $e->getMessage());
             $status['error'] = $e->getMessage();
@@ -54,7 +57,9 @@ class DatabaseUpdates
      * Bring the tables in line with the current code: no penalty columns,
      * 'Pending' account status, PHP 300 monthly contribution, payment_method,
      * installment carry-over (carried_over column, 'Partial' status),
-     * account_requests table. Safe to run any number of times.
+     * account_requests table, dividend_distributions batches (with
+     * dividends.distribution_id and a 'Rejected' dividend status).
+     * Safe to run any number of times.
      */
     public static function repairSchema($db, $forge): void
     {
@@ -107,6 +112,47 @@ class DatabaseUpdates
             $forge->addForeignKey('member_id', 'members', 'member_id', 'CASCADE', 'CASCADE', 'fk_account_requests_member');
             $forge->createTable('account_requests', true);
         }
+
+        // One row per year's dividend distribution. year_lock holds the year while
+        // the batch is Pending or Approved and is cleared on rejection, so the
+        // unique key allows only one live distribution per year.
+        if (! $db->tableExists('dividend_distributions', false)) {
+            $forge->addField([
+                'distribution_id'      => ['type' => 'INT', 'unsigned' => true, 'auto_increment' => true],
+                'distribution_year'    => ['type' => 'INT', 'unsigned' => true],
+                'year_lock'            => ['type' => 'INT', 'unsigned' => true, 'null' => true],
+                'profit_pool'          => ['type' => 'DECIMAL', 'constraint' => '15,2'],
+                'basic_count'          => ['type' => 'INT', 'unsigned' => true],
+                'pioneer_count'        => ['type' => 'INT', 'unsigned' => true],
+                'total_weight'         => ['type' => 'DECIMAL', 'constraint' => '12,4'],
+                'basic_share'          => ['type' => 'DECIMAL', 'constraint' => '18,6'],
+                'pioneer_share'        => ['type' => 'DECIMAL', 'constraint' => '18,6'],
+                'total_distributed'    => ['type' => 'DECIMAL', 'constraint' => '15,2'],
+                'distribution_date'    => ['type' => 'DATE'],
+                'status'               => ['type' => 'ENUM', 'constraint' => ['Pending', 'Approved', 'Rejected'], 'default' => 'Pending'],
+                'created_by'           => ['type' => 'INT', 'unsigned' => true, 'null' => true],
+                'first_approved_by'    => ['type' => 'INT', 'unsigned' => true, 'null' => true],
+                'first_approval_date'  => ['type' => 'DATETIME', 'null' => true],
+                'second_approved_by'   => ['type' => 'INT', 'unsigned' => true, 'null' => true],
+                'second_approval_date' => ['type' => 'DATETIME', 'null' => true],
+                'rejected_by'          => ['type' => 'INT', 'unsigned' => true, 'null' => true],
+                'rejected_at'          => ['type' => 'DATETIME', 'null' => true],
+                'created_at'           => ['type' => 'DATETIME', 'null' => true],
+                'updated_at'           => ['type' => 'DATETIME', 'null' => true],
+            ]);
+            $forge->addKey('distribution_id', true);
+            $forge->addUniqueKey('year_lock', 'uq_dividend_distributions_year');
+            $forge->addKey('distribution_year');
+            $forge->createTable('dividend_distributions', true);
+        }
+        $db->resetDataCache();
+        if (! $db->fieldExists('distribution_id', 'dividends')) {
+            $forge->addColumn('dividends', [
+                'distribution_id' => ['type' => 'INT', 'unsigned' => true, 'null' => true, 'after' => 'dividend_id'],
+            ]);
+            $db->query('ALTER TABLE dividends ADD INDEX idx_dividends_distribution (distribution_id)');
+        }
+        $db->query("ALTER TABLE dividends MODIFY dividend_status ENUM('Pending','Approved','Distributed','Rejected') NOT NULL DEFAULT 'Pending'");
 
         $db->resetDataCache();
     }
