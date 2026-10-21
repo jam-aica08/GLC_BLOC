@@ -1,9 +1,8 @@
 name: PHPUnit
 
 on:
+  push:
   pull_request:
-    branches:
-      - develop
 
 permissions:
   contents: read
@@ -19,6 +18,21 @@ jobs:
     runs-on: ubuntu-24.04
     if: (! contains(github.event.pull_request.title, '[ci skip]'))
 
+    # The app's migrations are MySQL-specific, so database tests use a real MySQL.
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: glc_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -proot"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -30,7 +44,7 @@ jobs:
         with:
           php-version: ${{ matrix.php-versions }}
           tools: composer, pecl, phpunit
-          extensions: intl, json, mbstring, mysqlnd, xdebug, xml, sqlite3
+          extensions: intl, json, mbstring, mysqli, mysqlnd, xdebug, xml, sqlite3, zip
           coverage: xdebug
 
       - name: Get composer cache directory
@@ -53,3 +67,12 @@ jobs:
 
       - name: Test with phpunit
         run: vendor/bin/phpunit --coverage-text
+        env:
+          database_tests_hostname: 127.0.0.1
+          database_tests_port: 3306
+          database_tests_database: glc_test
+          database_tests_username: root
+          database_tests_password: root
+          database_tests_DBDriver: MySQLi
+          database_tests_DBPrefix: ''
+          database_tests_charset: utf8mb4

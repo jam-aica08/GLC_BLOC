@@ -407,8 +407,10 @@ class Admin extends BaseController
             return redirect()->to('/admin/members');
         }
 
+        // The login goes with the membership: signed-in sessions end on their next request.
         $memberModel->update($id, ['membership_status' => 'Inactive']);
-        session()->setFlashdata('success', 'Member deactivated.');
+        db_connect()->table('users')->where('user_id', (int) $memberModel->find($id)['user_id'])->update(['account_status' => 'Inactive']);
+        session()->setFlashdata('success', 'Member deactivated. They can no longer sign in.');
         return redirect()->to('/admin/members');
     }
 
@@ -430,7 +432,8 @@ class Admin extends BaseController
         }
 
         $memberModel->update($id, ['membership_status' => 'Active']);
-        session()->setFlashdata('success', 'Member reactivated.');
+        db_connect()->table('users')->where('user_id', (int) $memberModel->find($id)['user_id'])->update(['account_status' => 'Active']);
+        session()->setFlashdata('success', 'Member reactivated. They can sign in again.');
         return redirect()->to('/admin/members');
     }
 
