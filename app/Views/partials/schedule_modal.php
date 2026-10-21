@@ -2,8 +2,8 @@
 <div class="modal fade" id="scheduleModal" tabindex="-1" aria-labelledby="scheduleModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
-            <div class="modal-header" style="background:#1a1a2e;">
-                <h5 class="modal-title text-white" id="scheduleModalLabel"><i class="fa-solid fa-calendar-days me-2" style="color:#f0a500;"></i><span>Loan Schedule</span></h5>
+            <div class="modal-header modal-header-brand">
+                <h5 class="modal-title text-white" id="scheduleModalLabel"><i class="fa-solid fa-calendar-days me-2 glc-icon"></i><span>Loan Schedule</span></h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body" id="scheduleModalBody" aria-live="polite"></div>

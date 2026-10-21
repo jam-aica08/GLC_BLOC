@@ -6,8 +6,8 @@ $canPlan  = $available && $plan['errors'] === [] && ! $plan['existing'] && ! $pl
 ?>
 
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h4 class="mb-0"><i class="fas fa-coins me-2 text-warning"></i>Dividends</h4>
-    <button class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#distributeModal">
+    <h4 class="mb-0"><i class="fas fa-coins me-2 glc-icon"></i>Dividends</h4>
+    <button class="btn btn-brand btn-sm" data-bs-toggle="modal" data-bs-target="#distributeModal">
         <i class="fas fa-plus me-1"></i>Distribute Dividends
     </button>
 </div>
@@ -39,18 +39,20 @@ $canPlan  = $available && $plan['errors'] === [] && ! $plan['existing'] && ! $pl
             </div>
             <button class="btn btn-outline-secondary btn-sm">Calculate</button>
         </form>
-        <div class="row g-3 text-center">
-            <div class="col-sm-4">
-                <div class="text-muted small">Profit Pool <?= esc($year) ?> (auto)</div>
-                <div class="fw-bold fs-5"><?= $peso($plan['profit_pool']) ?></div>
-                <div class="text-muted small">Interest earned on loans approved this year</div>
+        <div class="row g-3 text-center align-items-center">
+            <div class="col-md-6">
+                <div class="pool-hero text-start">
+                    <div class="pool-label"><i class="fa-solid fa-sack-dollar me-2"></i>Profit pool <?= esc($year) ?></div>
+                    <div class="pool-value"><?= $peso($plan['profit_pool']) ?></div>
+                    <div class="pool-sub">Interest earned on loans approved this year · calculated automatically</div>
+                </div>
             </div>
-            <div class="col-sm-4">
+            <div class="col-6 col-md-3">
                 <div class="text-muted small">Basic share (<?= $plan['basic_count'] ?> accounts)</div>
                 <div class="fw-bold fs-5"><?= $peso($plan['basic_share']) ?></div>
                 <?php if ($plan['basic_share'] > 0): ?><div class="text-muted small">exact <?= $peso($plan['basic_share'], 6) ?></div><?php endif; ?>
             </div>
-            <div class="col-sm-4">
+            <div class="col-6 col-md-3">
                 <div class="text-muted small">Pioneer share (<?= $plan['pioneer_count'] ?> accounts, +2%)</div>
                 <div class="fw-bold fs-5"><?= $peso($plan['pioneer_share']) ?></div>
                 <?php if ($plan['pioneer_share'] > 0): ?>
@@ -75,7 +77,7 @@ $canPlan  = $available && $plan['errors'] === [] && ! $plan['existing'] && ! $pl
 
 <?php if (! empty($distributions)): ?>
 <div class="card shadow-sm mb-4">
-    <div class="card-header bg-white fw-semibold"><i class="fas fa-layer-group me-2 text-warning"></i>Distributions</div>
+    <div class="card-header bg-white fw-semibold"><i class="fas fa-layer-group me-2 glc-icon"></i>Distributions</div>
     <div class="table-responsive">
         <table class="table align-middle mb-0" style="font-size:.875rem;">
             <thead class="table-light">
@@ -212,7 +214,7 @@ $canPlan  = $available && $plan['errors'] === [] && ! $plan['existing'] && ! $pl
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-warning btn-sm" <?= $canPlan ? '' : 'disabled' ?>>
+                    <button type="submit" class="btn btn-brand btn-sm" <?= $canPlan ? '' : 'disabled' ?>>
                         <i class="fas fa-coins me-1"></i>Confirm Distribution
                     </button>
                 </div>

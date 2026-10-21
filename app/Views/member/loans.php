@@ -19,7 +19,7 @@
         }
     ?>
     <?php if (!$hasActiveLoan): ?>
-        <button type="button" class="btn btn-sm text-white" style="background:#1a1a2e;"
+        <button type="button" class="btn btn-sm btn-brand"
                 data-bs-toggle="modal" data-bs-target="#loanApplicationModal">
             <i class="fa-solid fa-plus me-2"></i>Apply for Loan
         </button>
@@ -47,7 +47,7 @@
 <!-- Loans Table -->
 <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center">
-        <span><i class="fa-solid fa-hand-holding-dollar me-2" style="color:#f0a500;"></i>My Loan Applications</span>
+        <span><i class="fa-solid fa-hand-holding-dollar me-2 glc-icon"></i>My Loan Applications</span>
         <span class="badge bg-secondary"><?= count($loans ?? []) ?> record(s)</span>
     </div>
     <div class="card-body p-0">
@@ -89,7 +89,7 @@
                             <td class="py-3 text-center">
                                 <?php if (isset($loan['panel'])): ?>
                                     <?php $isOpen = in_array($loan['status'], ['Approved', 'Active'], true); ?>
-                                    <button type="button" class="btn btn-sm <?= $isOpen ? 'btn-warning' : 'btn-outline-secondary' ?>"
+                                    <button type="button" class="btn btn-sm <?= $isOpen ? 'btn-brand' : 'btn-outline-secondary' ?>"
                                             data-bs-toggle="modal" data-bs-target="#loanPanelModal"
                                             data-loan-id="<?= (int) $loan['id'] ?>">
                                         <i class="fa-solid fa-<?= $isOpen ? 'money-bill-wave' : 'calendar-days' ?> me-1"></i><?= $isOpen ? 'View &amp; Pay' : 'View' ?>
@@ -119,17 +119,17 @@
 <div class="modal fade" id="loanApplicationModal" tabindex="-1" aria-labelledby="loanApplicationModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content">
-            <div class="modal-header" style="background:#1a1a2e;">
+            <div class="modal-header modal-header-brand">
                 <h5 class="modal-title text-white" id="loanApplicationModalLabel">
-                    <i class="fa-solid fa-hand-holding-dollar me-2" style="color:#f0a500;"></i>Loan Application
+                    <i class="fa-solid fa-hand-holding-dollar me-2 glc-icon"></i>Loan Application
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <form action="<?= base_url('member/loans/apply') ?>" method="post">
                 <?= csrf_field() ?>
                 <div class="modal-body p-4">
-                    <div class="alert" style="background:rgba(240,165,0,0.1);border:1px solid rgba(240,165,0,0.3);border-radius:8px;font-size:0.85rem;">
-                        <i class="fa-solid fa-circle-info me-2" style="color:#f0a500;"></i>
+                    <div class="alert" style="background:rgba(var(--glc-accent-rgb),0.1);border:1px solid rgba(var(--glc-accent-rgb),0.3);border-radius:8px;font-size:0.85rem;">
+                        <i class="fa-solid fa-circle-info me-2 glc-icon"></i>
                         Loan applications are subject to approval by the cooperative administrators.
                         Interest rates and terms are determined by the cooperative's policies.
                     </div>
@@ -181,7 +181,7 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn text-white" style="background:#1a1a2e;">
+                    <button type="submit" class="btn btn-brand">
                         <i class="fa-solid fa-paper-plane me-2"></i>Submit Application
                     </button>
                 </div>
@@ -200,9 +200,9 @@ document.getElementById('loan_account_id').addEventListener('change', function (
 <div class="modal fade" id="loanPanelModal" tabindex="-1" aria-labelledby="loanPanelTitle" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
         <div class="modal-content">
-            <div class="modal-header" style="background:#1a1a2e;">
+            <div class="modal-header modal-header-brand">
                 <h5 class="modal-title text-white" id="loanPanelTitle">
-                    <i class="fa-solid fa-money-bill-wave me-2" style="color:#f0a500;"></i>Loan #<span id="loanPanelId"></span>
+                    <i class="fa-solid fa-money-bill-wave me-2 glc-icon"></i>Loan #<span id="loanPanelId"></span>
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>

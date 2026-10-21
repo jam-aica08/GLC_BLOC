@@ -105,9 +105,12 @@ class DividendService
     {
         model(CooperativeAccountModel::class)->syncStatuses();
 
+        // Only accounts that were open by the end of that year share its profit
+        // (matters when an earlier year is distributed after imports).
         $accounts = $this->db->table('cooperative_accounts')
             ->select('account_id, account_number, account_type')
             ->where('account_status', 'Active')
+            ->where('account_start_date <=', "{$year}-12-31")
             ->orderBy('account_id', 'ASC')
             ->get()->getResultArray();
 

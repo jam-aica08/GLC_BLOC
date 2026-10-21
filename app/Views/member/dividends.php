@@ -2,7 +2,7 @@
 <?= $this->section('content') ?>
 
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h4 class="fw-bold mb-0"><i class="fas fa-coins me-2 text-warning"></i>My Dividends</h4>
+    <h4 class="fw-bold mb-0"><i class="fas fa-coins me-2 glc-icon"></i>My Dividends</h4>
 </div>
 
 <div class="card shadow-sm" data-search>

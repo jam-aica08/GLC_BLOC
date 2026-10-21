@@ -8,7 +8,7 @@
         <h4 class="mb-1 fw-bold">My Contributions</h4>
         <p class="text-muted mb-0 small">View your contribution history and submit new contributions.</p>
     </div>
-    <button type="button" class="btn btn-sm text-white" style="background:#1a1a2e;"
+    <button type="button" class="btn btn-sm btn-brand"
             data-bs-toggle="modal" data-bs-target="#newContributionModal">
         <i class="fa-solid fa-plus me-2"></i>Submit Contribution
     </button>
@@ -59,7 +59,7 @@
 <!-- Account Standing -->
 <div class="card mb-4">
     <div class="card-header">
-        <span><i class="fa-solid fa-scale-balanced me-2" style="color:#f0a500;"></i>Account Standing (₱<?= number_format(\App\Models\CooperativeAccountModel::MONTHLY_CONTRIBUTION, 2) ?> per month)</span>
+        <span><i class="fa-solid fa-scale-balanced me-2 glc-icon"></i>Account Standing (₱<?= number_format(\App\Models\CooperativeAccountModel::MONTHLY_CONTRIBUTION, 2) ?> per month)</span>
     </div>
     <div class="card-body p-0">
         <div class="table-responsive">
@@ -98,7 +98,7 @@
 <!-- Contributions History Table -->
 <div class="card" data-search>
     <div class="card-header d-flex justify-content-between align-items-center">
-        <span><i class="fa-solid fa-piggy-bank me-2" style="color:#f0a500;"></i>Contribution History</span>
+        <span><i class="fa-solid fa-piggy-bank me-2 glc-icon"></i>Contribution History</span>
         <span class="badge bg-secondary"><?= count($contributions ?? []) ?> record(s)</span>
     </div>
     <div class="card-body p-0">
@@ -147,9 +147,9 @@
 <div class="modal fade" id="newContributionModal" tabindex="-1" aria-labelledby="newContributionModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
-            <div class="modal-header" style="background:#1a1a2e;">
+            <div class="modal-header modal-header-brand">
                 <h5 class="modal-title text-white" id="newContributionModalLabel">
-                    <i class="fa-solid fa-piggy-bank me-2" style="color:#f0a500;"></i>Submit New Contribution
+                    <i class="fa-solid fa-piggy-bank me-2 glc-icon"></i>Submit New Contribution
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
@@ -186,7 +186,7 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn text-white" style="background:#1a1a2e;">
+                    <button type="submit" class="btn btn-brand">
                         <i class="fa-solid fa-paper-plane me-2"></i>Submit
                     </button>
                 </div>

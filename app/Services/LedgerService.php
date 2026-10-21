@@ -91,6 +91,62 @@ class LedgerService
     }
 
     /**
+     * Append many approved financial records in one go (data imports): one
+     * lock, the hashes chained in order, rows inserted in batches. Each
+     * record is hashed exactly as createEntry() would hash it.
+     *
+     * @param  list<array> $records financial_records rows, in ledger order
+     * @return int entries added
+     */
+    public function appendMany(array $records): int
+    {
+        if ($records === []) {
+            return 0;
+        }
+
+        $db = db_connect();
+        $lockResult = $db->query("SELECT GET_LOCK('blockchain_ledger_append', 10) AS locked")->getRowArray();
+        if (empty($lockResult['locked'])) {
+            throw new \RuntimeException('LedgerService: could not acquire ledger append lock.');
+        }
+
+        try {
+            $latest = $db->table('blockchain_ledger')
+                         ->select('transaction_hash, ledger_sequence')
+                         ->orderBy('ledger_sequence', 'DESC')
+                         ->limit(1)
+                         ->get()
+                         ->getRowArray();
+
+            $previousHash = $latest['transaction_hash'] ?? null;
+            $sequence     = $latest ? (int) $latest['ledger_sequence'] : 0;
+            $now          = date('Y-m-d H:i:s');
+            $rows         = [];
+
+            foreach ($records as $record) {
+                $hash   = hash('sha256', $this->buildCanonicalPayload($record) . ($previousHash ?? ''));
+                $rows[] = [
+                    'financial_record_id' => (int) $record['financial_record_id'],
+                    'transaction_hash'    => $hash,
+                    'previous_hash'       => $previousHash,
+                    'ledger_sequence'     => ++$sequence,
+                    'recorded_at'         => $now,
+                    'verification_status' => 'Valid',
+                ];
+                $previousHash = $hash;
+            }
+
+            foreach (array_chunk($rows, 200) as $chunk) {
+                $db->table('blockchain_ledger')->insertBatch($chunk);
+            }
+        } finally {
+            $db->query("SELECT RELEASE_LOCK('blockchain_ledger_append')");
+        }
+
+        return count($rows);
+    }
+
+    /**
      * Full end-to-end verification of the entire ledger (Fix 4.6).
      *
      * Walks all entries in sequence order, recomputing each hash from the

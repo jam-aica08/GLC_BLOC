@@ -14,7 +14,7 @@ $locked  = $summary['has_pending'];
 $peso    = fn($n) => '₱' . number_format((float) $n, 2);
 ?>
 <div class="row g-2 mb-3 text-center">
-    <div class="col-4"><div class="border rounded p-2 h-100" style="border-color:#f0a500 !important;">
+    <div class="col-4"><div class="border rounded p-2 h-100" style="border-color:var(--glc-accent) !important;">
         <div class="text-muted small">Due now</div>
         <div class="fw-bold fs-5"><?= $summary['current'] ? $peso($summary['due_now']) : '—' ?></div>
     </div></div>
@@ -109,7 +109,7 @@ $peso    = fn($n) => '₱' . number_format((float) $n, 2);
             <div class="fw-semibold">Total to pay: <span class="fs-5 js-pay-total">₱0.00</span></div>
             <div class="small text-muted js-pay-note" aria-live="polite"></div>
         </div>
-        <button type="submit" class="btn btn-warning px-4 py-2 js-pay-submit" disabled>
+        <button type="submit" class="btn btn-gradient px-4 py-2 js-pay-submit" disabled>
             <i class="fas fa-paper-plane me-1"></i>Submit Payment
         </button>
     </div>

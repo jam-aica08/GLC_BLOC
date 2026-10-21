@@ -22,7 +22,7 @@
         <h4 class="mb-1 fw-bold">Dashboard</h4>
         <p class="text-muted mb-0 small">Welcome back, <?= esc(session()->get('username') ?? 'Admin') ?>. Here's what's happening today.</p>
     </div>
-    <span class="badge" style="background-color: #1a1a2e; color: #f0a500; font-size: 0.8rem; padding: 8px 14px; border-radius: 8px;">
+    <span class="badge" style="background:var(--glc-gradient-dark);color:#fff; font-size: 0.8rem; padding: 8px 14px; border-radius: 8px;">
         <i class="fa-regular fa-calendar me-1"></i> <?= date('F d, Y') ?>
     </span>
 </div>
@@ -41,7 +41,7 @@
         <span class="input-group-text bg-white"><i class="fa-solid fa-magnifying-glass"></i></span>
         <input type="search" name="q" class="form-control" aria-label="Search member accounts"
                placeholder="Search members by name, member #, account #, username or email">
-        <button class="btn text-white" style="background:#1a1a2e;" type="submit">Search</button>
+        <button class="btn btn-brand" type="submit">Search</button>
     </div>
 </form>
 
@@ -54,7 +54,7 @@
         ['Account Requests', $pendingRequests, 'admin/members#account-requests', 'fa-inbox'],
     ] as [$label, $count, $url, $icon]): ?>
         <div class="col-sm-6 col-lg-3">
-            <a href="<?= base_url($url) ?>" class="card text-decoration-none h-100 <?= $count ? 'border-warning' : '' ?>" style="color:#1a1a2e;">
+            <a href="<?= base_url($url) ?>" class="card text-decoration-none h-100 <?= $count ? 'border-warning' : '' ?>" style="color:var(--glc-navy);">
                 <div class="card-body py-2 px-3 d-flex justify-content-between align-items-center">
                     <span class="small"><i class="fa-solid <?= $icon ?> me-2 text-muted"></i>Pending <?= $label ?></span>
                     <span class="badge <?= $count ? 'bg-warning text-dark' : 'bg-light text-muted' ?> fs-6"><?= (int) $count ?></span>

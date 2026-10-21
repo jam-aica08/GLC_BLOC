@@ -32,8 +32,7 @@
         <div class="d-flex align-items-center gap-2 flex-wrap">
             <span class="text-muted small me-1"><i class="fa-solid fa-filter me-1"></i>Filter by status:</span>
             <a href="<?= base_url('admin/loans') ?>"
-               class="btn btn-sm <?= (!isset($filterStatus) || $filterStatus === '') ? 'text-white' : 'btn-outline-secondary' ?>"
-               style="<?= (!isset($filterStatus) || $filterStatus === '') ? 'background:#1a1a2e;' : '' ?>">All</a>
+               class="btn btn-sm <?= (!isset($filterStatus) || $filterStatus === '') ? 'btn-brand' : 'btn-outline-secondary' ?>">All</a>
             <a href="<?= base_url('admin/loans?status=Pending') ?>"
                class="btn btn-sm <?= (($filterStatus ?? '') === 'Pending') ? 'btn-warning' : 'btn-outline-warning' ?>">Pending</a>
             <a href="<?= base_url('admin/loans?status=Approved') ?>"
@@ -51,7 +50,7 @@
 <!-- Loans Table -->
 <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center">
-        <span><i class="fa-solid fa-hand-holding-dollar me-2" style="color:#f0a500;"></i>Loan Applications</span>
+        <span><i class="fa-solid fa-hand-holding-dollar me-2 glc-icon"></i>Loan Applications</span>
         <span class="badge bg-secondary"><?= (int) $page['total'] ?> record(s)</span>
     </div>
     <div class="card-body p-0">

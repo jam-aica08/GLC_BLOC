@@ -2,7 +2,7 @@
 <?= $this->section('content') ?>
 
 <div class="mb-4">
-    <h4 class="fw-bold mb-1"><i class="fa-solid fa-gear me-2" style="color:#f0a500;"></i>Settings</h4>
+    <h4 class="fw-bold mb-1"><i class="fa-solid fa-gear me-2 glc-icon"></i>Settings</h4>
     <p class="text-muted small mb-0">Signed in as <strong><?= esc($user['username'] ?? '') ?></strong> (<?= esc($user['email'] ?? '') ?>)</p>
 </div>
 
@@ -80,7 +80,7 @@
                         <label for="confirm_password" class="form-label small fw-semibold">Confirm New Password</label>
                         <input type="password" class="form-control" id="confirm_password" name="confirm_password" minlength="8" required autocomplete="new-password">
                     </div>
-                    <button type="submit" class="btn text-white" style="background:#1a1a2e;">
+                    <button type="submit" class="btn btn-brand">
                         <i class="fa-solid fa-floppy-disk me-2"></i>Update Password
                     </button>
                 </form>
@@ -109,7 +109,7 @@
                         <input type="password" class="form-control" id="admin_password" name="password" minlength="8" required autocomplete="new-password">
                         <div class="form-text">Ask the new admin to change it in Settings after signing in.</div>
                     </div>
-                    <button type="submit" class="btn text-white" style="background:#1a1a2e;">
+                    <button type="submit" class="btn btn-brand">
                         <i class="fa-solid fa-user-plus me-2"></i>Create Admin
                     </button>
                 </form>

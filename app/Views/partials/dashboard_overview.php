@@ -12,12 +12,13 @@ $icons = ['Contribution' => 'fa-piggy-bank', 'Loan Disbursement' => 'fa-hand-hol
 $loanLink = fn($loan) => $isAdmin ? base_url('admin/loans/' . (int) $loan['loan_id'] . '/schedule') : base_url('member/loans');
 ?>
 <style>
-    .dash-tile { border: 0; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
-    .dash-tile .label { font-size: .8rem; color: #6c757d; }
+    .dash-tile .value { font-variant-numeric: tabular-nums; }
+    .dash-tile .label { font-size: .8rem; color: var(--glc-muted); }
     .dash-tile .value { font-size: 1.45rem; font-weight: 700; line-height: 1.2; }
-    .dash-equity { background: #1a1a2e; color: #fff; }
-    .dash-equity .label { color: #c9d1d9 !important; }
-    .dash-equity .value { color: #f0a500; font-size: 1.7rem; }
+    .dash-equity { background: var(--glc-gradient-dark); color: #fff; border: 0; position: relative; overflow: hidden; }
+    .dash-equity::after { content: ""; position: absolute; inset: auto 0 0 0; height: 4px; background: var(--glc-gradient); }
+    .dash-equity .label { color: rgba(255,255,255,.75) !important; }
+    .dash-equity .value { color: var(--glc-accent-on-dark); font-size: 1.7rem; }
 </style>
 
 <!-- Equity and totals -->
@@ -58,8 +59,10 @@ $loanLink = fn($loan) => $isAdmin ? base_url('admin/loans/' . (int) $loan['loan_
 <div class="card dash-tile mb-4">
     <div class="card-body d-flex flex-wrap gap-4 align-items-center justify-content-between">
         <div>
-            <div class="fw-semibold"><i class="fa-solid fa-coins me-2" style="color:#f0a500;"></i><?= (int) $dp['year'] ?> Dividends (estimate)</div>
-            <div class="small text-muted">Profit pool <?= $peso($dp['profit_pool']) ?> · <?= $dp['basic_count'] ?> Basic, <?= $dp['pioneer_count'] ?> Pioneer active account(s)</div>
+            <div class="fw-semibold"><i class="fa-solid fa-coins me-2 glc-icon"></i><?= (int) $dp['year'] ?> Dividends (estimate)</div>
+            <div class="small text-muted mt-2">Profit pool</div>
+            <div class="pool-figure"><?= $peso($dp['profit_pool']) ?></div>
+            <div class="small text-muted"><?= $dp['basic_count'] ?> Basic, <?= $dp['pioneer_count'] ?> Pioneer active account(s)</div>
         </div>
         <div class="d-flex flex-wrap gap-4">
             <div>
@@ -80,7 +83,7 @@ $loanLink = fn($loan) => $isAdmin ? base_url('admin/loans/' . (int) $loan['loan_
     <div class="col-lg-8">
         <div class="card dash-tile h-100">
             <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                <span class="fw-semibold"><i class="fa-solid fa-chart-column me-2" style="color:#f0a500;"></i>Contributions per Month <span class="text-muted fw-normal small">(month paid for, last 12 months)</span></span>
+                <span class="fw-semibold"><i class="fa-solid fa-chart-column me-2 glc-icon"></i>Contributions per Month <span class="text-muted fw-normal small">(month paid for, last 12 months)</span></span>
                 <a href="<?= base_url(($isAdmin ? 'admin' : 'member') . '/analytics') ?>" class="btn btn-sm btn-outline-secondary">Full analytics</a>
             </div>
             <div class="card-body">
@@ -104,7 +107,7 @@ $loanLink = fn($loan) => $isAdmin ? base_url('admin/loans/' . (int) $loan['loan_
     <div class="col-lg-4">
         <div class="card dash-tile h-100">
             <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                <span class="fw-semibold"><i class="fa-solid fa-file-invoice-dollar me-2" style="color:#f0a500;"></i>Financial Records</span>
+                <span class="fw-semibold"><i class="fa-solid fa-file-invoice-dollar me-2 glc-icon"></i>Financial Records</span>
                 <?php if ($isAdmin): ?><a href="<?= base_url('admin/financial-records') ?>" class="btn btn-sm btn-outline-secondary">View all</a><?php endif; ?>
             </div>
             <ul class="list-group list-group-flush">
@@ -127,7 +130,7 @@ $loanLink = fn($loan) => $isAdmin ? base_url('admin/loans/' . (int) $loan['loan_
     <div class="col-lg-7">
         <div class="card dash-tile">
             <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                <span class="fw-semibold"><i class="fa-solid fa-hand-holding-dollar me-2" style="color:#f0a500;"></i>Active Loans</span>
+                <span class="fw-semibold"><i class="fa-solid fa-hand-holding-dollar me-2 glc-icon"></i>Active Loans</span>
                 <a href="<?= base_url(($isAdmin ? 'admin' : 'member') . '/loans') ?>" class="btn btn-sm btn-outline-secondary">All loans</a>
             </div>
             <div class="table-responsive">
@@ -170,7 +173,7 @@ $loanLink = fn($loan) => $isAdmin ? base_url('admin/loans/' . (int) $loan['loan_
     </div>
     <div class="col-lg-5">
         <div class="card dash-tile">
-            <div class="card-header bg-white fw-semibold"><i class="fa-solid fa-clock-rotate-left me-2" style="color:#f0a500;"></i>Recent Activity</div>
+            <div class="card-header bg-white fw-semibold"><i class="fa-solid fa-clock-rotate-left me-2 glc-icon"></i>Recent Activity</div>
             <ul class="list-group list-group-flush">
                 <?php if (empty($d['recent'])): ?>
                     <li class="list-group-item text-center text-muted py-4 small">No activity yet.</li>
@@ -204,7 +207,7 @@ $loanLink = fn($loan) => $isAdmin ? base_url('admin/loans/' . (int) $loan['loan_
             datasets: [{
                 label: 'Contributions',
                 data: <?= json_encode($d['chart']['values']) ?>,
-                backgroundColor: '#f0a500',
+                backgroundColor: '#ff0a7e',
                 hoverBackgroundColor: '#c98a00',
                 borderRadius: { topLeft: 4, topRight: 4 },
                 borderSkipped: 'start',

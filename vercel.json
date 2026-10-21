@@ -3,11 +3,13 @@
   "regions": ["sin1"],
   "functions": {
     "api/index.php": {
-      "runtime": "vercel-php@0.7.3"
+      "runtime": "vercel-php@0.7.3",
+      "maxDuration": 60
     }
   },
   "routes": [
     { "src": "/(favicon\\.ico|robots\\.txt)", "dest": "/public/$1" },
+    { "src": "/assets/(.*)", "dest": "/public/assets/$1", "headers": { "cache-control": "public, max-age=86400" } },
     { "src": "/(.*)", "dest": "/api/index.php" }
   ]
 }

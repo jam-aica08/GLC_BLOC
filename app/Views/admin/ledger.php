@@ -12,9 +12,9 @@
     <!-- Run Integrity Verification -->
     <form action="<?= base_url('admin/ledger/verify') ?>" method="post">
         <?= csrf_field() ?>
-        <button type="submit" class="btn btn-sm text-white" style="background:#1a1a2e;"
+        <button type="submit" class="btn btn-sm btn-brand"
                 onclick="return confirm('Run integrity verification on the entire ledger?')">
-            <i class="fa-solid fa-shield-halved me-2" style="color:#f0a500;"></i>Run Integrity Verification
+            <i class="fa-solid fa-shield-halved me-2 glc-icon"></i>Run Integrity Verification
         </button>
     </form>
 </div>
@@ -89,7 +89,7 @@
 <!-- Ledger Table -->
 <div class="card" data-search>
     <div class="card-header d-flex justify-content-between align-items-center">
-        <span><i class="fa-solid fa-link me-2" style="color:#f0a500;"></i>Ledger Chain</span>
+        <span><i class="fa-solid fa-link me-2 glc-icon"></i>Ledger Chain</span>
         <span class="badge bg-secondary"><?= count($ledgerEntries ?? []) ?> block(s)</span>
     </div>
     <div class="card-body p-0">
