@@ -34,8 +34,9 @@
         .login-brand::before { width: 420px; height: 420px; right: -140px; top: -120px; background: radial-gradient(circle, rgba(255,10,126,.55), transparent 65%); }
         .login-brand::after { width: 480px; height: 480px; left: -160px; bottom: -200px; background: radial-gradient(circle, rgba(0,194,230,.5), transparent 65%); }
         .login-brand > * { position: relative; z-index: 1; }
-        .brand-tile { background: #fff; border-radius: 20px; padding: 18px 22px; display: inline-block; box-shadow: 0 18px 40px rgba(0,0,0,.25); }
-        .brand-tile img { width: 150px; height: auto; display: block; }
+        .brand-tile { display: inline-block; }
+        /* No backdrop: a soft light edge keeps the navy link visible on the dark panel. */
+        .brand-tile img { width: 190px; height: auto; display: block; filter: drop-shadow(0 0 1.5px rgba(255,255,255,.95)) drop-shadow(0 0 12px rgba(255,255,255,.35)); }
         .login-brand h1 { font-size: clamp(1.9rem, 2.6vw, 2.6rem); font-weight: 800; line-height: 1.15; letter-spacing: -.02em; margin: 36px 0 14px; color: #fff; }
         .login-brand .lead { color: rgba(255,255,255,.78); font-size: 1rem; max-width: 460px; }
         .brand-points { list-style: none; padding: 0; margin: 28px 0 0; display: grid; gap: 14px; }
