@@ -28,7 +28,8 @@ class AccountRequestService
             ->where('member_id', $memberId)->where('status', 'Pending')->countAllResults() > 0;
     }
 
-    public function create(int $memberId, string $accountType): void
+    /** Returns the new request's ID. */
+    public function create(int $memberId, string $accountType): int
     {
         $now = date('Y-m-d H:i:s');
         $this->db()->table('account_requests')->insert([
@@ -38,6 +39,8 @@ class AccountRequestService
             'created_at'   => $now,
             'updated_at'   => $now,
         ]);
+
+        return (int) $this->db()->insertID();
     }
 
     /** Waiting and recently rejected requests of one member, newest first. */

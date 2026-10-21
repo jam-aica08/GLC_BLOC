@@ -339,6 +339,7 @@ class Admin extends BaseController
         if ($error !== null) {
             session()->setFlashdata('error', $error);
         } else {
+            Notifier::resolveForAdmins('review-request-' . $id);
             session()->setFlashdata('success', "Request approved. Account {$accountNumber} is open and becomes active once PHP "
                 . number_format(CooperativeAccountModel::joinAmount(), 2) . ' (January to ' . date('F') . ') is paid.');
         }
@@ -358,6 +359,9 @@ class Admin extends BaseController
         }
 
         $rejected = (new \App\Services\AccountRequestService())->reject($id, (int) session()->get('user_id'));
+        if ($rejected) {
+            Notifier::resolveForAdmins('review-request-' . $id);
+        }
         session()->setFlashdata($rejected ? 'success' : 'error', $rejected ? 'Request rejected.' : 'This request is no longer waiting for approval.');
 
         return redirect()->to('/admin/members');
@@ -666,6 +670,7 @@ class Admin extends BaseController
         Notifier::toAccountOwner((int) $loan['account_id'], 'loan', 'Loan approved',
             'Your loan #' . $id . ' of PHP ' . number_format((float) $loan['loan_amount'], 2) . ' was approved. Your monthly schedule is ready.',
             'member/loans', 'loan-approved-' . $id);
+        Notifier::resolveForAdmins('review-loan-' . $id);
 
         session()->setFlashdata('success', 'Loan approved and installments generated.');
         return redirect()->to('/admin/loans');
@@ -699,6 +704,7 @@ class Admin extends BaseController
         Notifier::toAccountOwner((int) $loan['account_id'], 'loan', 'Loan application rejected',
             'Your loan application #' . $id . ' of PHP ' . number_format((float) $loan['loan_amount'], 2) . ' was rejected.',
             'member/loans', 'loan-rejected-' . $id);
+        Notifier::resolveForAdmins('review-loan-' . $id);
 
         session()->setFlashdata('success', 'Loan rejected.');
         return redirect()->to('/admin/loans');
@@ -855,6 +861,7 @@ class Admin extends BaseController
         }
 
         $this->notifyRecord($fr, 'approved', $account);
+        Notifier::resolveForAdmins('review-record-' . $frId);
 
         $label = ['Contribution' => 'Contribution', 'Loan Payment' => 'Payment'][$fr['record_type']] ?? 'Financial record';
         return [true, "{$label} approved and recorded in the blockchain ledger."];
@@ -896,6 +903,7 @@ class Admin extends BaseController
         }
 
         $this->notifyRecord($fr, 'rejected');
+        Notifier::resolveForAdmins('review-record-' . $frId);
 
         $label = ['Contribution' => 'Contribution', 'Loan Payment' => 'Payment'][$fr['record_type']] ?? 'Financial record';
         return [true, "{$label} rejected."];
@@ -1115,6 +1123,11 @@ class Admin extends BaseController
             (int) $this->request->getPost('expected_accounts'),
         );
 
+        if (! $error) {
+            Notifier::toAdmins('dividend', 'Dividend distribution to review',
+                session()->get('username') . " created distribution #{$id} for {$year}. It needs an administrator's approval.",
+                'admin/dividends?year=' . $year, 'review-dividend-' . $id, (int) session()->get('user_id'));
+        }
         session()->setFlashdata($error ? 'error' : 'success', $error
             ?? "Distribution #{$id} for {$year} was created and is waiting for approval.");
 
@@ -1131,6 +1144,9 @@ class Admin extends BaseController
         }
 
         [$message, $ok] = (new \App\Services\DividendService())->approve($id, (int) session()->get('user_id'));
+        if ($ok) {
+            Notifier::resolveForAdmins('review-dividend-' . $id);
+        }
         session()->setFlashdata($ok ? 'success' : 'error', $message);
 
         return redirect()->to('/admin/dividends?year=' . (int) $this->request->getPost('year'));
@@ -1146,11 +1162,60 @@ class Admin extends BaseController
         }
 
         $ok = (new \App\Services\DividendService())->reject($id, (int) session()->get('user_id'));
+        if ($ok) {
+            Notifier::resolveForAdmins('review-dividend-' . $id);
+        }
         session()->setFlashdata($ok ? 'success' : 'error', $ok
             ? 'Distribution rejected. Its records are kept as Rejected and the year can be distributed again.'
             : 'This distribution is no longer waiting for approval.');
 
         return redirect()->to('/admin/dividends?year=' . (int) $this->request->getPost('year'));
+    }
+
+    // =========================================================================
+    // Notifications (each administrator has their own)
+    // =========================================================================
+
+    /** Where to go after marking notifications read: the admin page they were on. */
+    private function backTo(): string
+    {
+        $next = trim((string) $this->request->getPost('next'), '/');
+
+        return preg_match('#^admin(/[A-Za-z0-9_/-]*)?$#', $next) ? '/' . $next : '/admin/dashboard';
+    }
+
+    /** POST: mark one of the administrator's own notifications as read. */
+    public function readNotification(int $id)
+    {
+        $this->requireAdmin();
+        if ($this->request->is('post')) {
+            Notifier::adminMarkRead((int) session()->get('user_id'), $id);
+        }
+
+        return redirect()->to($this->backTo());
+    }
+
+    /** POST: mark all of the administrator's notifications as read. */
+    public function readAllNotifications()
+    {
+        $this->requireAdmin();
+        if ($this->request->is('post')) {
+            Notifier::adminMarkRead((int) session()->get('user_id'));
+        }
+
+        return redirect()->to($this->backTo());
+    }
+
+    /** GET: every notification of the signed-in administrator. */
+    public function notifications(): string
+    {
+        $this->requireAdmin();
+        $userId = (int) session()->get('user_id');
+
+        return view('admin/notifications', [
+            'notifications' => Notifier::adminLatest($userId, 200),
+            'unread'        => Notifier::adminUnreadCount($userId),
+        ]);
     }
 
     // =========================================================================
@@ -1245,6 +1310,11 @@ class Admin extends BaseController
 
         $ledgerService = new LedgerService();
         $result        = $ledgerService->verifyLedger();
+        if ($result['result'] !== 'PASS') {
+            Notifier::toAdmins('ledger', 'Ledger integrity problem',
+                "Verification found {$result['tampered']} tampered of {$result['checked']} ledger entries. Check the ledger now.",
+                'admin/ledger', 'ledger-tampered-' . date('Y-m-d'));
+        }
 
         // If the caller accepts JSON, return JSON; otherwise flash and redirect
         if (strpos($this->request->getHeaderLine('Accept'), 'application/json') !== false) {

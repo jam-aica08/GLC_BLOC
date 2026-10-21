@@ -57,6 +57,11 @@ $routes->group('admin', ['filter' => 'auth:admin'], function ($routes) {
     $routes->get('ledger', 'Admin::ledger');
     $routes->post('ledger/verify', 'Admin::verifyLedger');
 
+    // Notifications
+    $routes->get('notifications', 'Admin::notifications');
+    $routes->post('notifications/(:num)/read', 'Admin::readNotification/$1');
+    $routes->post('notifications/read-all', 'Admin::readAllNotifications');
+
     // Audit logs (super admin only; read-only)
     $routes->get('audit-logs', 'Admin::auditLogs');
 

@@ -1,17 +1,21 @@
 <?php
 /**
- * A member's notifications. Unread ones are marked and can be marked read.
+ * A member's or an administrator's notifications. Unread ones are marked and can be marked read.
  *
  * @var array  $notifications
- * @var string $next  'dashboard' or 'notifications' (where to come back after marking read)
+ * @var string $next  The page to come back to after marking read
+ * @var string $area  'member' (default) or 'admin'
  */
+$area  = ($area ?? 'member') === 'admin' ? 'admin' : 'member';
 $icons = ['contribution' => 'fa-piggy-bank', 'payment' => 'fa-money-bill-wave', 'loan' => 'fa-hand-holding-dollar',
-          'dividend' => 'fa-coins', 'account' => 'fa-wallet', 'announcement' => 'fa-bullhorn'];
+          'dividend' => 'fa-coins', 'account' => 'fa-wallet', 'announcement' => 'fa-bullhorn', 'ledger' => 'fa-shield-halved'];
 ?>
 <?php if (empty($notifications)): ?>
     <div class="text-center text-muted small py-4">
         <i class="fa-regular fa-bell fa-lg d-block mb-2"></i>
-        No notifications yet. Updates about your contributions, payments, loans and dividends will appear here.
+        <?= $area === 'admin'
+            ? 'No notifications yet. New contributions, loan applications, payments and account requests to review will appear here.'
+            : 'No notifications yet. Updates about your contributions, payments, loans and dividends will appear here.' ?>
     </div>
 <?php else: ?>
     <ul class="list-group list-group-flush">
@@ -30,7 +34,7 @@ $icons = ['contribution' => 'fa-piggy-bank', 'payment' => 'fa-money-bill-wave', 
                     <div class="d-flex gap-3 mt-1">
                         <?php if (! empty($n['link'])): ?><a class="small" href="<?= base_url($n['link']) ?>">Open</a><?php endif; ?>
                         <?php if ($unread): ?>
-                            <form method="post" action="<?= base_url('member/notifications/' . (int) $n['notification_id'] . '/read') ?>">
+                            <form method="post" action="<?= base_url($area . '/notifications/' . (int) $n['notification_id'] . '/read') ?>">
                                 <?= csrf_field() ?><input type="hidden" name="next" value="<?= esc($next) ?>">
                                 <button class="btn btn-link btn-sm p-0 small">Mark as read</button>
                             </form>

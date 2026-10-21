@@ -42,6 +42,8 @@ class AuditLog
         'member/settings/password'           => ['Changed own password', 'user'],
         'member/notifications/read'          => null,  // not worth auditing
         'member/notifications/read-all'      => null,
+        'admin/notifications/read'           => null,
+        'admin/notifications/read-all'       => null,
     ];
 
     public static function available(): bool
