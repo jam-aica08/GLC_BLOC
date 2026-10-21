@@ -162,6 +162,15 @@
         .table { --bs-table-color: #16161d; --bs-table-hover-color: #16161d; }
         code { color: #16161d; }
         :is(.text-success, .text-danger, .text-primary, .text-info, .text-warning):not(i):not(.badge):not(.invalid-feedback) { color: #16161d !important; }
+        /* Notifications dropdown (bell) */
+        .notif-toggle { background: none; border: 0; color: #1a1a2e; padding: 6px 8px; border-radius: 8px; }
+        .notif-toggle:hover, .notif-toggle:focus-visible { background: rgba(26,26,46,0.06); }
+        .notif-menu { width: min(380px, calc(100vw - 24px)); }
+        .notif-menu .notif-scroll { max-height: 360px; overflow-y: auto; }
+        .notif-unread { background: #fffaf0; }
+        @media (max-width: 575.98px) {
+            .notif-menu.show { position: fixed !important; inset: 64px 12px auto 12px !important; transform: none !important; width: auto; }
+        }
         /* Profile dropdown */
         .profile-toggle { background: none; border: 0; display: flex; align-items: center; gap: 10px; padding: 4px 6px; border-radius: 8px; color: inherit; text-align: left; }
         .profile-toggle:hover, .profile-toggle:focus-visible { background: rgba(26,26,46,0.06); }
@@ -279,11 +288,34 @@
             Guyo &amp; Liding Cooperative
         </div>
         <div class="user-info">
-            <?php $glcUnread = \App\Services\Notifier::unreadCount((int) session()->get('member_id')); ?>
-            <a href="<?= base_url('member/dashboard#notifications') ?>" class="position-relative me-2" style="color:#1a1a2e;" aria-label="Notifications<?= $glcUnread ? ', ' . $glcUnread . ' unread' : '' ?>">
-                <i class="fa-solid fa-bell fa-lg"></i>
-                <?php if ($glcUnread): ?><span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size:.65rem;"><?= $glcUnread ?></span><?php endif; ?>
-            </a>
+            <?php
+                $glcMember = (int) session()->get('member_id');
+                $glcUnread = \App\Services\Notifier::unreadCount($glcMember);
+                $glcLatest = \App\Services\Notifier::latest($glcMember, 6);
+                $glcHere   = uri_string();
+            ?>
+            <div class="dropdown me-2">
+                <button type="button" class="notif-toggle position-relative" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false"
+                        aria-label="Notifications<?= $glcUnread ? ', ' . $glcUnread . ' unread' : '' ?>">
+                    <i class="fa-solid fa-bell fa-lg"></i>
+                    <?php if ($glcUnread): ?><span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size:.65rem;"><?= $glcUnread ?></span><?php endif; ?>
+                </button>
+                <div class="dropdown-menu dropdown-menu-end shadow notif-menu p-0">
+                    <div class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom">
+                        <span class="fw-semibold">Notifications<?= $glcUnread ? ' <span class="badge bg-danger ms-1">' . $glcUnread . '</span>' : '' ?></span>
+                        <?php if ($glcUnread): ?>
+                            <form method="post" action="<?= base_url('member/notifications/read-all') ?>">
+                                <?= csrf_field() ?><input type="hidden" name="next" value="<?= esc($glcHere) ?>">
+                                <button class="btn btn-link btn-sm p-0">Mark all as read</button>
+                            </form>
+                        <?php endif; ?>
+                    </div>
+                    <div class="notif-scroll">
+                        <?= view('partials/notification_list', ['notifications' => $glcLatest, 'next' => $glcHere]) ?>
+                    </div>
+                    <a class="d-block text-center small py-2 border-top" href="<?= base_url('member/notifications') ?>">View all notifications</a>
+                </div>
+            </div>
             <div class="dropdown">
                 <button class="profile-toggle dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Open profile menu">
                     <span class="user-avatar"><?= strtoupper(substr(session()->get('username') ?? 'M', 0, 1)) ?></span>
@@ -294,7 +326,6 @@
                 </button>
                 <ul class="dropdown-menu dropdown-menu-end profile-menu shadow-sm">
                     <li><a class="dropdown-item" href="<?= base_url('member/profile') ?>"><i class="fa-solid fa-circle-user"></i>Profile</a></li>
-                    <li><a class="dropdown-item" href="<?= base_url('member/notifications') ?>"><i class="fa-solid fa-bell"></i>Notifications<?= $glcUnread ? ' <span class="badge bg-danger ms-auto">' . $glcUnread . '</span>' : '' ?></a></li>
                     <li><a class="dropdown-item" href="<?= base_url('member/settings') ?>"><i class="fa-solid fa-gear"></i>Settings</a></li>
                     <li><hr class="dropdown-divider"></li>
                     <li>
