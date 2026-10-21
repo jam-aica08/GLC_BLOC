@@ -22,6 +22,12 @@ class Auth extends BaseController
      */
     public function index(): string|\CodeIgniter\HTTP\RedirectResponse
     {
+        // Visitors without a session cookie can't be logged in or have flash
+        // messages, so skip starting a session (a database round trip on Vercel).
+        if ($this->request->getCookie(config('Session')->cookieName) === null) {
+            return view('auth/login', ['error' => null, 'success' => null, 'username' => '']);
+        }
+
         $session = session();
 
         // Redirect already-authenticated users to their dashboard
@@ -30,7 +36,11 @@ class Auth extends BaseController
             return redirect()->to($role === 'admin' ? '/admin/dashboard' : '/member/dashboard');
         }
 
-        return view('auth/login');
+        return view('auth/login', [
+            'error'    => $session->getFlashdata('error'),
+            'success'  => $session->getFlashdata('success'),
+            'username' => old('username'),
+        ]);
     }
 
     // -------------------------------------------------------------------------

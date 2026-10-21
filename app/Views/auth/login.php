@@ -190,18 +190,18 @@
         <h5><i class="fa-solid fa-lock me-2" style="color: var(--accent);"></i>GLC-BLOC</h5>
 
         <!-- Flash Error Message -->
-        <?php if (session()->getFlashdata('error')): ?>
+        <?php if ($error): ?>
             <div class="alert alert-danger d-flex align-items-center mb-3" role="alert">
                 <i class="fa-solid fa-circle-exclamation me-2"></i>
-                <?= esc(session()->getFlashdata('error')) ?>
+                <?= esc($error) ?>
             </div>
         <?php endif; ?>
 
-        <?php if (session()->getFlashdata('success')): ?>
+        <?php if ($success): ?>
             <div class="alert alert-success d-flex align-items-center mb-3" role="alert"
                  style="background-color: rgba(25,135,84,0.15); border-color: rgba(25,135,84,0.3); color: #75c997;">
                 <i class="fa-solid fa-circle-check me-2"></i>
-                <?= esc(session()->getFlashdata('success')) ?>
+                <?= esc($success) ?>
             </div>
         <?php endif; ?>
 
@@ -219,7 +219,7 @@
                         id="username"
                         name="username"
                         placeholder="Enter your username"
-                        value="<?= esc(old('username')) ?>"
+                        value="<?= esc($username) ?>"
                         required
                         autocomplete="username"
                     >
