@@ -5,7 +5,7 @@
     <h4 class="fw-bold mb-0"><i class="fas fa-coins me-2 text-warning"></i>My Dividends</h4>
 </div>
 
-<div class="card shadow-sm">
+<div class="card shadow-sm" data-search>
     <div class="card-body p-0">
         <div class="table-responsive">
             <table class="table table-hover mb-0">

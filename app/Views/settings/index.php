@@ -93,7 +93,7 @@
         <div class="card shadow-sm">
             <div class="card-header fw-semibold bg-white"><i class="fa-solid fa-user-shield me-2"></i>Add Administrator</div>
             <div class="card-body">
-                <p class="text-muted small">Financial records need approval from two different admins.</p>
+                <p class="text-muted small">Any administrator can approve contributions, payments, loans and dividends.</p>
                 <form method="post" action="<?= base_url($base . '/admins') ?>" autocomplete="off">
                     <?= csrf_field() ?>
                     <div class="mb-3">

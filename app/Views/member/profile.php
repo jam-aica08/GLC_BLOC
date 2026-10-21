@@ -9,7 +9,7 @@
 
 <div class="row g-4">
     <div class="col-lg-6">
-        <div class="card shadow-sm" data-no-search>
+        <div class="card shadow-sm">
             <div class="card-header fw-semibold bg-white">Account Information</div>
             <div class="card-body">
                 <table class="table table-borderless table-sm mb-0">
@@ -38,7 +38,7 @@
         </div>
     </div>
     <div class="col-lg-6">
-        <div class="card shadow-sm" data-no-search>
+        <div class="card shadow-sm">
             <div class="card-header fw-semibold bg-white">Member Details</div>
             <div class="card-body">
                 <table class="table table-borderless table-sm mb-0">

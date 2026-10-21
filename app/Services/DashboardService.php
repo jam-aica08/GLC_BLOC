@@ -55,6 +55,7 @@ class DashboardService
             'records'       => $this->recordSummary($scope),
             'recent'        => $this->recentActivity($scope),
             'chart'         => $this->monthlyContributions($scope),
+            'dividendPlan'  => (new DividendService())->plan((int) date('Y')),
         ];
     }
 
@@ -123,9 +124,7 @@ class DashboardService
             ->get()->getResultArray();
 
         return array_map(static function (array $r): array {
-            $r['status_label'] = $r['approval_status'] === 'Pending' && ! empty($r['first_approved_by'])
-                ? 'Needs 2nd approval'
-                : $r['approval_status'];
+            $r['status_label'] = $r['approval_status'];
 
             return $r;
         }, $rows);

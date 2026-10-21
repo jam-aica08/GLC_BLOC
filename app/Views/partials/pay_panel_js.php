@@ -7,13 +7,37 @@
     const checks = form => Array.from(form.querySelectorAll('.js-pay-check'));
     const amountOf = cb => cb.closest('tr').querySelector('.js-pay-amount');
 
+    // Explain what is wrong with an amount, or return '' when it is fine.
+    function problem(input) {
+        const raw = input.value.trim();
+        const value = Number(raw);
+        const owed = parseFloat(input.dataset.owed);
+        if (raw === '' || !Number.isFinite(value)) return 'Enter an amount in pesos, for example 500.00.';
+        if (value <= 0) return 'The amount must be more than ₱0.00.';
+        if (Math.abs(Math.round(value * 100) - value * 100) > 1e-6) return 'Use at most two decimal places (centavos).';
+        if (value > owed + 0.004) return 'Only ' + peso(owed) + ' is owed for Month ' + input.dataset.month + '.';
+        return '';
+    }
+
     function update(form) {
         let total = 0;
+        let invalid = false;
         const notes = [];
         checks(form).forEach(function (cb) {
             const input = amountOf(cb);
+            const error = document.getElementById(input.getAttribute('aria-describedby'));
             input.disabled = !cb.checked;
-            if (!cb.checked) { input.value = ''; return; }
+            if (!cb.checked) {
+                input.value = '';
+                input.classList.remove('is-invalid');
+                if (error) error.textContent = '';
+                return;
+            }
+            const message = problem(input);
+            input.classList.toggle('is-invalid', message !== '');
+            input.setAttribute('aria-invalid', message ? 'true' : 'false');
+            if (error) error.textContent = message;
+            if (message) { invalid = true; return; }
             const value = parseFloat(input.value) || 0;
             const owed = parseFloat(input.dataset.owed);
             total += value;
@@ -25,7 +49,7 @@
         });
         form.querySelector('.js-pay-total').textContent = peso(total);
         form.querySelector('.js-pay-note').textContent = notes.join(' ');
-        form.querySelector('.js-pay-submit').disabled = total <= 0 || form.hasAttribute('data-locked');
+        form.querySelector('.js-pay-submit').disabled = invalid || total <= 0 || form.hasAttribute('data-locked');
     }
 
     document.addEventListener('change', function (e) {

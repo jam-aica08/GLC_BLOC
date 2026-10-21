@@ -246,4 +246,115 @@ class AnalyticsService
             'note' => 'Forecast values are ESTIMATES / PREDICTIONS based on historical trends.',
         ];
     }
+
+    // -------------------------------------------------------------------------
+    // Recent activity for a time range
+    // -------------------------------------------------------------------------
+
+    /**
+     * Time ranges: [label, length in seconds, bucket size in seconds, default refresh in seconds].
+     * Every range is a rolling window ending now. "weekly" is today and the 6
+     * days before (7 calendar days), "monthly" today and the 29 days before.
+     */
+    public const RANGES = [
+        '30s'     => ['Last 30 seconds', 30, 5, 10],
+        '1m'      => ['Last 1 minute', 60, 10, 10],
+        '2m'      => ['Last 2 minutes', 120, 15, 15],
+        '5m'      => ['Last 5 minutes', 300, 30, 30],
+        '10m'     => ['Last 10 minutes', 600, 60, 30],
+        '30m'     => ['Last 30 minutes', 1800, 180, 60],
+        '1h'      => ['Last 1 hour', 3600, 300, 60],
+        '5h'      => ['Last 5 hours', 18000, 1800, 300],
+        '12h'     => ['Last 12 hours', 43200, 3600, 300],
+        '24h'     => ['Last 24 hours', 86400, 3600, 300],
+        'weekly'  => ['Weekly (last 7 days)', 7, 86400, 900],
+        'monthly' => ['Monthly (last 30 days)', 30, 86400, 900],
+    ];
+
+    /** Money that moved in a time range, grouped into buckets, from approved records. */
+    public function activity(string $range, ?int $now = null): array
+    {
+        $now = $now ?? time();
+        if (! isset(self::RANGES[$range])) {
+            $range = '24h';
+        }
+        [$label, $length, $bucket, $refresh] = self::RANGES[$range];
+
+        if ($bucket === 86400) {
+            // Whole calendar days: today and the ($length - 1) days before it.
+            $from = strtotime('today', $now) - ($length - 1) * 86400;
+            $from = strtotime(date('Y-m-d', $from));
+        } else {
+            $from = $now - $length;
+        }
+
+        $series = ['Contribution' => [], 'Loan Payment' => [], 'Loan Disbursement' => [], 'Dividend' => []];
+        $labels = [];
+        $starts = [];
+        for ($t = $from; $t < $now; $t = $bucket === 86400 ? strtotime('+1 day', $t) : $t + $bucket) {
+            $starts[] = $t;
+            $labels[] = $bucket === 86400 ? date('M j', $t) : ($bucket < 60 ? date('g:i:s A', $t) : ($length > 43200 ? date('M j g A', $t) : date('g:i A', $t)));
+            foreach ($series as $type => $_) {
+                $series[$type][] = 0.0;
+            }
+        }
+
+        $db       = db_connect();
+        $approved = 'COALESCE(second_approval_date, first_approval_date, updated_at)';
+        $rows     = $db->table('financial_records')
+            ->select("record_type, amount, {$approved} AS approved_at", false)
+            ->where('approval_status', 'Approved')
+            ->where("{$approved} >= " . $db->escape(date('Y-m-d H:i:s', $from)), null, false)
+            ->where("{$approved} <= " . $db->escape(date('Y-m-d H:i:s', $now)), null, false)
+            ->get()->getResultArray();
+
+        $totals = [];
+        foreach ($series as $type => $_) {
+            $totals[$type] = ['amount' => 0.0, 'count' => 0];
+        }
+        foreach ($rows as $row) {
+            $t = strtotime($row['approved_at']);
+            $i = count($starts) - 1;
+            while ($i > 0 && $starts[$i] > $t) {
+                $i--;
+            }
+            $type = $row['record_type'];
+            if (! isset($series[$type])) {
+                continue;
+            }
+            $series[$type][$i]       = round($series[$type][$i] + (float) $row['amount'], 2);
+            $totals[$type]['amount'] = round($totals[$type]['amount'] + (float) $row['amount'], 2);
+            $totals[$type]['count']++;
+        }
+
+        $waiting = db_connect()->table('financial_records')
+            ->where('approval_status', 'Pending')
+            ->where('created_at >=', date('Y-m-d H:i:s', $from))
+            ->countAllResults();
+
+        return [
+            'range'           => $range,
+            'label'           => $label,
+            'from'            => date('M j, Y g:i:s A', $from),
+            'to'              => date('M j, Y g:i:s A', $now),
+            'generated_at'    => date('g:i:s A', $now),
+            'bucket_seconds'  => $bucket,
+            'default_refresh' => $refresh,
+            'labels'          => $labels,
+            'series'          => [
+                'contributions' => $series['Contribution'],
+                'payments'      => $series['Loan Payment'],
+                'loans'         => $series['Loan Disbursement'],
+                'dividends'     => $series['Dividend'],
+            ],
+            'totals'          => [
+                'contributions' => $totals['Contribution'],
+                'payments'      => $totals['Loan Payment'],
+                'loans'         => $totals['Loan Disbursement'],
+                'dividends'     => $totals['Dividend'],
+            ],
+            'waiting'         => $waiting,
+            'empty'           => $rows === [],
+        ];
+    }
 }
