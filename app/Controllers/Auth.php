@@ -25,7 +25,7 @@ class Auth extends BaseController
         // Visitors without a session cookie can't be logged in or have flash
         // messages, so skip starting a session (a database round trip on Vercel).
         if ($this->request->getCookie(config('Session')->cookieName) === null) {
-            return view('auth/login', ['error' => null, 'success' => null]);
+            return view('auth/login', ['error' => null, 'success' => null, 'username' => '']);
         }
 
         $session = session();
@@ -37,8 +37,9 @@ class Auth extends BaseController
         }
 
         return view('auth/login', [
-            'error'   => $session->getFlashdata('error'),
-            'success' => $session->getFlashdata('success'),
+            'error'    => $session->getFlashdata('error'),
+            'success'  => $session->getFlashdata('success'),
+            'username' => old('username'),
         ]);
     }
 

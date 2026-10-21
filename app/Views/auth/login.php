@@ -219,7 +219,7 @@
                         id="username"
                         name="username"
                         placeholder="Enter your username"
-                        value="<?= esc(old('username')) ?>"
+                        value="<?= esc($username) ?>"
                         required
                         autocomplete="username"
                     >
