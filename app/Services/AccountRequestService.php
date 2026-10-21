@@ -19,7 +19,7 @@ class AccountRequestService
     /** False until "Apply Database Updates" has created the table. */
     public function available(): bool
     {
-        return $this->db()->tableExists('account_requests');
+        return \App\Libraries\SchemaCache::passes('table_account_requests', fn () => $this->db()->tableExists('account_requests'));
     }
 
     public function hasPending(int $memberId): bool
