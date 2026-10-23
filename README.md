@@ -1,69 +1,60 @@
-# CodeIgniter 4 Application Starter
+# GLC-BLOC
 
-## What is CodeIgniter?
+A cooperative savings and loan system: members save a monthly contribution,
+borrow against it, repay in instalments and share the year's loan interest as
+dividends. Every money movement is written to a tamper-evident ledger.
 
-CodeIgniter is a PHP full-stack web framework that is light, fast, flexible and secure.
-More information can be found at the [official site](https://codeigniter.com).
+Built with CodeIgniter 4 (PHP 8.2+), MySQL/MariaDB or TiDB, Bootstrap 5 and
+Chart.js. Production runs on Vercel (`sin1`) with a TiDB Cloud database in
+`ap-southeast-1`.
 
-This repository holds a composer-installable app starter.
-It has been built from the
-[development repository](https://github.com/codeigniter4/CodeIgniter4).
+## Features
 
-More information about the plans for version 4 can be found in [CodeIgniter 4](https://forum.codeigniter.com/forumdisplay.php?fid=28) on the forums.
+- **Members:** dashboard, contributions, loan applications, instalment
+  payments, dividends, ledger history and notifications.
+- **Admins:** member and account management, approval queues, loans,
+  dividends, an interactive Reports page, the ledger and its verification.
+- **Super admin:** adds admins, imports a client's data from Excel and resets
+  data.
+- **Security:** CSRF, login throttling, per-request account checks, security
+  headers and parameterised queries.
 
-You can read the [user guide](https://codeigniter.com/user_guide/)
-corresponding to the latest version of the framework.
+## Quick start (local)
 
-## Installation & updates
+```bash
+composer install
+cp env .env              # then set the database section, see docs/setup-and-deployment.md
+php spark migrate --all
+php spark db:seed GlcBlocSeeder
+php spark serve          # http://localhost:8080
+```
 
-`composer create-project codeigniter4/appstarter` then `composer update` whenever
-there is a new release of the framework.
+The seeder creates two accounts. Change both passwords before using the
+system for real.
 
-When updating, check the release notes to see if there are any changes you might need to apply
-to your `app` folder. The affected files can be copied or merged from
-`vendor/codeigniter4/framework/app`.
+| Role | Username | Password |
+|------|----------|----------|
+| Super admin | `admin` | `Admin@123` |
+| Member | `jdoe` | `Member@123` |
 
-## Setup
+To fill the system with realistic demo data, run `php spark demo:load`
+([details](docs/data-loading.md)).
 
-Copy `env` to `.env` and tailor for your app, specifically the baseURL
-and any database settings.
+## Documentation
 
-## Important Change with index.php
+| Guide | What it covers |
+|-------|----------------|
+| [Setup and deployment](docs/setup-and-deployment.md) | Local setup with XAMPP, Vercel and TiDB configuration, migrations and tests |
+| [Loading data](docs/data-loading.md) | Demo data for presentations, and importing a client's records from Excel |
+| [User guide](docs/user-guide.md) | Day-to-day use for admins and members |
+| [Architecture](docs/architecture.md) | Code layout, business rules, the ledger and security |
 
-`index.php` is no longer in the root of the project! It has been moved inside the *public* folder,
-for better security and separation of components.
+## Tests
 
-This means that you should configure your web server to "point" to your project's *public* folder, and
-not to the project root. A better practice would be to configure a virtual host to point there. A poor practice would be to point your web server to the project root and expect to enter *public/...*, as the rest of your logic and the
-framework are exposed.
+```bash
+vendor/bin/phpunit
+```
 
-**Please** read the user guide for a better explanation of how CI4 works!
-
-## Repository Management
-
-We use GitHub issues, in our main repository, to track **BUGS** and to track approved **DEVELOPMENT** work packages.
-We use our [forum](http://forum.codeigniter.com) to provide SUPPORT and to discuss
-FEATURE REQUESTS.
-
-This repository is a "distribution" one, built by our release preparation script.
-Problems with it can be raised on our forum, or as issues in the main repository.
-
-## Server Requirements
-
-PHP version 8.2 or higher is required, with the following extensions installed:
-
-- [intl](http://php.net/manual/en/intl.requirements.php)
-- [mbstring](http://php.net/manual/en/mbstring.installation.php)
-
-> [!WARNING]
-> - The end of life date for PHP 7.4 was November 28, 2022.
-> - The end of life date for PHP 8.0 was November 26, 2023.
-> - The end of life date for PHP 8.1 was December 31, 2025.
-> - If you are still using below PHP 8.2, you should upgrade immediately.
-> - The end of life date for PHP 8.2 will be December 31, 2026.
-
-Additionally, make sure that the following extensions are enabled in your PHP:
-
-- json (enabled by default - don't turn it off)
-- [mysqlnd](http://php.net/manual/en/mysqlnd.install.php) if you plan to use MySQL
-- [libcurl](http://php.net/manual/en/curl.requirements.php) if you plan to use the HTTP\CURLRequest library
+The feature tests need a MySQL test database; see
+[Setup and deployment](docs/setup-and-deployment.md#running-the-tests). GitHub
+Actions runs the full suite on PHP 8.2 and 8.3 for every push and pull request.
