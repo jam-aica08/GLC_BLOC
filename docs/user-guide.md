@@ -77,7 +77,7 @@ any entry that was changed or removed outside the app shows as **Invalid**.
 
 ### Settings
 
-- Every admin can change the cooperative details and their own password.
+- Every admin can change their own password and see today's recent errors.
 - **Database updates** says whether the database matches the current
   release. If it does not, press **Apply Database Updates**; data is kept.
 
