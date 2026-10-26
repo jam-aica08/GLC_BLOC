@@ -206,7 +206,7 @@
                                         data-member-name="<?= esc(($member['first_name'] ?? '') . ' ' . ($member['last_name'] ?? '')) ?>"
                                         data-member-active="<?= ($member['status'] ?? 'Active') === 'Active' ? '1' : '0' ?>"
                                         data-accounts="<?= esc(json_encode($accRows)) ?>">
-                                    <i class="fa-solid fa-wallet me-1"></i>View Accounts (<?= count($member['accounts']) ?>)
+                                    <i class="fa-solid fa-wallet me-1"></i>Manage Accounts (<?= count($member['accounts']) ?>)
                                 </button>
                                 <?php if ($pendingAcc): ?>
                                     <span class="badge bg-warning text-dark ms-1"><?= $pendingAcc ?> pending</span>
@@ -226,16 +226,16 @@
                                     <form action="<?= base_url('admin/members/deactivate/' . $member['id']) ?>" method="post"
                                           onsubmit="return confirm('Deactivate member <?= esc(($member['first_name'] ?? '') . ' ' . ($member['last_name'] ?? ''), 'js') ?>?')">
                                         <?= csrf_field() ?>
-                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Deactivate">
-                                            <i class="fa-solid fa-user-slash me-1"></i>Deactivate
+                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Deactivate this member and their sign-in">
+                                            <i class="fa-solid fa-user-slash me-1"></i>Deactivate member
                                         </button>
                                     </form>
                                 <?php else: ?>
                                     <form action="<?= base_url('admin/members/reactivate/' . $member['id']) ?>" method="post"
                                           onsubmit="return confirm('Reactivate member <?= esc(($member['first_name'] ?? '') . ' ' . ($member['last_name'] ?? ''), 'js') ?>?')">
                                         <?= csrf_field() ?>
-                                        <button type="submit" class="btn btn-sm btn-outline-success" title="Reactivate">
-                                            <i class="fa-solid fa-user-check me-1"></i>Reactivate
+                                        <button type="submit" class="btn btn-sm btn-outline-success" title="Reactivate this member and their sign-in">
+                                            <i class="fa-solid fa-user-check me-1"></i>Reactivate member
                                         </button>
                                     </form>
                                 <?php endif; ?>
@@ -363,7 +363,7 @@
 
 <!-- View Accounts Modal -->
 <div class="modal fade" id="viewAccountsModal" tabindex="-1" aria-labelledby="viewAccountsModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-dialog modal-dialog-centered modal-xl modal-fullscreen-md-down">
         <div class="modal-content">
             <div class="modal-header modal-header-brand">
                 <h5 class="modal-title text-white" id="viewAccountsModalLabel">
@@ -372,6 +372,17 @@
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body p-0">
+                <?php if (empty($canDeactivateAccounts)): ?>
+                    <div class="alert alert-warning rounded-0 border-0 border-bottom mb-0 small" role="status">
+                        <i class="fa-solid fa-triangle-exclamation me-1"></i>
+                        Account deactivation needs a database update.
+                        <?php if (session()->get('is_super_admin')): ?>
+                            Open <a href="<?= base_url('admin/settings') ?>" class="alert-link">Settings</a> and click <strong>Apply Database Updates</strong>.
+                        <?php else: ?>
+                            Ask the super administrator to apply the database updates in Settings.
+                        <?php endif; ?>
+                    </div>
+                <?php endif; ?>
                 <div class="table-responsive">
                     <table class="table align-middle mb-0" style="font-size:0.875rem;">
                         <thead style="background:#f8f9fa;">
@@ -404,39 +415,93 @@
     const canChange = <?= json_encode((bool) ($canDeactivateAccounts ?? false)) ?>;
     const accountsUrl = <?= json_encode(rtrim(base_url('admin/members/accounts'), '/') . '/') ?>;
     const csrfName = <?= json_encode(csrf_token()) ?>, csrfHash = <?= json_encode(csrf_hash()) ?>;
+    const search = <?= json_encode((string) ($search ?? '')) ?>;
 
-    // A POST form for one account: deactivate (with an optional reason) or reactivate.
-    function accountForm(r, action) {
+    function postForm(r, action) {
         const form = document.createElement('form');
         form.method = 'post';
         form.action = accountsUrl + encodeURIComponent(r.id) + '/' + action;
-        form.className = 'd-inline-flex gap-1 justify-content-end';
         const token = document.createElement('input');
         token.type = 'hidden'; token.name = csrfName; token.value = csrfHash;
         form.appendChild(token);
-        const btn = document.createElement('button');
+        if (search) {   // come back to the same search afterwards
+            const q = document.createElement('input');
+            q.type = 'hidden'; q.name = 'q'; q.value = search;
+            form.appendChild(q);
+        }
+        return form;
+    }
+
+    function button(cls, icon, label) {
+        const b = document.createElement('button');
+        b.className = 'btn btn-sm text-nowrap ' + cls;
+        b.innerHTML = '<i class="fa-solid ' + icon + ' me-1" aria-hidden="true"></i>';
+        b.appendChild(document.createTextNode(label));
+        return b;
+    }
+
+    // Reactivate: one button, confirmed.
+    function reactivateForm(r) {
+        const form = postForm(r, 'reactivate');
+        const btn = button('btn-outline-success', 'fa-rotate-left', 'Reactivate');
         btn.type = 'submit';
-        if (action === 'deactivate') {
+        form.appendChild(btn);
+        form.addEventListener('submit', function (ev) {
+            if (!confirm('Reactivate account ' + r.number + '?')) ev.preventDefault();
+        });
+        return form;
+    }
+
+    // Deactivate: a compact button in the row; clicking it opens a row below
+    // with the optional reason and the confirm / cancel buttons.
+    function deactivateButton(r, tr) {
+        const btn = button('btn-outline-danger', 'fa-ban', 'Deactivate');
+        btn.type = 'button';
+        btn.setAttribute('aria-expanded', 'false');
+        btn.addEventListener('click', function () {
+            const open = tr.nextElementSibling && tr.nextElementSibling.dataset.confirmFor === String(r.id);
+            if (open) { tr.nextElementSibling.remove(); btn.setAttribute('aria-expanded', 'false'); return; }
+
+            const row = document.createElement('tr');
+            row.dataset.confirmFor = String(r.id);
+            row.className = 'table-danger';
+            const td = document.createElement('td');
+            td.colSpan = 7; td.className = 'px-4 py-3';
+            const form = postForm(r, 'deactivate');
+            form.className = 'd-flex flex-wrap align-items-end gap-2';
+
+            const field = document.createElement('div');
+            field.className = 'flex-grow-1';
+            const label = document.createElement('label');
+            label.className = 'form-label small fw-semibold mb-1';
+            label.htmlFor = 'deactivate-reason-' + r.id;
+            label.textContent = 'Deactivate account ' + r.number + ' — reason (optional)';
             const reason = document.createElement('input');
             reason.type = 'text'; reason.name = 'reason'; reason.maxLength = 255;
-            reason.className = 'form-control form-control-sm'; reason.style.width = '9rem';
-            reason.placeholder = 'Reason (optional)';
-            reason.setAttribute('aria-label', 'Reason for deactivating ' + r.number);
-            form.appendChild(reason);
-            btn.className = 'btn btn-sm btn-outline-danger text-nowrap';
-            btn.innerHTML = '<i class="fa-solid fa-ban me-1"></i>Deactivate';
-            form.addEventListener('submit', function (ev) {
-                if (!confirm('Deactivate account ' + r.number + '? It will take no new contributions or loans and is left out of dividends. Its records are kept.')) ev.preventDefault();
-            });
-        } else {
-            btn.className = 'btn btn-sm btn-outline-success text-nowrap';
-            btn.innerHTML = '<i class="fa-solid fa-rotate-left me-1"></i>Reactivate';
-            form.addEventListener('submit', function (ev) {
-                if (!confirm('Reactivate account ' + r.number + '?')) ev.preventDefault();
-            });
-        }
-        form.appendChild(btn);
-        return form;
+            reason.id = 'deactivate-reason-' + r.id;
+            reason.className = 'form-control form-control-sm';
+            reason.placeholder = 'e.g. Member asked to close this account';
+            field.append(label, reason);
+
+            const confirmBtn = button('btn-danger', 'fa-ban', 'Confirm deactivation');
+            confirmBtn.type = 'submit';
+            const cancel = button('btn-outline-secondary', 'fa-xmark', 'Cancel');
+            cancel.type = 'button';
+            cancel.addEventListener('click', function () { row.remove(); btn.setAttribute('aria-expanded', 'false'); btn.focus(); });
+
+            const note = document.createElement('div');
+            note.className = 'w-100 small text-muted';
+            note.textContent = 'It will take no new contributions or loans and is left out of dividends. The member\'s other accounts and sign-in are not affected; its records are kept.';
+
+            form.append(field, confirmBtn, cancel, note);
+            form.addEventListener('submit', function () { confirmBtn.disabled = true; });
+            td.appendChild(form);
+            row.appendChild(td);
+            tr.after(row);
+            btn.setAttribute('aria-expanded', 'true');
+            reason.focus();
+        });
+        return btn;
     }
 
     document.getElementById('viewAccountsModal').addEventListener('show.bs.modal', function (e) {
@@ -462,19 +527,23 @@
             const actions = tr.insertCell();
             actions.className = 'py-3 pe-4 text-end';
             if (!canChange) {
-                actions.textContent = '—';
+                actions.className += ' small text-muted';
+                actions.textContent = 'Needs database update';
             } else if (r.state === 'Active' || r.state === 'Pending') {
                 if (r.blockers.length) {
-                    const note = document.createElement('span');
-                    note.className = 'small text-muted';
-                    note.textContent = 'Cannot deactivate yet: ' + r.blockers.join('; ') + '.';
-                    actions.appendChild(note);
+                    // Shown disabled, with the reason, so it is clear why it cannot be used yet.
+                    const off = button('btn-outline-secondary', 'fa-ban', 'Deactivate');
+                    off.type = 'button'; off.disabled = true;
+                    const note = document.createElement('div');
+                    note.className = 'small text-muted mt-1';
+                    note.textContent = 'Not yet: ' + r.blockers.join('; ') + '.';
+                    actions.append(off, note);
                 } else {
-                    actions.appendChild(accountForm(r, 'deactivate'));
+                    actions.appendChild(deactivateButton(r, tr));
                 }
             } else if (r.state === 'Inactive') {
                 if (memberActive) {
-                    actions.appendChild(accountForm(r, 'reactivate'));
+                    actions.appendChild(reactivateForm(r));
                 } else {
                     actions.className += ' small text-muted';
                     actions.textContent = 'Reactivate the member first.';

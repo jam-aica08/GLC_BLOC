@@ -481,7 +481,15 @@ class Admin extends BaseController
                 . 'It takes no new contributions or loans and is left out of dividends; its records are kept.');
         }
 
-        return redirect()->to('/admin/members');
+        return redirect()->to($this->membersPage());
+    }
+
+    /** The Members page with the search the admin was on, so the account stays in view. */
+    private function membersPage(): string
+    {
+        $search = trim((string) $this->request->getPost('q'));
+
+        return '/admin/members' . ($search !== '' ? '?q=' . rawurlencode($search) : '');
     }
 
     /**
@@ -506,7 +514,7 @@ class Admin extends BaseController
                 . ($account['account_status'] === 'Active' ? ' and active.' : ' and becomes active once its joining contributions are paid.'));
         }
 
-        return redirect()->to('/admin/members');
+        return redirect()->to($this->membersPage());
     }
 
     // =========================================================================
