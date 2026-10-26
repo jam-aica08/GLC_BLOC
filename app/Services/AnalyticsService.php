@@ -13,10 +13,13 @@ class AnalyticsService
     // -------------------------------------------------------------------------
 
     /**
-     * Retrieve monthly equity totals for the past N months.
+     * The cooperative's equity at the end of each of the past N months: every
+     * approved contribution and dividend up to that day, the same figure as
+     * the "Current Equity" tile, so the line grows as the cooperative does.
      *
-     * Tries analytics_snapshots first (fast path); falls back to aggregating
-     * financial_records directly if no snapshot data exists for the period.
+     * Read straight from financial_records. analytics_snapshots is not used:
+     * nothing keeps it up to date, and the seeded sample row would otherwise
+     * pin January 2026 at zero.
      *
      * @param  int   $months  Number of calendar months to look back (default 12)
      * @return array  Ordered oldest-first: [['label' => 'Oct 2026', 'total' => 1500.00], …]
@@ -42,44 +45,25 @@ class AnalyticsService
             ];
         }
 
-        // --- Fast path: check analytics_snapshots ----------------------------
-        $snapshotMap = [];
-        $startDate   = $periods[0]['start'];
-        $endDate     = $periods[count($periods) - 1]['end'];
+        $equity = fn () => $db->table('financial_records')
+            ->whereIn('record_type', ['Contribution', 'Dividend'])
+            ->where('approval_status', 'Approved');
 
-        $snapshotRows = $db->table('analytics_snapshots')
-                           ->where('period_type', 'Monthly')
-                           ->where('snapshot_date >=', $startDate)
-                           ->where('snapshot_date <=', $endDate)
-                           ->get()
-                           ->getResultArray();
+        // Everything before the first month, then each month's additions: two queries in all.
+        $total = (float) ($equity()->selectSum('amount', 'total')
+            ->where('transaction_date <', $periods[0]['start'])
+            ->get()->getRowArray()['total'] ?? 0);
 
-        foreach ($snapshotRows as $snap) {
-            $key  = date('Y-n', strtotime($snap['snapshot_date']));
-            $data = is_string($snap['totals']) ? json_decode($snap['totals'], true) : $snap['totals'];
-            $snapshotMap[$key] = (float) ($data['equity_total'] ?? 0);
+        $added = [];
+        foreach ($equity()->select("DATE_FORMAT(transaction_date, '%Y-%m') AS ym, SUM(amount) AS total", false)
+                     ->where('transaction_date >=', $periods[0]['start'])
+                     ->where('transaction_date <=', $periods[count($periods) - 1]['end'])
+                     ->groupBy('ym')->get()->getResultArray() as $row) {
+            $added[$row['ym']] = (float) $row['total'];
         }
 
-        // --- Per-period resolution -------------------------------------------
         foreach ($periods as $period) {
-            $key = "{$period['year']}-{$period['month']}";
-
-            if (isset($snapshotMap[$key])) {
-                $total = $snapshotMap[$key];
-            } else {
-                // Compute from financial_records (approved Contributions only)
-                $row = $db->table('financial_records')
-                          ->selectSum('amount', 'total')
-                          ->where('record_type', 'Contribution')
-                          ->where('approval_status', 'Approved')
-                          ->where('transaction_date >=', $period['start'])
-                          ->where('transaction_date <=', $period['end'])
-                          ->get()
-                          ->getRowArray();
-
-                $total = ($row && $row['total'] !== null) ? (float) $row['total'] : 0.0;
-            }
-
+            $total += $added[substr($period['start'], 0, 7)] ?? 0.0;
             $result[] = [
                 'label' => $period['label'],
                 'total' => round($total, 2),

@@ -248,35 +248,44 @@ document.addEventListener('DOMContentLoaded', function () {
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     const ctx = document.getElementById('equityChart');
+    let equityChart = null;
 
-    // Fetch analytics data from the API endpoint
-    fetch('<?= base_url($dataUrl ?? 'admin/analytics/data') ?>', {
-        headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
-    })
-    .then(response => {
-        if (!response.ok) throw new Error('Network response was not ok');
-        return response.json();
-    })
-    .then(data => {
-        renderChart(ctx, data);
-        // Update stat tiles if provided
-        if (data.stats) {
-            const fmt = (n) => '₱' + Number(n).toLocaleString('en-PH', {minimumFractionDigits: 2});
-            if (data.stats.total_members !== undefined)
-                document.getElementById('stat-members').textContent = data.stats.total_members.toLocaleString();
-            if (data.stats.total_contributions !== undefined)
-                document.getElementById('stat-contributions').textContent = fmt(data.stats.total_contributions);
-            if (data.stats.active_loans !== undefined)
-                document.getElementById('stat-loans').textContent = data.stats.active_loans.toLocaleString();
-            if (data.stats.current_equity !== undefined)
-                document.getElementById('stat-equity').textContent = fmt(data.stats.current_equity);
-        }
-    })
-    .catch(err => {
-        console.error('Analytics data fetch error:', err);
-        // Render with empty placeholder so the chart frame is still visible
-        renderChart(ctx, { labels: [], actual: [], forecast: [], forecastStartIndex: 0 });
-    });
+    // Fetch analytics data from the API endpoint; again every minute while the
+    // page is visible and on returning to it, so new approvals show up.
+    function loadEquity() {
+        fetch('<?= base_url($dataUrl ?? 'admin/analytics/data') ?>', {
+            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            cache: 'no-store'
+        })
+        .then(response => {
+            if (!response.ok) throw new Error('Network response was not ok');
+            return response.json();
+        })
+        .then(data => {
+            renderChart(ctx, data);
+            // Update stat tiles if provided
+            if (data.stats) {
+                const fmt = (n) => '₱' + Number(n).toLocaleString('en-PH', {minimumFractionDigits: 2});
+                if (data.stats.total_members !== undefined)
+                    document.getElementById('stat-members').textContent = data.stats.total_members.toLocaleString();
+                if (data.stats.total_contributions !== undefined)
+                    document.getElementById('stat-contributions').textContent = fmt(data.stats.total_contributions);
+                if (data.stats.active_loans !== undefined)
+                    document.getElementById('stat-loans').textContent = data.stats.active_loans.toLocaleString();
+                if (data.stats.current_equity !== undefined)
+                    document.getElementById('stat-equity').textContent = fmt(data.stats.current_equity);
+            }
+        })
+        .catch(err => {
+            console.error('Analytics data fetch error:', err);
+            // Render with empty placeholder so the chart frame is still visible (first load only)
+            if (!equityChart) renderChart(ctx, { labels: [], actual: [], forecast: [], forecastStartIndex: 0 });
+        });
+    }
+
+    loadEquity();
+    setInterval(() => { if (!document.hidden) loadEquity(); }, 60000);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) loadEquity(); });
 
     function renderChart(canvas, data) {
         const labels = data.labels || [];
@@ -299,12 +308,20 @@ document.addEventListener('DOMContentLoaded', function () {
                 forecastData.push(i === actualValues.length - 1 ? actualValues[i] : null); // connect at boundary
             } else {
                 historicalData.push(null);
-                const fIdx = i - (actualValues.length - 1);
+                const fIdx = i - actualValues.length;   // first month after the history is forecast[0]
                 forecastData.push(forecastValues[fIdx] !== undefined ? forecastValues[fIdx] : null);
             }
         }
 
-        new Chart(canvas, {
+        if (equityChart) {
+            equityChart.data.labels = allLabels;
+            equityChart.data.datasets[0].data = historicalData;
+            equityChart.data.datasets[1].data = forecastData;
+            equityChart.update('none');
+            return;
+        }
+
+        equityChart = new Chart(canvas, {
             type: 'line',
             data: {
                 labels: allLabels,
