@@ -118,6 +118,16 @@ final class AnalyticsTest extends CIUnitTestCase
         $this->assertGreaterThan($payload['forecast'][1], $payload['forecast'][2]);
     }
 
+    public function testActivityRefreshesWithinAMinuteForEveryRange(): void
+    {
+        foreach (array_keys(AnalyticsService::RANGES) as $range) {
+            $refresh = (new AnalyticsService())->activity($range)['default_refresh'];
+            $this->assertGreaterThan(0, $refresh, $range);
+            $this->assertLessThanOrEqual(60, $refresh, "{$range} refreshes too slowly to look live");
+        }
+        $this->assertSame(30, (new AnalyticsService())->activity('24h')['default_refresh'], 'The default range');
+    }
+
     public function testOutOfRangeMonthsAreClamped(): void
     {
         $service = new AnalyticsService();

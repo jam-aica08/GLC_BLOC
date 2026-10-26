@@ -48,6 +48,7 @@
                 <select id="act_refresh" class="form-select form-select-sm">
                     <option value="auto">Match range</option>
                     <option value="0">Off</option>
+                    <option value="5">Every 5 seconds</option>
                     <option value="10">Every 10 seconds</option>
                     <option value="30">Every 30 seconds</option>
                     <option value="60">Every minute</option>
@@ -143,7 +144,10 @@ document.addEventListener('DOMContentLoaded', function () {
             if (!res.ok) throw new Error('HTTP ' + res.status);
             const data = await res.json();
             render(data);
-            statusEl.textContent = 'Updated ' + data.generated_at;
+            const every = interval();
+            statusEl.textContent = 'Updated ' + data.generated_at + (every > 0
+                ? ' · refreshes every ' + (every < 60 ? every + ' seconds' : (every / 60) + ' minute' + (every === 60 ? '' : 's'))
+                : ' · auto-refresh off');
         } catch (err) {
             if (err.name !== 'AbortError') {
                 statusEl.textContent = 'Could not update. Retrying at the next refresh.';
@@ -174,7 +178,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     range.addEventListener('change', () => { try { localStorage.setItem('glc-activity-range', range.value); } catch (e) {} restart(); });
-    refreshSel.addEventListener('change', schedule);
+    refreshSel.addEventListener('change', restart);   // update now, then at the new rate
     document.getElementById('act_reload').addEventListener('click', restart);
     document.addEventListener('visibilitychange', () => { if (!document.hidden) restart(); });
     load();

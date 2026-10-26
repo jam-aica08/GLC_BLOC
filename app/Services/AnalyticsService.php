@@ -246,18 +246,19 @@ class AnalyticsService
      * days before (7 calendar days), "monthly" today and the 29 days before.
      */
     public const RANGES = [
-        '30s'     => ['Last 30 seconds', 30, 5, 10],
-        '1m'      => ['Last 1 minute', 60, 10, 10],
-        '2m'      => ['Last 2 minutes', 120, 15, 15],
-        '5m'      => ['Last 5 minutes', 300, 30, 30],
-        '10m'     => ['Last 10 minutes', 600, 60, 30],
-        '30m'     => ['Last 30 minutes', 1800, 180, 60],
-        '1h'      => ['Last 1 hour', 3600, 300, 60],
-        '5h'      => ['Last 5 hours', 18000, 1800, 300],
-        '12h'     => ['Last 12 hours', 43200, 3600, 300],
-        '24h'     => ['Last 24 hours', 86400, 3600, 300],
-        'weekly'  => ['Weekly (last 7 days)', 7, 86400, 900],
-        'monthly' => ['Monthly (last 30 days)', 30, 86400, 900],
+        // Refresh often enough that a new approval shows up while you watch.
+        '30s'     => ['Last 30 seconds', 30, 5, 5],
+        '1m'      => ['Last 1 minute', 60, 10, 5],
+        '2m'      => ['Last 2 minutes', 120, 15, 10],
+        '5m'      => ['Last 5 minutes', 300, 30, 10],
+        '10m'     => ['Last 10 minutes', 600, 60, 10],
+        '30m'     => ['Last 30 minutes', 1800, 180, 15],
+        '1h'      => ['Last 1 hour', 3600, 300, 15],
+        '5h'      => ['Last 5 hours', 18000, 1800, 30],
+        '12h'     => ['Last 12 hours', 43200, 3600, 30],
+        '24h'     => ['Last 24 hours', 86400, 3600, 30],
+        'weekly'  => ['Weekly (last 7 days)', 7, 86400, 60],
+        'monthly' => ['Monthly (last 30 days)', 30, 86400, 60],
     ];
 
     /** Money that moved in a time range, grouped into buckets, from approved records. */

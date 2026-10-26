@@ -138,6 +138,7 @@ class Auth extends BaseController
             'member_id'      => $memberId,
             'is_super_admin' => $isSuper,
             'logged_in'      => true,
+            'last_activity'  => time(),   // AuthFilter ends the sign-in after IDLE_MINUTES without a request
         ]);
         AuditLog::record('Logged in', 'user', $user['user_id']);
 
@@ -156,7 +157,7 @@ class Auth extends BaseController
     private function clearAuth(): void
     {
         $session = session();
-        $session->remove(['user_id', 'username', 'role', 'member_id', 'is_super_admin', 'logged_in']);
+        $session->remove(['user_id', 'username', 'role', 'member_id', 'is_super_admin', 'logged_in', 'last_activity']);
         $session->regenerate(true);
     }
 
