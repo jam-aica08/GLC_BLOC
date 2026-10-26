@@ -21,11 +21,12 @@ class AnalyticsService
      * @param  int   $months  Number of calendar months to look back (default 12)
      * @return array  Ordered oldest-first: [['label' => 'Oct 2026', 'total' => 1500.00], …]
      */
-    public function getEquityGrowthData(int $months = 12): array
+    public function getEquityGrowthData(int $months = 12, ?int $now = null): array
     {
         $db      = db_connect();
         $result  = [];
-        $now     = new \DateTime('now');
+        // From the 1st, so "-1 month" on the 31st cannot land in the same month again.
+        $now     = new \DateTime(date('Y-m-01', $now ?? time()));
 
         // Build list of month boundaries (oldest → newest)
         $periods = [];
@@ -147,7 +148,7 @@ class AnalyticsService
 
         // Determine the last historical month so we can label forecast months
         $lastLabel   = end($historicalData)['label'];  // e.g. "Oct 2026"
-        $lastMonthDt = \DateTime::createFromFormat('M Y', $lastLabel);
+        $lastMonthDt = \DateTime::createFromFormat('!M Y', $lastLabel);   // '!' = the 1st, not today's day
 
         $forecasts = [];
         for ($f = 1; $f <= $forecastMonths; $f++) {
@@ -216,9 +217,13 @@ class AnalyticsService
     /**
      * Chart.js payload for the equity growth chart plus headline stats.
      */
-    public function chartPayload(int $months = 12, int $forecastMonths = 3): array
+    public function chartPayload(int $months = 12, int $forecastMonths = 3, ?int $now = null): array
     {
-        $historical = $this->getEquityGrowthData($months);
+        // One query per month, so keep the range sensible whatever the URL asks for.
+        $months         = max(1, min(60, $months));
+        $forecastMonths = max(0, min(12, $forecastMonths));
+
+        $historical = $this->getEquityGrowthData($months, $now);
         $forecast   = $this->predictNextMonths($historical, $forecastMonths);
         $actual     = array_map('floatval', array_column($historical, 'total'));
 
@@ -237,9 +242,9 @@ class AnalyticsService
             'stats'              => [
                 'total_members'       => $db->table('members')->countAllResults(),
                 'total_contributions' => $sum(['Contribution']),
-                'active_loans'        => $db->table('financial_records')
-                    ->where('record_type', 'Loan Disbursement')
-                    ->where('approval_status', 'Approved')
+                // Loans still being repaid, not every loan ever released.
+                'active_loans'        => $db->table('loans')
+                    ->whereIn('loan_status', ['Approved', 'Active'])
                     ->countAllResults(),
                 'current_equity'      => $sum(['Contribution', 'Dividend']),
             ],

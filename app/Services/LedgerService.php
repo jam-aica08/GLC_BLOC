@@ -2,8 +2,6 @@
 
 namespace App\Services;
 
-use App\Models\FinancialRecordModel;
-
 /**
  * LedgerService — SHA-256 hash-linked ledger integrity (Fix 4.6)
  *
@@ -181,8 +179,16 @@ class LedgerService
         $prevHash     = null;
         $prevSequence = 0;
         $chainBroken  = false;  // once true, all remaining entries are marked Tampered
+        $afterBreak   = [];     // ledger_ids after the first failure, marked in one update
 
-        $frModel = model(FinancialRecordModel::class);
+        // The records behind the entries, fetched 500 at a time instead of one
+        // query per entry (the ledger grows with every transaction).
+        $records = [];
+        foreach (array_chunk(array_unique(array_map('intval', array_column($entries, 'financial_record_id'))), 500) as $ids) {
+            foreach ($db->table('financial_records')->whereIn('financial_record_id', $ids)->get()->getResultArray() as $row) {
+                $records[(int) $row['financial_record_id']] = $row;
+            }
+        }
 
         foreach ($entries as $entry) {
             $checked++;
@@ -191,7 +197,7 @@ class LedgerService
 
             // Once the chain is broken, every subsequent entry is unreliable
             if ($chainBroken) {
-                $this->markTampered($db, $ledgerId);
+                $afterBreak[] = $ledgerId;
                 $tampered++;
                 continue;
             }
@@ -243,7 +249,7 @@ class LedgerService
 
             // --- Check 3: recompute transaction_hash from original record ----
             $financialRecordId = (int) $entry['financial_record_id'];
-            $record            = $frModel->find($financialRecordId);
+            $record            = $records[$financialRecordId] ?? null;
 
             if (empty($record)) {
                 // Record has been deleted — cannot recompute; treat as tampered
@@ -282,6 +288,10 @@ class LedgerService
             $valid++;
             $prevHash     = $entry['transaction_hash'];
             $prevSequence = $seq;
+        }
+
+        foreach (array_chunk($afterBreak, 500) as $ids) {
+            $db->table('blockchain_ledger')->whereIn('ledger_id', $ids)->update(['verification_status' => 'Tampered']);
         }
 
         return [

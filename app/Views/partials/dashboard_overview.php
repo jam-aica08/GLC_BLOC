@@ -196,7 +196,8 @@ $loanLink = fn($loan) => $isAdmin ? base_url('admin/loans/' . (int) $loan['loan_
 </div>
 
 <script>
-(function () {
+// Chart.js loads with defer, so draw once the page has been parsed.
+document.addEventListener('DOMContentLoaded', function () {
     const canvas = document.getElementById('dashContribChart');
     if (!canvas || typeof Chart === 'undefined') return;
     const peso = n => '₱' + Number(n).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -227,5 +228,5 @@ $loanLink = fn($loan) => $isAdmin ? base_url('admin/loans/' . (int) $loan['loan_
             },
         },
     });
-})();
+});
 </script>

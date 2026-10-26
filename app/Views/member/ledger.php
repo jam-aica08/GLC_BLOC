@@ -4,7 +4,7 @@
 <div class="mx-auto" style="max-width:1100px;">
 <div class="text-center mb-4">
     <div>
-        <h4 class="fw-bold mb-1"><i class="fas fa-link me-2 glc-icon"></i>My Ledger</h4>
+        <h1 class="h4 fw-bold mb-1"><i class="fas fa-link me-2 glc-icon"></i>My Ledger</h1>
         <p class="text-muted small mb-0">Your transactions recorded on the blockchain ledger.</p>
     </div>
 </div>

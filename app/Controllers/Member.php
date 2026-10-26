@@ -300,7 +300,7 @@ class Member extends BaseController
         }
 
         $accountId    = (int) $this->request->getPost('account_id');
-        $loanAmount   = (float) $this->request->getPost('loan_amount');
+        $loanAmount   = round((float) $this->request->getPost('loan_amount'), 2);   // pesos and centavos
         $termMonths   = (int) $this->request->getPost('loan_term_months');
 
         $allowedTerms = [3, 6, 12, 18, 24];
@@ -342,7 +342,7 @@ class Member extends BaseController
 
         if ($loanAmount > $maxLimit) {
             session()->setFlashdata('error',
-                "Requested amount (PHP {$loanAmount}) exceeds your maximum loan limit (PHP {$maxLimit}).");
+                'Requested amount (PHP ' . number_format($loanAmount, 2) . ') exceeds your maximum loan limit (PHP ' . number_format($maxLimit, 2) . ').');
             return redirect()->to('/member/loans');
         }
 

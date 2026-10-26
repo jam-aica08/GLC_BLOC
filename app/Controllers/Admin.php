@@ -618,7 +618,11 @@ class Admin extends BaseController
             return redirect()->to('/admin/loans');
         }
 
-        $releaseDate = $this->request->getPost('release_date') ?: $today;
+        // The form does not send a release date; a posted one must be a real date (it sets every due date).
+        $releaseDate = (string) $this->request->getPost('release_date');
+        if (! preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $releaseDate, $m) || ! checkdate((int) $m[2], (int) $m[3], (int) $m[1])) {
+            $releaseDate = $today;
+        }
 
         $db->transStart();
 
@@ -1393,7 +1397,7 @@ class Admin extends BaseController
     {
         $get    = fn($k) => trim((string) $this->request->getGet($k));
         $preset = $get('period') ?: 'year';
-        $date   = fn($v) => preg_match('/^\d{4}-\d{2}-\d{2}$/', $v) ? $v : null;
+        $date   = fn($v) => preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $v, $m) && checkdate((int) $m[2], (int) $m[3], (int) $m[1]) ? $v : null;
 
         [$from, $to] = match ($preset) {
             'month'  => [date('Y-m-01'), date('Y-m-d')],
@@ -1583,7 +1587,7 @@ class Admin extends BaseController
         fputcsv($out, ['Record ID', 'Date', 'Type', 'Status', 'Amount (PHP)', 'Member #', 'Member', 'Account #']);
         foreach ($rows as $r) {
             fputcsv($out, [$r['financial_record_id'], $r['transaction_date'], $r['record_type'], $r['approval_status'],
-                number_format((float) $r['amount'], 2, '.', ''), $r['member_number'], $r['member_name'], $r['account_number']]);
+                number_format((float) $r['amount'], 2, '.', ''), self::csvText($r['member_number']), self::csvText($r['member_name']), self::csvText($r['account_number'])]);
         }
         rewind($out);
         $csv = stream_get_contents($out);
@@ -1592,6 +1596,19 @@ class Admin extends BaseController
         \App\Libraries\AuditLog::record('Exported report', null, null, "Transactions {$f['from']} to {$f['to']}, " . count($rows) . ' row(s)');
 
         return $this->response->download("glc-bloc-report-{$f['from']}-to-{$f['to']}.csv", $csv)->setContentType('text/csv');
+    }
+
+    /**
+     * A typed or imported value for a CSV cell. Excel runs a cell that starts
+     * with = + - @ (or a tab / carriage return) as a formula, so a member
+     * named "=HYPERLINK(...)" would become a live link; a leading apostrophe
+     * keeps it as text.
+     */
+    public static function csvText(?string $value): string
+    {
+        $value = (string) $value;
+
+        return $value !== '' && strpbrk($value[0], "=+-@\t\r") !== false ? "'" . $value : $value;
     }
 
     /** GET: approved activity for a time range (JSON). */

@@ -5,7 +5,7 @@
 <!-- Page Header -->
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
-        <h4 class="mb-1 fw-bold">Analytics</h4>
+        <h1 class="h4 mb-1 fw-bold">Analytics</h1>
         <p class="text-muted mb-0 small">Recent cooperative activity, plus the 12-month equity trend and forecast.</p>
     </div>
     <span class="badge" style="background:var(--glc-gradient-dark);color:#fff;padding:8px 14px;border-radius:8px;font-size:0.8rem;">
@@ -17,7 +17,7 @@
 <?php if (session()->getFlashdata('error')): ?>
     <div class="alert alert-danger alert-dismissible fade show" role="alert">
         <i class="fa-solid fa-circle-exclamation me-2"></i><?= esc(session()->getFlashdata('error')) ?>
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
     </div>
 <?php endif; ?>
 
@@ -81,7 +81,8 @@
 </div>
 <style>.act-key{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:middle;}</style>
 <script>
-(function () {
+// Chart.js loads with defer: start once the page has been parsed.
+document.addEventListener('DOMContentLoaded', function () {
     const URL_ = '<?= base_url($activityUrl ?? 'admin/analytics/activity') ?>';
     const COLORS = { contributions: '#2a78d6', payments: '#eb6834', loans: '#1baf7a', dividends: '#eda100' };
     const NAMES  = { contributions: 'Contributions approved', payments: 'Loan payments approved', loans: 'Loans released', dividends: 'Dividends distributed' };
@@ -177,7 +178,7 @@
     document.getElementById('act_reload').addEventListener('click', restart);
     document.addEventListener('visibilitychange', () => { if (!document.hidden) restart(); });
     load();
-})();
+});
 </script>
 
 <!-- Chart Card -->

@@ -98,10 +98,13 @@ class DataImport extends BaseController
 
     private function download(string $name, array $data)
     {
-        $path = tempnam(sys_get_temp_dir(), 'glc') . '.xlsx';
+        // tempnam() creates an empty file; the workbook goes next to it with .xlsx. Remove both.
+        $temp = tempnam(sys_get_temp_dir(), 'glc');
+        $path = $temp . '.xlsx';
         ImportWorkbook::write($path, $data);
         $body = file_get_contents($path);
         @unlink($path);
+        @unlink($temp);
 
         return $this->response->download($name, $body)
             ->setContentType('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');

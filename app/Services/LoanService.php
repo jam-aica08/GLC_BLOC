@@ -47,10 +47,13 @@ class LoanService
 
         $installments     = [];
         $baseDateTs       = strtotime($releaseDate);
+        $releaseDay       = (int) date('j', $baseDateTs);
 
         for ($i = 1; $i <= $termMonths; $i++) {
-            $dueTs      = strtotime("+{$i} month", $baseDateTs);
-            $dueDate    = date('Y-m-d', $dueTs);
+            // Same day each month, or the month's last day when it is shorter.
+            // ("+1 month" from 31 May would give 1 July and skip June.)
+            $monthTs = strtotime("first day of +{$i} month", $baseDateTs);
+            $dueDate = date('Y-m-', $monthTs) . sprintf('%02d', min($releaseDay, (int) date('t', $monthTs)));
 
             // Principal: last installment absorbs rounding diff
             $principal = ($i === $termMonths)

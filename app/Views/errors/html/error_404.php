@@ -24,7 +24,7 @@
 </head>
 <body>
     <main class="card">
-        <img src="/assets/img/logo-sm.png" alt="GLC-BLOC">
+        <img src="/assets/img/logo-sm.webp" alt="GLC-BLOC">
         <p class="code">ERROR 404</p>
         <h1>Page not found</h1>
         <p>

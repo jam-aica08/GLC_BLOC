@@ -3,7 +3,7 @@
 
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
     <div>
-        <h4 class="fw-bold mb-1">Notifications</h4>
+        <h1 class="h4 fw-bold mb-1">Notifications</h1>
         <p class="text-muted small mb-0"><?= (int) $unread ?> unread</p>
     </div>
     <?php if ($unread): ?>

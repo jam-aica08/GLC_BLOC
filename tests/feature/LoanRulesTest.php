@@ -127,4 +127,33 @@ final class LoanRulesTest extends CIUnitTestCase
 
         $this->assertSame(0, $this->openLoans());
     }
+
+    public function testAmountIsKeptToTheCentavo(): void
+    {
+        $this->apply(100.456);
+
+        $loan = $this->db->table('loans')->where('account_id', $this->accountId)->get()->getRowArray();
+        $this->assertSame('100.46', $loan['loan_amount']);
+        $this->assertSame('2.01', $loan['interest_amount'], '2% of 100.46, not of 100.456');
+    }
+
+    public function testOverLimitMessageShowsPesoAmounts(): void
+    {
+        $this->apply(999999.5);
+
+        $this->assertStringContainsString('(PHP 999,999.50)', (string) session()->getFlashdata('error'));
+    }
+
+    public function testApprovalIgnoresAnInvalidReleaseDate(): void
+    {
+        $this->apply(100);
+        $loanId = (int) $this->db->table('loans')->where('account_id', $this->accountId)->get()->getRow('loan_id');
+
+        $admin = ['user_id' => 1, 'username' => 'admin', 'role' => 'Admin', 'logged_in' => true];
+        $this->withSession($admin)->post('admin/loans/approve/' . $loanId, ['release_date' => 'yesterday-ish'])->assertRedirectTo('/admin/loans');
+
+        $this->seeInDatabase('loans', ['loan_id' => $loanId, 'release_date' => date('Y-m-d')]);
+        $first = $this->db->table('loan_installments')->where(['loan_id' => $loanId, 'installment_number' => 1])->get()->getRowArray();
+        $this->assertSame(date('Y-m', strtotime('first day of next month')), substr($first['due_date'], 0, 7));
+    }
 }
