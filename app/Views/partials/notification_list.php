@@ -19,14 +19,18 @@ $icons = ['contribution' => 'fa-piggy-bank', 'payment' => 'fa-money-bill-wave', 
     </div>
 <?php else: ?>
     <ul class="list-group list-group-flush">
-        <?php foreach ($notifications as $n): $unread = ! (int) $n['is_read']; ?>
+        <?php foreach ($notifications as $n):
+            $unread    = ! (int) $n['is_read'];
+            $important = $unread && \App\Services\Notifier::isImportant($area, $n['event_key']);   // stays unread until dealt with
+        ?>
             <li class="list-group-item d-flex gap-3 align-items-start py-3 <?= $unread ? 'notif-unread' : '' ?>">
                 <i class="fa-solid <?= $icons[$n['type']] ?? 'fa-bell' ?> mt-1" aria-hidden="true"></i>
                 <div class="flex-grow-1" style="min-width:0;">
                     <div class="d-flex flex-wrap justify-content-between gap-2">
                         <span class="<?= $unread ? 'fw-bold' : 'fw-semibold' ?>">
                             <?= esc($n['title']) ?>
-                            <?php if ($unread): ?><span class="badge bg-warning text-dark ms-1">New</span><?php endif; ?>
+                            <?php if ($important): ?><span class="badge bg-danger ms-1">Action needed</span>
+                            <?php elseif ($unread): ?><span class="badge bg-warning text-dark ms-1">New</span><?php endif; ?>
                         </span>
                         <time class="small text-muted text-nowrap" datetime="<?= esc($n['created_at']) ?>"><?= esc(date('M j, Y g:i A', strtotime($n['created_at']))) ?></time>
                     </div>

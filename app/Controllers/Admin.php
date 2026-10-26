@@ -1233,6 +1233,20 @@ class Admin extends BaseController
         return redirect()->to($this->backTo());
     }
 
+    /**
+     * POST (from the bell): the administrator opened their notifications, so
+     * everything but items still to review counts as read. JSON: the unread
+     * count left for the badge and a fresh CSRF token for the page.
+     */
+    public function seenNotifications()
+    {
+        $this->requireAdmin();
+        $userId = (int) session()->get('user_id');
+        Notifier::adminMarkSeen($userId);
+
+        return $this->response->setJSON(['unread' => Notifier::adminUnreadCount($userId), 'csrf' => csrf_hash()]);
+    }
+
     /** GET: every notification of the signed-in administrator. */
     public function notifications(): string
     {
