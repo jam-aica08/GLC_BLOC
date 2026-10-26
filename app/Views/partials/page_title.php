@@ -21,7 +21,8 @@ $names    = [
     'import'            => 'Import data',
     'settings'          => 'Settings',
     'profile'           => 'My Profile',
+    'retention'         => 'Data Retention',
 ];
-$page = $names[$segments[1] ?? ''] ?? null;
+$page = $segments[0] === 'privacy' ? 'Privacy & Data Retention' : ($names[$segments[1] ?? ''] ?? null);
 ?>
     <title><?= esc(($page ? $page . ' · ' : '') . $suffix) ?></title>

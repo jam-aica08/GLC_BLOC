@@ -12,6 +12,10 @@ $routes->get('/login', 'Auth::index');
 $routes->post('/login', 'Auth::login');
 $routes->post('/logout', 'Auth::logout');   // FIX 4.2: POST-only logout
 
+// Data retention: public privacy notice, and the daily review (Vercel Cron, secret-protected)
+$routes->get('privacy', 'Retention::notice');
+$routes->get('cron/retention', 'Retention::cron');
+
 // Admin routes (protected by auth + admin filter)
 $routes->group('admin', ['filter' => 'auth:admin'], function ($routes) {
     $routes->get('dashboard', 'Admin::dashboard');
@@ -22,6 +26,8 @@ $routes->group('admin', ['filter' => 'auth:admin'], function ($routes) {
     $routes->post('members/deactivate/(:num)', 'Admin::deactivateMember/$1');
     $routes->post('members/reactivate/(:num)', 'Admin::reactivateMember/$1');
     $routes->post('members/(:num)/accounts/add', 'Admin::addAccount/$1');
+    $routes->post('members/accounts/(:num)/deactivate', 'Admin::deactivateAccount/$1');
+    $routes->post('members/accounts/(:num)/reactivate', 'Admin::reactivateAccount/$1');
     $routes->post('members/announce', 'Admin::announce');
     $routes->post('members/requests/(:num)/approve', 'Admin::approveAccountRequest/$1');
     $routes->post('members/requests/(:num)/reject', 'Admin::rejectAccountRequest/$1');
@@ -66,6 +72,13 @@ $routes->group('admin', ['filter' => 'auth:admin'], function ($routes) {
     // Audit logs (super admin only; read-only)
     $routes->get('audit-logs', 'Admin::auditLogs');
 
+    // Data retention review (super admin only)
+    $routes->get('retention', 'Retention::index');
+    $routes->post('retention/run', 'Retention::run');
+    $routes->post('retention/hold', 'Retention::hold');
+    $routes->post('retention/(:num)/remove-login', 'Retention::removeLoginData/$1');
+    $routes->post('retention/(:num)/anonymize', 'Retention::anonymize/$1');
+
     // Analytics
     $routes->get('analytics', 'Admin::analytics');
     $routes->get('analytics/data', 'Admin::analyticsData');
@@ -102,6 +115,8 @@ $routes->group('member', ['filter' => 'auth:member'], function ($routes) {
     $routes->get('ledger', 'Member::ledger');
     $routes->get('profile', 'Member::profile');
     $routes->post('profile/accounts/add', 'Member::openAccount');
+    $routes->post('profile/accounts/(:num)/deactivate', 'Member::requestAccountChange/$1/Deactivate');
+    $routes->post('profile/accounts/(:num)/reactivate', 'Member::requestAccountChange/$1/Reactivate');
     $routes->get('payments', 'Member::payments');
     $routes->get('notifications', 'Member::notifications');
     $routes->post('notifications/(:num)/read', 'Member::readNotification/$1');

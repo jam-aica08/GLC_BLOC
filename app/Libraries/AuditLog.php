@@ -7,6 +7,8 @@ use Throwable;
 /**
  * Append-only audit trail. Never stores passwords, tokens or form contents:
  * only who acted, what they did, on which record, when, and whether it worked.
+ * Rows change only under the data retention policy (RetentionService): old
+ * entries are deleted, and a removed member's username is replaced.
  */
 class AuditLog
 {
@@ -16,6 +18,14 @@ class AuditLog
         'admin/members/deactivate'           => ['Deactivated member', 'member'],
         'admin/members/reactivate'           => ['Reactivated member', 'member'],
         'admin/members/accounts/add'         => ['Opened account for member', 'member'],
+        'admin/members/accounts/deactivate'  => ['Deactivated account', 'cooperative_account'],
+        'admin/members/accounts/reactivate'  => ['Reactivated account', 'cooperative_account'],
+        'admin/retention/run'                => null,  // RetentionService records the run with its summary
+        'admin/retention/hold'               => ['Changed legal hold', 'member'],
+        'admin/retention/remove-login'       => ['Removed member sign-in data (retention)', 'member'],
+        'admin/retention/anonymize'          => ['Anonymized member (retention)', 'member'],
+        'member/profile/accounts/deactivate' => ['Requested account deactivation', 'cooperative_account'],
+        'member/profile/accounts/reactivate' => ['Requested account reactivation', 'cooperative_account'],
         'admin/members/requests/approve'     => ['Approved account request', 'account_request'],
         'admin/members/requests/reject'      => ['Rejected account request', 'account_request'],
         'admin/members/announce'             => ['Posted announcement', null],

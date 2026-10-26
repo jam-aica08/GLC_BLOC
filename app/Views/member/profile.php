@@ -90,52 +90,137 @@
                         <th class="py-3">Status</th>
                         <th class="py-3">Paid</th>
                         <th class="py-3">Balance Due</th>
+                        <th class="py-3 pe-4 text-end">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <?php foreach (($accounts ?? []) as $acc): $st = $acc['standing']; ?>
-                    <tr>
+                    <?php foreach (($accounts ?? []) as $acc):
+                        $st       = $acc['standing'];
+                        $id       = (int) $acc['account_id'];
+                        $closed   = in_array($acc['account_status'], ['Inactive', 'Closed'], true);
+                        $waiting  = $pendingChanges[$id] ?? null;
+                        $blocked  = $blockers[$id] ?? [];
+                    ?>
+                    <tr class="<?= $closed ? 'text-muted' : '' ?>">
                         <td class="px-4 py-3"><code><?= esc($acc['account_number']) ?></code></td>
                         <td class="py-3"><?= esc($acc['account_type']) ?></td>
                         <td class="py-3"><?= esc($acc['account_start_date']) ?></td>
                         <td class="py-3">
                             <?php if ($acc['account_status'] === 'Pending'): ?>
                                 <span class="badge bg-warning text-dark">Joining — ₱<?= number_format($st['join_balance'], 2) ?> left</span>
+                            <?php elseif ($acc['account_status'] === 'Inactive'): ?>
+                                <span class="badge bg-secondary">Deactivated</span>
+                                <?php if (! empty($acc['deactivated_at'])): ?><div class="small">since <?= esc(date('M j, Y', strtotime($acc['deactivated_at']))) ?></div><?php endif; ?>
                             <?php else: ?>
                                 <span class="badge <?= $acc['account_status'] === 'Active' ? 'bg-success' : 'bg-secondary' ?>"><?= esc($acc['account_status']) ?></span>
                             <?php endif; ?>
                         </td>
                         <td class="py-3">₱<?= number_format($st['paid'], 2) ?></td>
-                        <td class="py-3 <?= $st['due_balance'] > 0 ? 'text-danger fw-semibold' : 'text-success' ?>">₱<?= number_format($st['due_balance'], 2) ?></td>
+                        <?php if ($closed): ?>
+                            <td class="py-3">—</td>
+                        <?php else: ?>
+                            <td class="py-3 <?= $st['due_balance'] > 0 ? 'text-danger fw-semibold' : 'text-success' ?>">₱<?= number_format($st['due_balance'], 2) ?></td>
+                        <?php endif; ?>
+                        <td class="py-3 pe-4 text-end">
+                            <?php if ($waiting !== null): ?>
+                                <span class="small"><i class="fa-solid fa-hourglass-half me-1"></i><?= esc($waiting === 'Deactivate' ? 'Deactivation' : 'Reactivation') ?> requested</span>
+                            <?php elseif (empty($canRequestChanges)): ?>
+                                <span class="small text-muted">—</span>
+                            <?php elseif ($acc['account_status'] === 'Inactive'): ?>
+                                <form method="post" action="<?= base_url('member/profile/accounts/' . $id . '/reactivate') ?>"
+                                      onsubmit="return confirm('Ask an admin to reactivate account <?= esc($acc['account_number'], 'js') ?>?');">
+                                    <?= csrf_field() ?>
+                                    <button type="submit" class="btn btn-sm btn-outline-success"><i class="fa-solid fa-rotate-left me-1"></i>Request reactivation</button>
+                                </form>
+                            <?php elseif (! $closed && $blocked): ?>
+                                <span class="small text-muted" title="<?= esc('Cannot be deactivated yet: ' . implode('; ', $blocked) . '.') ?>">
+                                    <i class="fa-solid fa-circle-info me-1"></i>Cannot deactivate yet
+                                </span>
+                                <div class="small text-muted"><?= esc(ucfirst(implode('; ', $blocked))) ?>.</div>
+                            <?php elseif (! $closed): ?>
+                                <button type="button" class="btn btn-sm btn-outline-danger"
+                                        data-bs-toggle="modal" data-bs-target="#deactivateAccountModal"
+                                        data-account-id="<?= $id ?>" data-account-number="<?= esc($acc['account_number']) ?>">
+                                    <i class="fa-solid fa-ban me-1"></i>Request deactivation
+                                </button>
+                            <?php else: ?>
+                                <span class="small text-muted">—</span>
+                            <?php endif; ?>
+                        </td>
                     </tr>
                     <?php endforeach; ?>
-                    <?php foreach (($requests ?? []) as $req): ?>
+                    <?php foreach (($requests ?? []) as $req):
+                        $reqType = $req['request_type'] ?? 'Open';
+                        if ($reqType !== 'Open' && $req['status'] === 'Pending') continue;   // shown on the account's own row
+                    ?>
                     <tr class="text-muted">
-                        <td class="px-4 py-3">—</td>
+                        <td class="px-4 py-3"><?= $reqType === 'Open' ? '—' : '<code>' . esc($req['account_number'] ?? '') . '</code>' ?></td>
                         <td class="py-3"><?= esc($req['account_type']) ?></td>
                         <td class="py-3">Requested <?= esc(date('Y-m-d', strtotime($req['created_at']))) ?></td>
                         <td class="py-3">
                             <?php if ($req['status'] === 'Pending'): ?>
                                 <span class="badge bg-secondary">Waiting for approval</span>
                             <?php else: ?>
-                                <span class="badge bg-danger">Request rejected</span>
+                                <span class="badge bg-danger"><?= esc(match ($reqType) { 'Deactivate' => 'Deactivation request rejected', 'Reactivate' => 'Reactivation request rejected', default => 'Request rejected' }) ?></span>
                             <?php endif; ?>
                         </td>
                         <td class="py-3">—</td>
                         <td class="py-3">—</td>
+                        <td class="py-3 pe-4"></td>
                     </tr>
                     <?php endforeach; ?>
                 </tbody>
             </table>
         </div>
     </div>
-    <?php if (in_array('Pending', array_column($accounts ?? [], 'account_status'), true)): ?>
-        <div class="card-footer bg-white small text-muted">
+    <div class="card-footer bg-white small text-muted">
+        <?php if (in_array('Pending', array_column($accounts ?? [], 'account_status'), true)): ?>
             Accounts marked <em>Joining</em> activate once the amount shown is paid.
-            <a href="<?= base_url('member/contributions') ?>">Contribute</a>
-        </div>
-    <?php endif; ?>
+            <a href="<?= base_url('member/contributions') ?>">Contribute</a><br>
+        <?php endif; ?>
+        A deactivated account takes no new contributions or loans and is not counted for dividends; your other accounts are not affected and its records are kept.
+        <a href="<?= base_url('privacy') ?>">How long records are kept</a>
+    </div>
 </div>
+
+<!-- Request Deactivation Modal -->
+<div class="modal fade" id="deactivateAccountModal" tabindex="-1" aria-labelledby="deactivateAccountModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header modal-header-brand">
+                <h5 class="modal-title text-white" id="deactivateAccountModalLabel">
+                    <i class="fa-solid fa-ban me-2 glc-icon"></i>Request Deactivation
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="deactivateAccountForm" method="post" action="">
+                <?= csrf_field() ?>
+                <div class="modal-body p-4">
+                    <p class="mb-2">Ask an admin to deactivate account <strong id="deactivateAccountNumber"></strong>.</p>
+                    <ul class="small text-muted mb-3">
+                        <li>It will take no new contributions or loans and is not counted for dividends.</li>
+                        <li>Your other accounts and your sign-in are not affected.</li>
+                        <li>Its contributions and records are kept, and you can ask to reactivate it later.</li>
+                    </ul>
+                    <label for="deactivate_reason" class="form-label fw-semibold small">Reason (optional)</label>
+                    <textarea id="deactivate_reason" name="reason" class="form-control" rows="2" maxlength="255"></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger"><i class="fa-solid fa-paper-plane me-2"></i>Send Request</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<script>
+document.getElementById('deactivateAccountModal').addEventListener('show.bs.modal', function (e) {
+    const btn = e.relatedTarget;
+    document.getElementById('deactivateAccountForm').action =
+        <?= json_encode(rtrim(base_url('member/profile/accounts'), '/') . '/') ?> + encodeURIComponent(btn.dataset.accountId) + '/deactivate';
+    document.getElementById('deactivateAccountNumber').textContent = btn.dataset.accountNumber;
+});
+</script>
 
 <!-- Request Account Modal -->
 <div class="modal fade" id="openAccountModal" tabindex="-1" aria-labelledby="openAccountModalLabel" aria-hidden="true">

@@ -80,22 +80,37 @@
     <div class="table-responsive">
         <table class="table align-middle mb-0" style="font-size:0.875rem;">
             <thead class="table-light">
-                <tr><th class="px-4">Member</th><th>Account Type</th><th>Requested</th><th class="text-end pe-4">Actions</th></tr>
+                <tr><th class="px-4">Member</th><th>Request</th><th>Requested</th><th class="text-end pe-4">Actions</th></tr>
             </thead>
             <tbody>
-                <?php foreach ($accountRequests as $req): ?>
+                <?php foreach ($accountRequests as $req):
+                    $reqType = $req['request_type'] ?? 'Open';
+                    $confirm = match ($reqType) {
+                        'Deactivate' => 'Deactivate account ' . $req['account_number'] . ' of ' . $req['member_name'] . '?',
+                        'Reactivate' => 'Reactivate account ' . $req['account_number'] . ' of ' . $req['member_name'] . '?',
+                        default      => 'Open a ' . $req['account_type'] . ' account for ' . $req['member_name'] . '?',
+                    };
+                ?>
                     <tr>
                         <td class="px-4">
                             <div class="fw-semibold"><?= esc($req['member_name']) ?></div>
                             <small class="text-muted"><?= esc($req['member_number']) ?></small>
                         </td>
-                        <td><?= esc($req['account_type']) ?></td>
+                        <td>
+                            <?php if ($reqType === 'Open'): ?>
+                                Open a new <?= esc($req['account_type']) ?> account
+                            <?php else: ?>
+                                <span class="badge <?= $reqType === 'Deactivate' ? 'bg-danger' : 'bg-success' ?>"><?= esc($reqType) ?></span>
+                                account <code><?= esc($req['account_number'] ?? '') ?></code> (<?= esc($req['account_type']) ?>)
+                                <?php if (! empty($req['reason'])): ?><div class="small text-muted">Reason: <?= esc($req['reason']) ?></div><?php endif; ?>
+                            <?php endif; ?>
+                        </td>
                         <td class="text-muted"><?= esc(date('M j, Y g:i A', strtotime($req['created_at']))) ?></td>
                         <td class="text-end pe-4">
                             <div class="d-inline-flex gap-1">
                                 <form method="post" action="<?= base_url('admin/members/requests/' . (int) $req['request_id'] . '/approve') ?>">
                                     <?= csrf_field() ?>
-                                    <button type="submit" class="btn btn-sm btn-success" onclick="return confirm('Open a <?= esc($req['account_type'], 'js') ?> account for <?= esc($req['member_name'], 'js') ?>?')">
+                                    <button type="submit" class="btn btn-sm btn-success" onclick="return confirm('<?= esc($confirm, 'js') ?>')">
                                         <i class="fa-solid fa-check me-1"></i>Approve
                                     </button>
                                 </form>
@@ -112,7 +127,8 @@
             </tbody>
         </table>
     </div>
-    <div class="card-footer bg-white small text-muted">Approving opens the account. It becomes active once January to the month of approval is paid.</div>
+    <div class="card-footer bg-white small text-muted">Approving a new account opens it; it becomes active once January to the month of approval is paid.
+        Approving a deactivation is refused while the account has an open loan or payments waiting for approval.</div>
 </div>
 <?php endif; ?>
 
@@ -166,25 +182,37 @@
                             <td class="py-3">
                                 <?php
                                     $accRows = array_map(fn($a) => [
+                                        'id'     => (int) $a['account_id'],
                                         'number' => $a['account_number'],
                                         'type'   => $a['account_type'],
                                         'opened' => $a['account_start_date'],
-                                        'status' => $a['account_status'] === 'Pending'
-                                            ? 'Pending — ₱' . number_format($a['standing']['join_balance'], 2) . ' to activate'
-                                            : $a['account_status'],
-                                        'paid'   => '₱' . number_format($a['standing']['paid'], 2),
-                                        'due'    => '₱' . number_format($a['standing']['due_balance'], 2),
+                                        'state'  => $a['account_status'],
+                                        'status' => match ($a['account_status']) {
+                                            'Pending'  => 'Pending — ₱' . number_format($a['standing']['join_balance'], 2) . ' to activate',
+                                            'Inactive' => 'Deactivated' . (! empty($a['deactivated_at']) ? ' ' . date('M j, Y', strtotime($a['deactivated_at'])) : '')
+                                                . (! empty($a['deactivation_reason']) ? ' — ' . $a['deactivation_reason'] : ''),
+                                            default    => $a['account_status'],
+                                        },
+                                        'paid'     => '₱' . number_format($a['standing']['paid'], 2),
+                                        // A deactivated account owes no monthly contribution.
+                                        'due'      => in_array($a['account_status'], ['Inactive', 'Closed'], true) ? '—' : '₱' . number_format($a['standing']['due_balance'], 2),
+                                        'blockers' => $a['blockers'],
                                     ], $member['accounts']);
-                                    $pendingAcc = count(array_filter($member['accounts'], fn($a) => $a['account_status'] === 'Pending'));
+                                    $pendingAcc  = count(array_filter($member['accounts'], fn($a) => $a['account_status'] === 'Pending'));
+                                    $inactiveAcc = count(array_filter($member['accounts'], fn($a) => $a['account_status'] === 'Inactive'));
                                 ?>
                                 <button type="button" class="btn btn-sm btn-outline-secondary"
                                         data-bs-toggle="modal" data-bs-target="#viewAccountsModal"
                                         data-member-name="<?= esc(($member['first_name'] ?? '') . ' ' . ($member['last_name'] ?? '')) ?>"
+                                        data-member-active="<?= ($member['status'] ?? 'Active') === 'Active' ? '1' : '0' ?>"
                                         data-accounts="<?= esc(json_encode($accRows)) ?>">
                                     <i class="fa-solid fa-wallet me-1"></i>View Accounts (<?= count($member['accounts']) ?>)
                                 </button>
                                 <?php if ($pendingAcc): ?>
                                     <span class="badge bg-warning text-dark ms-1"><?= $pendingAcc ?> pending</span>
+                                <?php endif; ?>
+                                <?php if ($inactiveAcc): ?>
+                                    <span class="badge bg-secondary ms-1"><?= $inactiveAcc ?> deactivated</span>
                                 <?php endif; ?>
                             </td>
                             <td class="py-3 text-center">
@@ -354,11 +382,15 @@
                                 <th class="py-3">Status</th>
                                 <th class="py-3">Paid</th>
                                 <th class="py-3">Balance Due</th>
+                                <th class="py-3 pe-4 text-end">Actions</th>
                             </tr>
                         </thead>
                         <tbody id="viewAccountsBody"></tbody>
                     </table>
                 </div>
+                <p class="small text-muted px-4 py-3 mb-0 border-top">Deactivating an account stops new contributions and loans and leaves it out of dividends.
+                    The member's other accounts and sign-in are not affected, and the account's records are kept.
+                    It cannot be deactivated while it has an open loan or payments waiting for approval.</p>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
@@ -368,26 +400,91 @@
 </div>
 
 <script>
-document.getElementById('viewAccountsModal').addEventListener('show.bs.modal', function (e) {
-    const btn = e.relatedTarget;
-    document.getElementById('viewAccountsName').textContent = btn.dataset.memberName;
-    const body = document.getElementById('viewAccountsBody');
-    body.replaceChildren();
-    const rows = JSON.parse(btn.dataset.accounts || '[]');
-    if (!rows.length) {
-        const tr = body.insertRow(), td = tr.insertCell();
-        td.colSpan = 6; td.className = 'text-center text-muted py-4'; td.textContent = 'No accounts yet.';
-        return;
+(function () {
+    const canChange = <?= json_encode((bool) ($canDeactivateAccounts ?? false)) ?>;
+    const accountsUrl = <?= json_encode(rtrim(base_url('admin/members/accounts'), '/') . '/') ?>;
+    const csrfName = <?= json_encode(csrf_token()) ?>, csrfHash = <?= json_encode(csrf_hash()) ?>;
+
+    // A POST form for one account: deactivate (with an optional reason) or reactivate.
+    function accountForm(r, action) {
+        const form = document.createElement('form');
+        form.method = 'post';
+        form.action = accountsUrl + encodeURIComponent(r.id) + '/' + action;
+        form.className = 'd-inline-flex gap-1 justify-content-end';
+        const token = document.createElement('input');
+        token.type = 'hidden'; token.name = csrfName; token.value = csrfHash;
+        form.appendChild(token);
+        const btn = document.createElement('button');
+        btn.type = 'submit';
+        if (action === 'deactivate') {
+            const reason = document.createElement('input');
+            reason.type = 'text'; reason.name = 'reason'; reason.maxLength = 255;
+            reason.className = 'form-control form-control-sm'; reason.style.width = '9rem';
+            reason.placeholder = 'Reason (optional)';
+            reason.setAttribute('aria-label', 'Reason for deactivating ' + r.number);
+            form.appendChild(reason);
+            btn.className = 'btn btn-sm btn-outline-danger text-nowrap';
+            btn.innerHTML = '<i class="fa-solid fa-ban me-1"></i>Deactivate';
+            form.addEventListener('submit', function (ev) {
+                if (!confirm('Deactivate account ' + r.number + '? It will take no new contributions or loans and is left out of dividends. Its records are kept.')) ev.preventDefault();
+            });
+        } else {
+            btn.className = 'btn btn-sm btn-outline-success text-nowrap';
+            btn.innerHTML = '<i class="fa-solid fa-rotate-left me-1"></i>Reactivate';
+            form.addEventListener('submit', function (ev) {
+                if (!confirm('Reactivate account ' + r.number + '?')) ev.preventDefault();
+            });
+        }
+        form.appendChild(btn);
+        return form;
     }
-    rows.forEach(function (r) {
-        const tr = body.insertRow();
-        [r.number, r.type, r.opened, r.status, r.paid, r.due].forEach(function (v, i) {
-            const td = tr.insertCell();
-            td.className = i === 0 ? 'px-4 py-3' : 'py-3';
-            td.textContent = v;
+
+    document.getElementById('viewAccountsModal').addEventListener('show.bs.modal', function (e) {
+        const btn = e.relatedTarget;
+        const memberActive = btn.dataset.memberActive === '1';
+        document.getElementById('viewAccountsName').textContent = btn.dataset.memberName;
+        const body = document.getElementById('viewAccountsBody');
+        body.replaceChildren();
+        const rows = JSON.parse(btn.dataset.accounts || '[]');
+        if (!rows.length) {
+            const tr = body.insertRow(), td = tr.insertCell();
+            td.colSpan = 7; td.className = 'text-center text-muted py-4'; td.textContent = 'No accounts yet.';
+            return;
+        }
+        rows.forEach(function (r) {
+            const tr = body.insertRow();
+            if (r.state === 'Inactive') tr.className = 'text-muted';
+            [r.number, r.type, r.opened, r.status, r.paid, r.due].forEach(function (v, i) {
+                const td = tr.insertCell();
+                td.className = i === 0 ? 'px-4 py-3' : 'py-3';
+                td.textContent = v;
+            });
+            const actions = tr.insertCell();
+            actions.className = 'py-3 pe-4 text-end';
+            if (!canChange) {
+                actions.textContent = '—';
+            } else if (r.state === 'Active' || r.state === 'Pending') {
+                if (r.blockers.length) {
+                    const note = document.createElement('span');
+                    note.className = 'small text-muted';
+                    note.textContent = 'Cannot deactivate yet: ' + r.blockers.join('; ') + '.';
+                    actions.appendChild(note);
+                } else {
+                    actions.appendChild(accountForm(r, 'deactivate'));
+                }
+            } else if (r.state === 'Inactive') {
+                if (memberActive) {
+                    actions.appendChild(accountForm(r, 'reactivate'));
+                } else {
+                    actions.className += ' small text-muted';
+                    actions.textContent = 'Reactivate the member first.';
+                }
+            } else {
+                actions.textContent = '—';
+            }
         });
     });
-});
+})();
 document.getElementById('addAccountModal').addEventListener('show.bs.modal', function (e) {
     const btn = e.relatedTarget;
     document.getElementById('addAccountForm').action =

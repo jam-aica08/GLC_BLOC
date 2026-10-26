@@ -29,6 +29,10 @@ $glcNav = [
         ['member/ledger', 'fa-link', 'Blockchain Ledger'],
         ['member/analytics', 'fa-chart-line', 'Analytics'],
     ],
+    'Account' => [
+        ['member/profile', 'fa-wallet', 'My Accounts'],
+        ['privacy', 'fa-user-shield', 'Privacy & My Data'],
+    ],
 ];
 ?>
 <!-- Sidebar -->

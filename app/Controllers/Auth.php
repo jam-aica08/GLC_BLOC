@@ -148,6 +148,8 @@ class Auth extends BaseController
             'password_mark'  => AccountAccess::passwordMark($user['password_hash']),   // a password change ends other sign-ins
         ]);
         AuditLog::record('Logged in', 'user', $user['user_id']);
+        \App\Services\RetentionService::touch((int) $user['user_id']);   // inactivity is counted from here
+        $session->set('activity_day', date('Y-m-d'));
 
         // Redirect to role dashboard
         if (strtolower($roleName) === 'admin') {
