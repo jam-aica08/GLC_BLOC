@@ -736,6 +736,19 @@ class Member extends BaseController
         return redirect()->to($this->backTo());
     }
 
+    /**
+     * POST (from the bell): the member opened their notifications, so
+     * everything but important ones counts as read. JSON: the unread count
+     * left for the badge and a fresh CSRF token for the page.
+     */
+    public function seenNotifications()
+    {
+        $memberId = $this->requireMember();
+        \App\Services\Notifier::markSeen($memberId);
+
+        return $this->response->setJSON(['unread' => \App\Services\Notifier::unreadCount($memberId), 'csrf' => csrf_hash()]);
+    }
+
     /** GET: every notification of the signed-in member. */
     public function notifications(): string
     {

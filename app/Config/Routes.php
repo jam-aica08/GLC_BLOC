@@ -61,6 +61,7 @@ $routes->group('admin', ['filter' => 'auth:admin'], function ($routes) {
     $routes->get('notifications', 'Admin::notifications');
     $routes->post('notifications/(:num)/read', 'Admin::readNotification/$1');
     $routes->post('notifications/read-all', 'Admin::readAllNotifications');
+    $routes->post('notifications/seen', 'Admin::seenNotifications');   // the bell was opened
 
     // Audit logs (super admin only; read-only)
     $routes->get('audit-logs', 'Admin::auditLogs');
@@ -105,6 +106,7 @@ $routes->group('member', ['filter' => 'auth:member'], function ($routes) {
     $routes->get('notifications', 'Member::notifications');
     $routes->post('notifications/(:num)/read', 'Member::readNotification/$1');
     $routes->post('notifications/read-all', 'Member::readAllNotifications');
+    $routes->post('notifications/seen', 'Member::seenNotifications');
     $routes->get('analytics', 'Member::analytics');
     $routes->get('analytics/data', 'Member::analyticsData');
     $routes->get('analytics/activity', 'Member::analyticsActivity');

@@ -16,6 +16,30 @@ class Notifier
     private const MEMBER = ['notifications', 'member_id'];
     private const ADMIN  = ['admin_notifications', 'user_id'];
 
+    /**
+     * Event keys that stay unread when the bell is opened: something the
+     * person still has to act on, or a refusal they should not miss. The rest
+     * (confirmations, approvals, dividends, announcements) count as seen once
+     * the list has been opened. Review items clear themselves when handled
+     * (resolveForAdmins), activation reminders when the account activates.
+     */
+    private const IMPORTANT = [
+        'notifications'       => ['activate-', 'contribution-rejected-', 'payment-rejected-', 'loan-rejected-'],
+        'admin_notifications' => ['review-', 'ledger-tampered-'],
+    ];
+
+    /** Whether a notification keeps its unread badge until it is dealt with. */
+    public static function isImportant(string $area, ?string $eventKey): bool
+    {
+        foreach (self::IMPORTANT[$area === 'admin' ? self::ADMIN[0] : self::MEMBER[0]] as $prefix) {
+            if (str_starts_with((string) $eventKey, $prefix)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public static function available(string $table = 'notifications'): bool
     {
         try {
@@ -175,6 +199,18 @@ class Notifier
         return self::read(self::MEMBER, $memberId, $notificationId);
     }
 
+    /** The member opened the bell: mark everything except important notifications read. */
+    public static function markSeen(int $memberId): int
+    {
+        return self::seen(self::MEMBER, $memberId);
+    }
+
+    /** The administrator opened the bell: mark everything except important notifications read. */
+    public static function adminMarkSeen(int $userId): int
+    {
+        return self::seen(self::ADMIN, $userId);
+    }
+
     public static function adminUnreadCount(int $userId): int
     {
         return self::countUnread(self::ADMIN, $userId);
@@ -208,6 +244,24 @@ class Notifier
             ? db_connect()->table($table)->where($owner, $ownerId)
                 ->orderBy('created_at', 'DESC')->orderBy('notification_id', 'DESC')->limit($limit)->get()->getResultArray()
             : [];
+    }
+
+    private static function seen(array $box, int $ownerId): int
+    {
+        [$table, $owner] = $box;
+        if (! self::available($table)) {
+            return 0;
+        }
+        $q = db_connect()->table($table)->where($owner, $ownerId)->where('is_read', 0)
+            ->groupStart()->where('event_key', null);
+        $q->orGroupStart();
+        foreach (self::IMPORTANT[$table] as $prefix) {
+            $q->notLike('event_key', $prefix, 'after');
+        }
+        $q->groupEnd()->groupEnd()
+          ->update(['is_read' => 1, 'read_at' => date('Y-m-d H:i:s')]);
+
+        return db_connect()->affectedRows();
     }
 
     private static function read(array $box, int $ownerId, ?int $notificationId): int

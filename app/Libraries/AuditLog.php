@@ -44,6 +44,8 @@ class AuditLog
         'member/notifications/read-all'      => null,
         'admin/notifications/read'           => null,
         'admin/notifications/read-all'       => null,
+        'admin/notifications/seen'           => null,  // opening the bell
+        'member/notifications/seen'          => null,
     ];
 
     public static function available(): bool

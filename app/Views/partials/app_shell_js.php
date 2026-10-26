@@ -27,6 +27,37 @@
         if (mq.matches) setOpen(false);
     });
 
+    // Opening the bell marks everything read except important notifications
+    // (things still to act on, refusals); the badge then counts only those.
+    document.querySelectorAll('.notif-toggle[data-seen-url]').forEach(function (bell) {
+        var sent = false;
+        bell.addEventListener('shown.bs.dropdown', function () {
+            var menu = bell.parentElement;
+            if (sent || !menu.querySelector('.notif-count')) return;
+            sent = true;
+            var body = new FormData();
+            var token = document.querySelector('input[name="<?= csrf_token() ?>"]');
+            if (token) body.append(token.name, token.value);
+            fetch(bell.getAttribute('data-seen-url'), {
+                method: 'POST', body: body, headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+            })
+                .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+                .then(function (data) {
+                    // The token changes after each POST; keep the page's forms working.
+                    if (data.csrf) document.querySelectorAll('input[name="<?= csrf_token() ?>"]').forEach(function (i) { i.value = data.csrf; });
+                    menu.querySelectorAll('.notif-count').forEach(function (badge) {
+                        if (data.unread > 0) badge.textContent = data.unread; else badge.remove();
+                    });
+                    if (data.unread < 1) {
+                        var readAll = menu.querySelector('form[action$="/read-all"]');
+                        if (readAll) readAll.hidden = true;
+                    }
+                    bell.setAttribute('aria-label', 'Notifications' + (data.unread > 0 ? ', ' + data.unread + ' unread' : ''));
+                })
+                .catch(function () { sent = false; });   // try again next time it opens
+        });
+    });
+
     // Label every cell with its column name so wide tables can stack into
     // cards on phones (see .table-stack in glc.css). Opt out with data-no-stack.
     // Pages that swap content in call window.glcStackTables(container) again.
