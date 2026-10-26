@@ -68,6 +68,56 @@ final class AnalyticsTest extends CIUnitTestCase
         $this->assertSame(['Nov 2026', 'Dec 2026', 'Jan 2027'], $payload['forecastLabels']);
     }
 
+    private function addRecord(string $type, float $amount, string $date, string $status = 'Approved'): void
+    {
+        $accountId = (int) $this->db->table('cooperative_accounts')->get()->getRowArray()['account_id'];
+        $this->db->table('financial_records')->insert([
+            'account_id' => $accountId, 'record_type' => $type, 'transaction_date' => $date,
+            'amount' => $amount, 'approval_status' => $status,
+        ]);
+    }
+
+    public function testEquityLineIsTheRunningTotalOfContributionsAndDividends(): void
+    {
+        // The seeder adds an approved PHP 300 contribution on 2026-01-05.
+        $this->addRecord('Contribution', 1000, '2025-06-10');               // before the 12 months
+        $this->addRecord('Contribution', 500, '2026-02-10');
+        $this->addRecord('Contribution', 200, '2026-05-20', 'Pending');     // not counted
+        $this->addRecord('Loan Payment', 70, '2026-03-01');                 // not equity
+        $this->addRecord('Dividend', 50, '2026-08-01');
+
+        $payload = (new AnalyticsService())->chartPayload(12, 3, strtotime('2026-10-15'));
+
+        $this->assertSame(
+            [1000.0, 1000.0, 1300.0, 1800.0, 1800.0, 1800.0, 1800.0, 1800.0, 1800.0, 1850.0, 1850.0, 1850.0],
+            $payload['actual']
+        );
+        $this->assertSame($payload['stats']['current_equity'], end($payload['actual']), 'Last point matches the Current Equity tile.');
+    }
+
+    public function testSeededSnapshotNoLongerZeroesItsMonth(): void
+    {
+        // GlcBlocSeeder stores a January 2026 snapshot without an equity figure.
+        $this->seeInDatabase('analytics_snapshots', ['snapshot_date' => '2026-01-31']);
+
+        $payload = (new AnalyticsService())->chartPayload(12, 3, strtotime('2026-10-15'));
+
+        $this->assertSame(300.0, $payload['actual'][array_search('Jan 2026', $payload['labels'], true)]);
+    }
+
+    public function testForecastFollowsGrowingEquity(): void
+    {
+        foreach (['2025-12-10', '2026-02-10', '2026-04-10', '2026-06-10', '2026-08-10', '2026-10-10'] as $date) {
+            $this->addRecord('Contribution', 600, $date);
+        }
+
+        $payload = (new AnalyticsService())->chartPayload(12, 3, strtotime('2026-10-15'));
+
+        $this->assertGreaterThan(end($payload['actual']), $payload['forecast'][0]);
+        $this->assertGreaterThan($payload['forecast'][0], $payload['forecast'][1]);
+        $this->assertGreaterThan($payload['forecast'][1], $payload['forecast'][2]);
+    }
+
     public function testOutOfRangeMonthsAreClamped(): void
     {
         $service = new AnalyticsService();
