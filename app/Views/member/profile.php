@@ -178,6 +178,9 @@
             Accounts marked <em>Joining</em> activate once the amount shown is paid.
             <a href="<?= base_url('member/contributions') ?>">Contribute</a><br>
         <?php endif; ?>
+        <?php if (empty($canRequestChanges) && ($member['membership_status'] ?? '') === 'Active'): ?>
+            <span class="text-warning-emphasis"><i class="fa-solid fa-circle-info me-1"></i>Requests to deactivate or reactivate an account are not available yet. Please try again later or contact the cooperative office.</span><br>
+        <?php endif; ?>
         A deactivated account takes no new contributions or loans and is not counted for dividends; your other accounts are not affected and its records are kept.
         <a href="<?= base_url('privacy') ?>">How long records are kept</a>
     </div>

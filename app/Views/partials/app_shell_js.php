@@ -27,6 +27,29 @@
         if (mq.matches) setOpen(false);
     });
 
+    // A table wider than the screen scrolls sideways in its .table-responsive box;
+    // that box must be reachable by keyboard (Tab, then arrow keys) and named for
+    // screen readers (WCAG 2.1.1). Only boxes that actually scroll get a tab stop.
+    function scrollableTables() {
+        document.querySelectorAll('.table-responsive').forEach(function (box) {
+            var scrolls = box.scrollWidth > box.clientWidth + 1;
+            if (scrolls && !box.hasAttribute('tabindex')) {
+                var card = box.closest('.card, .modal-content');
+                var heading = card && card.querySelector('.card-header, .modal-title, h1, h2, h3');
+                box.setAttribute('tabindex', '0');
+                box.setAttribute('role', 'region');
+                box.setAttribute('aria-label', (heading ? heading.textContent.trim().replace(/\s+/g, ' ') : 'Table') + ' (scrolls sideways)');
+                box.dataset.glcScroll = '1';
+            } else if (!scrolls && box.dataset.glcScroll) {
+                box.removeAttribute('tabindex'); box.removeAttribute('role'); box.removeAttribute('aria-label');
+                delete box.dataset.glcScroll;
+            }
+        });
+    }
+    scrollableTables();
+    window.addEventListener('resize', function () { clearTimeout(scrollableTables.t); scrollableTables.t = setTimeout(scrollableTables, 150); });
+    document.addEventListener('shown.bs.modal', scrollableTables);
+
     // A background request answered "signed out" (401 from AuthFilter: idle
     // limit, password changed, account deactivated) goes to the login page
     // instead of leaving the page showing old figures and retrying.
