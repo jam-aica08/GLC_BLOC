@@ -2,7 +2,7 @@
 <?= $this->section('content') ?>
 
 <div class="mb-4">
-    <h4 class="fw-bold mb-1"><i class="fas fa-user-circle me-2 glc-icon"></i>My Profile</h4>
+    <h1 class="h4 fw-bold mb-1"><i class="fas fa-user-circle me-2 glc-icon"></i>My Profile</h1>
 </div>
 
 <?= view('partials/flash') ?>
@@ -145,7 +145,7 @@
                 <h5 class="modal-title text-white" id="openAccountModalLabel">
                     <i class="fa-solid fa-wallet me-2 glc-icon"></i>Request New Account
                 </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form method="post" action="<?= base_url('member/profile/accounts/add') ?>">
                 <?= csrf_field() ?>

@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>GLC-BLOC Member Portal</title>
+    <?= view('partials/page_title', ['suffix' => 'GLC-BLOC Member Portal']) ?>
     <?= view('partials/app_head') ?>
     <?php if (preg_match('#/(dashboard|analytics)$#', '/' . uri_string())): ?>
-    <!-- Chart.js CDN (only the pages with charts need it) -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <!-- Chart.js (only the pages with charts need it); deferred so it does not hold up the first paint -->
+    <script src="<?= base_url('assets/lib/chart.js-4.4.1/chart.umd.js') ?>" defer></script>
     <?php endif; ?>
 </head>
 <body>
@@ -34,7 +34,7 @@ $glcNav = [
 <aside id="sidebar" aria-label="Main navigation">
     <div class="d-flex align-items-center">
         <a class="sidebar-brand" href="<?= base_url('member/dashboard') ?>">
-            <img src="<?= base_url('assets/img/logo-sm.png') ?>" alt="" width="64" height="25">
+            <img src="<?= base_url('assets/img/logo-sm.webp') ?>" alt="" width="64" height="25">
             <span>
                 <span class="brand-name d-block">GLC-BLOC</span>
                 <span class="brand-sub">Member Portal</span>
@@ -61,7 +61,7 @@ $glcNav = [
             <button type="button" class="icon-btn d-lg-none" id="sidebar-toggle" aria-controls="sidebar" aria-expanded="false" aria-label="Open menu">
                 <i class="fa-solid fa-bars fa-lg"></i>
             </button>
-            <img src="<?= base_url('assets/img/logo-sm.png') ?>" alt="GLC-BLOC" class="topbar-logo d-lg-none" width="72" height="28">
+            <img src="<?= base_url('assets/img/logo-sm.webp') ?>" alt="GLC-BLOC" class="topbar-logo d-lg-none" width="72" height="28">
             <div class="navbar-title">Guyo &amp; Liding Cooperative</div>
         </div>
         <div class="user-info">
@@ -125,8 +125,8 @@ $glcNav = [
     </main>
 </div>
 
-<!-- Bootstrap 5 JS Bundle -->
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<!-- Bootstrap 5 JS bundle -->
+<script src="<?= base_url('assets/lib/bootstrap-5.3.2/bootstrap.bundle.min.js') ?>"></script>
 <?= view('partials/table_search') ?>
 <?= view('partials/app_shell_js') ?>
 

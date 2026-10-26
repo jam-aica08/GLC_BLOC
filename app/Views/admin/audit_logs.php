@@ -3,7 +3,7 @@
 
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
-        <h4 class="mb-1 fw-bold">Audit Logs</h4>
+        <h1 class="h4 mb-1 fw-bold">Audit Logs</h1>
         <p class="text-muted mb-0 small">Who did what and when. Visible to the super administrator only; entries cannot be edited or deleted.</p>
     </div>
 </div>

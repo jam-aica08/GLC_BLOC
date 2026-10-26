@@ -2,20 +2,20 @@
 <?= $this->section('content') ?>
 
 <div class="mb-4">
-    <h4 class="fw-bold mb-1"><i class="fa-solid fa-gear me-2 glc-icon"></i>Settings</h4>
+    <h1 class="h4 fw-bold mb-1"><i class="fa-solid fa-gear me-2 glc-icon"></i>Settings</h1>
     <p class="text-muted small mb-0">Signed in as <strong><?= esc($user['username'] ?? '') ?></strong> (<?= esc($user['email'] ?? '') ?>)</p>
 </div>
 
 <?php if (session()->getFlashdata('success')): ?>
     <div class="alert alert-success alert-dismissible fade show" role="alert">
         <i class="fa-solid fa-circle-check me-2"></i><?= esc(session()->getFlashdata('success')) ?>
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
     </div>
 <?php endif; ?>
 <?php if (session()->getFlashdata('error')): ?>
     <div class="alert alert-danger alert-dismissible fade show" role="alert">
         <i class="fa-solid fa-circle-exclamation me-2"></i><?= esc(session()->getFlashdata('error')) ?>
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
     </div>
 <?php endif; ?>
 

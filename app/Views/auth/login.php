@@ -60,6 +60,7 @@
         .login-panel .form-control { padding: 11px 14px; font-size: .95rem; }
         .password-toggle { border: 1px solid var(--bs-border-color); border-left: 0; background: #fff; color: var(--glc-muted); }
         .password-toggle:hover, .password-toggle:focus-visible { color: var(--glc-indigo); background: #fff; }
+        .password-toggle:focus-visible { outline: 2px solid var(--glc-indigo); outline-offset: -2px; z-index: 5; }
         .btn-login { width: 100%; padding: 12px; font-weight: 700; font-size: 1rem; border-radius: 12px; margin-top: 4px; }
         .login-foot { text-align: center; margin-top: 18px; color: var(--glc-muted); font-size: .75rem; }
     </style>
@@ -70,7 +71,7 @@
     <!-- Brand panel -->
     <section class="login-brand" aria-hidden="true">
         <div>
-            <span class="brand-tile"><img src="<?= base_url('assets/img/logo-sm.png') ?>" alt=""></span>
+            <span class="brand-tile"><img src="<?= base_url('assets/img/logo-sm.webp') ?>" alt="" width="190" height="73"></span>
             <h1>Guyo &amp; Liding<br>Cooperative</h1>
             <p class="lead">Contributions, loans and dividends for every member, recorded on a tamper-evident ledger.</p>
             <ul class="brand-points">
@@ -86,7 +87,7 @@
     <main class="login-main">
         <div class="login-card">
             <div class="login-mobile-logo">
-                <img src="<?= base_url('assets/img/logo-sm.png') ?>" alt="GLC-BLOC" width="132" height="51">
+                <img src="<?= base_url('assets/img/logo-sm.webp') ?>" alt="GLC-BLOC" width="132" height="51">
             </div>
 
             <div class="login-panel">

@@ -23,7 +23,7 @@
 </head>
 <body>
     <main class="card">
-        <img src="/assets/img/logo-sm.png" alt="GLC-BLOC">
+        <img src="/assets/img/logo-sm.webp" alt="GLC-BLOC">
         <h1>Something went wrong</h1>
         <p>The system could not finish your request. Please try again in a few minutes; if it keeps happening, contact the cooperative office.</p>
         <a href="/">Back to sign in</a>

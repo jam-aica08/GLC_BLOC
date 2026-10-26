@@ -2,7 +2,7 @@
 <?= $this->section('content') ?>
 
 <div class="mb-4">
-    <h4 class="fw-bold mb-1"><i class="fa-solid fa-money-check-dollar me-2 glc-icon"></i>My Payments</h4>
+    <h1 class="h4 fw-bold mb-1"><i class="fa-solid fa-money-check-dollar me-2 glc-icon"></i>My Payments</h1>
     <p class="text-muted small mb-0">Loan payments you submitted and their approval status.</p>
 </div>
 

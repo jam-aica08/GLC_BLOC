@@ -9,6 +9,7 @@
   },
   "routes": [
     { "src": "/(favicon\\.ico|robots\\.txt)", "dest": "/public/$1" },
+    { "src": "/assets/lib/(.*)", "dest": "/public/assets/lib/$1", "headers": { "cache-control": "public, max-age=31536000, immutable" } },
     { "src": "/assets/(.*)", "dest": "/public/assets/$1", "headers": { "cache-control": "public, max-age=86400" } },
     { "src": "/(.*)", "dest": "/api/index.php" }
   ]

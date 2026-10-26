@@ -6,7 +6,7 @@
 <!-- Page Header -->
 <div class="text-center mb-4 d-flex flex-column align-items-center gap-3">
     <div>
-        <h4 class="mb-1 fw-bold">Blockchain Ledger</h4>
+        <h1 class="h4 mb-1 fw-bold">Blockchain Ledger</h1>
         <p class="text-muted mb-0 small">Immutable chain of financial records secured with cryptographic hashing.</p>
     </div>
     <!-- Run Integrity Verification -->
@@ -23,13 +23,13 @@
 <?php if (session()->getFlashdata('success')): ?>
     <div class="alert alert-success alert-dismissible fade show" role="alert">
         <i class="fa-solid fa-circle-check me-2"></i><?= esc(session()->getFlashdata('success')) ?>
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
     </div>
 <?php endif; ?>
 <?php if (session()->getFlashdata('error')): ?>
     <div class="alert alert-danger alert-dismissible fade show" role="alert">
         <i class="fa-solid fa-triangle-exclamation me-2"></i><?= esc(session()->getFlashdata('error')) ?>
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
     </div>
 <?php endif; ?>
 
@@ -50,7 +50,7 @@
                 <?php endif; ?>
             </div>
         </div>
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
     </div>
 <?php endif; ?>
 

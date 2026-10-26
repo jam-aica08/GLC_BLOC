@@ -5,7 +5,7 @@
 <!-- Page Header -->
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
-        <h4 class="mb-1 fw-bold">My Loans</h4>
+        <h1 class="h4 mb-1 fw-bold">My Loans</h1>
         <p class="text-muted mb-0 small">View your loan history and apply for a new loan.</p>
     </div>
     <?php
@@ -34,13 +34,13 @@
 <?php if (session()->getFlashdata('success')): ?>
     <div class="alert alert-success alert-dismissible fade show" role="alert">
         <i class="fa-solid fa-circle-check me-2"></i><?= esc(session()->getFlashdata('success')) ?>
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
     </div>
 <?php endif; ?>
 <?php if (session()->getFlashdata('error')): ?>
     <div class="alert alert-danger alert-dismissible fade show" role="alert">
         <i class="fa-solid fa-circle-exclamation me-2"></i><?= esc(session()->getFlashdata('error')) ?>
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
     </div>
 <?php endif; ?>
 
@@ -123,7 +123,7 @@
                 <h5 class="modal-title text-white" id="loanApplicationModalLabel">
                     <i class="fa-solid fa-hand-holding-dollar me-2 glc-icon"></i>Loan Application
                 </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form action="<?= base_url('member/loans/apply') ?>" method="post">
                 <?= csrf_field() ?>

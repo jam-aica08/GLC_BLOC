@@ -3,7 +3,7 @@
 
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
-        <h4 class="fw-bold mb-1"><i class="fas fa-calendar-alt me-2 glc-icon"></i>Loan #<?= (int) $loan['loan_id'] ?></h4>
+        <h1 class="h4 fw-bold mb-1"><i class="fas fa-calendar-alt me-2 glc-icon"></i>Loan #<?= (int) $loan['loan_id'] ?></h1>
         <p class="text-muted small mb-0">
             ₱<?= number_format($loan['loan_amount'] ?? 0, 2) ?> at <?= esc($loan['interest_rate'] ?? '') ?>% ·
             <?= (int) ($loan['loan_term_months'] ?? 0) ?> months · <?= esc($loan['account_number'] ?? '') ?>

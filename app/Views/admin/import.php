@@ -22,7 +22,7 @@ $r = $result;
 
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
-        <h4 class="mb-1 fw-bold">Import data</h4>
+        <h1 class="h4 mb-1 fw-bold">Import data</h1>
         <p class="text-muted mb-0 small">Bring your cooperative's existing members, accounts, contributions, loans and payments in from Excel.</p>
     </div>
 </div>

@@ -92,7 +92,7 @@ $sumOf = function (array $s, array $typeList, string $status = 'Approved'): arra
 
 <div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-3">
     <div>
-        <h4 class="mb-1 fw-bold">Reports</h4>
+        <h1 class="h4 mb-1 fw-bold">Reports</h1>
         <p class="mb-0 small text-muted" id="report-subtitle"><?= esc($titles[$f['category']]) ?> · <?= esc($range($f['from'], $f['to'])) ?> · generated <?= date('M j, Y g:i A') ?></p>
     </div>
     <div class="d-flex gap-2 no-print">
@@ -469,7 +469,8 @@ $sumOf = function (array $s, array $typeList, string $status = 'Approved'): arra
 <script>
 // Interactive reports: filters and tabs reload only the report body, charts
 // drill down into transactions, and the transaction list sorts, searches and pages.
-(function () {
+// Chart.js loads with defer: start once the page has been parsed.
+document.addEventListener('DOMContentLoaded', function () {
     const form = document.getElementById('report-filters');
     const body = document.getElementById('report-body');
     const peso = n => '₱' + Number(n).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -716,7 +717,7 @@ $sumOf = function (array $s, array $typeList, string $status = 'Approved'): arra
 
     syncCustom();
     init();
-})();
+});
 </script>
 
 <?= $this->endSection() ?>

@@ -5,7 +5,7 @@
 <!-- Page Header -->
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
-        <h4 class="mb-1 fw-bold">Members</h4>
+        <h1 class="h4 mb-1 fw-bold">Members</h1>
         <p class="text-muted mb-0 small">Manage cooperative members and their accounts.</p>
     </div>
     <button type="button" class="btn btn-sm btn-brand"
@@ -18,13 +18,13 @@
 <?php if (session()->getFlashdata('success')): ?>
     <div class="alert alert-success alert-dismissible fade show" role="alert">
         <i class="fa-solid fa-circle-check me-2"></i><?= esc(session()->getFlashdata('success')) ?>
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
     </div>
 <?php endif; ?>
 <?php if (session()->getFlashdata('error')): ?>
     <div class="alert alert-danger alert-dismissible fade show" role="alert">
         <i class="fa-solid fa-circle-exclamation me-2"></i><?= esc(session()->getFlashdata('error')) ?>
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
     </div>
 <?php endif; ?>
 
@@ -236,7 +236,7 @@
                 <h5 class="modal-title text-white" id="addMemberModalLabel">
                     <i class="fa-solid fa-user-plus me-2 glc-icon"></i>Add New Member
                 </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form action="<?= base_url('admin/members/add') ?>" method="post">
                 <?= csrf_field() ?>
@@ -304,7 +304,7 @@
                 <h5 class="modal-title text-white" id="addAccountModalLabel">
                     <i class="fa-solid fa-wallet me-2 glc-icon"></i>Add Account
                 </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form id="addAccountForm" method="post" action="">
                 <?= csrf_field() ?>

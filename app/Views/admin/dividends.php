@@ -6,7 +6,7 @@ $canPlan  = $available && $plan['errors'] === [] && ! $plan['existing'] && ! $pl
 ?>
 
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h4 class="mb-0"><i class="fas fa-coins me-2 glc-icon"></i>Dividends</h4>
+    <h1 class="h4 mb-0"><i class="fas fa-coins me-2 glc-icon"></i>Dividends</h1>
     <button class="btn btn-brand btn-sm" data-bs-toggle="modal" data-bs-target="#distributeModal">
         <i class="fas fa-plus me-1"></i>Distribute Dividends
     </button>
@@ -15,13 +15,13 @@ $canPlan  = $available && $plan['errors'] === [] && ! $plan['existing'] && ! $pl
 <?php if (session()->getFlashdata('success')): ?>
     <div class="alert alert-success alert-dismissible fade show">
         <?= esc(session()->getFlashdata('success')) ?>
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
     </div>
 <?php endif; ?>
 <?php if (session()->getFlashdata('error')): ?>
     <div class="alert alert-danger alert-dismissible fade show">
         <?= esc(session()->getFlashdata('error')) ?>
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
     </div>
 <?php endif; ?>
 <?php if (! $available): ?>
