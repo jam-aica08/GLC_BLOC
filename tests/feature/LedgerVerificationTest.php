@@ -79,6 +79,37 @@ final class LedgerVerificationTest extends CIUnitTestCase
         }
     }
 
+    public function testApprovedRecordAddedOutsideTheLedgerFails(): void
+    {
+        // Straight into the table, as someone with database access could: no hash breaks.
+        $accountId = (int) $this->db->table('cooperative_accounts')->get()->getRowArray()['account_id'];
+        $this->db->table('financial_records')->insert([
+            'account_id' => $accountId, 'record_type' => 'Contribution', 'transaction_date' => '2026-10-01',
+            'amount' => 50000, 'approval_status' => 'Approved', 'processed_by' => 1,
+        ]);
+        $fakeId = (int) $this->db->insertID();
+
+        $result = (new LedgerService())->verifyLedger();
+
+        $this->assertSame('FAIL', $result['result']);
+        $this->assertSame(0, $result['tampered'], 'The chain itself is intact.');
+        $this->assertSame(1, $result['missing']);
+        $this->assertSame([$fakeId], $result['missing_ids']);
+    }
+
+    public function testPendingAndRejectedRecordsNeedNoLedgerEntry(): void
+    {
+        $accountId = (int) $this->db->table('cooperative_accounts')->get()->getRowArray()['account_id'];
+        foreach (['Pending', 'Rejected'] as $status) {
+            $this->db->table('financial_records')->insert([
+                'account_id' => $accountId, 'record_type' => 'Contribution', 'transaction_date' => '2026-10-01',
+                'amount' => 300, 'approval_status' => $status, 'processed_by' => 1,
+            ]);
+        }
+
+        $this->assertSame('PASS', (new LedgerService())->verifyLedger()['result']);
+    }
+
     public function testRecordInTheLedgerCannotBeDeleted(): void
     {
         // The foreign key from blockchain_ledger refuses it outright.

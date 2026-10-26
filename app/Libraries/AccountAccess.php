@@ -11,19 +11,38 @@ class AccountAccess
 {
     public static function allowed(int $userId): bool
     {
+        return self::isActive(self::state($userId));
+    }
+
+    /** The login's status, membership status and password hash (one query), or null. */
+    public static function state(int $userId): ?array
+    {
         if ($userId <= 0) {
-            return false;
+            return null;
         }
 
-        $row = db_connect()->table('users u')
-            ->select('u.account_status, m.membership_status')
+        return db_connect()->table('users u')
+            ->select('u.account_status, u.password_hash, m.membership_status')
             ->join('members m', 'm.user_id = u.user_id', 'left')
             ->where('u.user_id', $userId)
             ->get()->getRowArray();
+    }
 
-        return $row !== null
-            && $row['account_status'] === 'Active'
-            && ($row['membership_status'] === null || $row['membership_status'] === 'Active');
+    public static function isActive(?array $state): bool
+    {
+        return $state !== null
+            && $state['account_status'] === 'Active'
+            && ($state['membership_status'] === null || $state['membership_status'] === 'Active');
+    }
+
+    /**
+     * A short fingerprint of the password hash, kept in the session at sign-in.
+     * When the password changes it no longer matches, which ends every other
+     * sign-in of that account (AuthFilter).
+     */
+    public static function passwordMark(string $passwordHash): string
+    {
+        return substr(hash('sha256', $passwordHash), 0, 16);
     }
 
     /**

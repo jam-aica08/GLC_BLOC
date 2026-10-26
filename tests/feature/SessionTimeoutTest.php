@@ -71,6 +71,40 @@ final class SessionTimeoutTest extends CIUnitTestCase
         $this->assertEqualsWithDelta(time(), session()->get('last_activity'), 5);
     }
 
+    public function testBackgroundRequestOfAnEndedSignInGets401(): void
+    {
+        $result = $this->withSession($this->admin + ['last_activity' => time() - (AuthFilter::IDLE_MINUTES * 60 + 5)])
+            ->withHeaders(['X-Requested-With' => 'XMLHttpRequest'])
+            ->get('admin/analytics/activity?range=24h');
+
+        $result->assertStatus(401);
+        $this->assertTrue(json_decode($result->getJSON(), true)['signedOut']);
+    }
+
+    public function testPasswordChangeEndsOtherSignIns(): void
+    {
+        $hash  = $this->db->table('users')->where('user_id', $this->admin['user_id'])->get()->getRow('password_hash');
+        $other = $this->admin + ['last_activity' => time(), 'password_mark' => \App\Libraries\AccountAccess::passwordMark($hash)];
+        $this->withSession($other)->get('admin/dashboard')->assertOK();
+
+        // The password is changed (from another device).
+        $this->db->table('users')->where('user_id', $this->admin['user_id'])->update(['password_hash' => password_hash('Another@789', PASSWORD_DEFAULT)]);
+
+        $result = $this->withSession($other)->get('admin/dashboard');
+        $result->assertRedirectTo('/login');
+        $this->assertStringContainsString('password was changed', (string) session()->getFlashdata('error'));
+    }
+
+    public function testTheSessionThatChangesThePasswordStaysSignedIn(): void
+    {
+        $this->post('login', ['username' => 'admin', 'password' => 'Admin@123']);
+        $this->withSession(session()->get())
+            ->post('admin/settings/password', ['current_password' => 'Admin@123', 'new_password' => 'Another@789', 'confirm_password' => 'Another@789'])
+            ->assertRedirectTo('/admin/settings');
+
+        $this->withSession(session()->get())->get('admin/dashboard')->assertOK();
+    }
+
     public function testSignInStartsTheIdleClock(): void
     {
         $this->post('login', ['username' => 'admin', 'password' => 'Admin@123'])->assertRedirectTo('/admin/dashboard');
