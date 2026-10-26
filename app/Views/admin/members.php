@@ -99,10 +99,12 @@
                         <td>
                             <?php if ($reqType === 'Open'): ?>
                                 Open a new <?= esc($req['account_type']) ?> account
-                            <?php else: ?>
-                                <span class="badge <?= $reqType === 'Deactivate' ? 'bg-danger' : 'bg-success' ?>"><?= esc($reqType) ?></span>
-                                account <code><?= esc($req['account_number'] ?? '') ?></code> (<?= esc($req['account_type']) ?>)
-                                <?php if (! empty($req['reason'])): ?><div class="small text-muted">Reason: <?= esc($req['reason']) ?></div><?php endif; ?>
+                            <?php else: /* one block, so the phone layout keeps it on one line */ ?>
+                                <div>
+                                    <span class="badge <?= $reqType === 'Deactivate' ? 'bg-danger' : 'bg-success' ?>"><?= esc($reqType) ?></span>
+                                    account <code><?= esc($req['account_number'] ?? '') ?></code> (<?= esc($req['account_type']) ?>)
+                                    <?php if (! empty($req['reason'])): ?><div class="small text-muted">Reason: <?= esc($req['reason']) ?></div><?php endif; ?>
+                                </div>
                             <?php endif; ?>
                         </td>
                         <td class="text-muted"><?= esc(date('M j, Y g:i A', strtotime($req['created_at']))) ?></td>

@@ -23,7 +23,8 @@
 
 <div class="card shadow-sm mb-4">
     <div class="card-header fw-semibold bg-white"><i class="fa-solid fa-table-list me-2"></i>Retention schedule</div>
-    <div class="table-responsive">
+    <!-- Wider than a phone: the box scrolls sideways, so it takes keyboard focus. -->
+    <div class="table-responsive" tabindex="0" role="region" aria-label="Retention schedule (scrolls sideways)">
         <table class="table align-middle mb-0" style="font-size:0.85rem; min-width: 900px;">
             <thead class="table-light">
                 <tr><th class="px-3">Information</th><th>Stored in</th><th>Why it is kept</th><th>How long</th><th>Then</th></tr>
