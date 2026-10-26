@@ -1366,7 +1366,8 @@ class Admin extends BaseController
         $result        = $ledgerService->verifyLedger();
         if ($result['result'] !== 'PASS') {
             Notifier::toAdmins('ledger', 'Ledger integrity problem',
-                "Verification found {$result['tampered']} tampered of {$result['checked']} ledger entries. Check the ledger now.",
+                "Verification found {$result['tampered']} tampered of {$result['checked']} ledger entries"
+                . ($result['missing'] ? " and {$result['missing']} approved record(s) missing from the ledger" : '') . '. Check the ledger now.',
                 'admin/ledger', 'ledger-tampered-' . date('Y-m-d'));
         }
 
@@ -1377,7 +1378,12 @@ class Admin extends BaseController
 
         $message = "Ledger verification {$result['result']}: "
                  . "{$result['valid']} valid, {$result['tampered']} tampered "
-                 . "out of {$result['checked']} checked.";
+                 . "out of {$result['checked']} checked"
+                 . ($result['missing']
+                     ? "; {$result['missing']} approved record(s) are not in the ledger at all (record #"
+                       . implode(', #', $result['missing_ids']) . ($result['missing'] > count($result['missing_ids']) ? ', …' : '')
+                       . '): they were added outside the app, or their ledger entry failed to save.'
+                     : '.');
 
         $tamperedIds = [];
         if (!empty($result['first_failure'])) {

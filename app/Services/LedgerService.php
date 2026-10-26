@@ -294,11 +294,25 @@ class LedgerService
             $db->table('blockchain_ledger')->whereIn('ledger_id', $ids)->update(['verification_status' => 'Tampered']);
         }
 
+        // --- Check 4: every approved record is in the chain -------------------
+        // A row added straight to financial_records breaks no hash, yet it
+        // counts toward equity and loan limits; so does an approval whose
+        // ledger write failed (approveRecord only logs that).
+        $missingIds = array_map('intval', array_column($db->table('financial_records fr')
+            ->select('fr.financial_record_id')
+            ->join('blockchain_ledger bl', 'bl.financial_record_id = fr.financial_record_id', 'left')
+            ->where('fr.approval_status', 'Approved')
+            ->where('bl.ledger_id IS NULL')
+            ->orderBy('fr.financial_record_id', 'ASC')
+            ->get()->getResultArray(), 'financial_record_id'));
+
         return [
             'checked'       => $checked,
             'valid'         => $valid,
             'tampered'      => $tampered,
-            'result'        => $tampered > 0 ? 'FAIL' : 'PASS',
+            'missing'       => count($missingIds),
+            'missing_ids'   => array_slice($missingIds, 0, 20),
+            'result'        => ($tampered > 0 || $missingIds !== []) ? 'FAIL' : 'PASS',
             'first_failure' => $firstFailure,
             'verified_at'   => date('Y-m-d H:i:s'),
         ];

@@ -142,7 +142,9 @@ class Settings extends BaseController
 
         db_connect()->table('users')
                     ->where('user_id', $user['user_id'])
-                    ->update(['password_hash' => password_hash($new, PASSWORD_DEFAULT)]);
+                    ->update(['password_hash' => $hash = password_hash($new, PASSWORD_DEFAULT)]);
+        // This session stays signed in; every other sign-in of the account ends (AuthFilter).
+        session()->set('password_mark', AccountAccess::passwordMark($hash));
 
         return redirect()->to($this->home())->with('success', 'Your password has been changed.');
     }

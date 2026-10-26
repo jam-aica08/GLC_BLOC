@@ -27,6 +27,21 @@
         if (mq.matches) setOpen(false);
     });
 
+    // A background request answered "signed out" (401 from AuthFilter: idle
+    // limit, password changed, account deactivated) goes to the login page
+    // instead of leaving the page showing old figures and retrying.
+    var nativeFetch = window.fetch;
+    window.fetch = function () {
+        return nativeFetch.apply(this, arguments).then(function (res) {
+            if (res.status === 401) {
+                res.clone().json().then(function (data) {
+                    if (data && data.signedOut) window.location.href = '<?= base_url('login') ?>';
+                }).catch(function () {});
+            }
+            return res;
+        });
+    };
+
     // Opening the bell marks everything read except important notifications
     // (things still to act on, refusals); the badge then counts only those.
     document.querySelectorAll('.notif-toggle[data-seen-url]').forEach(function (bell) {

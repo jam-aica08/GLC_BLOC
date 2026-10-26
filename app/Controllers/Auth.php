@@ -88,6 +88,12 @@ class Auth extends BaseController
                                ->where('account_status', 'Active')
                                ->first();
 
+        // An unknown username still pays for one password check, so the reply
+        // time does not reveal which usernames exist.
+        if (! $user) {
+            password_verify($password, self::decoyHash());
+        }
+
         if (! $user || ! password_verify($password, $user['password_hash'])) {
             // Record the attempt (the username typed, never the password).
             AuditLog::record('Failed login', 'user', $user['user_id'] ?? null, 'Invalid username or password.', false,
@@ -139,6 +145,7 @@ class Auth extends BaseController
             'is_super_admin' => $isSuper,
             'logged_in'      => true,
             'last_activity'  => time(),   // AuthFilter ends the sign-in after IDLE_MINUTES without a request
+            'password_mark'  => AccountAccess::passwordMark($user['password_hash']),   // a password change ends other sign-ins
         ]);
         AuditLog::record('Logged in', 'user', $user['user_id']);
 
@@ -157,8 +164,17 @@ class Auth extends BaseController
     private function clearAuth(): void
     {
         $session = session();
-        $session->remove(['user_id', 'username', 'role', 'member_id', 'is_super_admin', 'logged_in', 'last_activity']);
+        $session->remove(\App\Filters\AuthFilter::SIGN_IN_KEYS);
         $session->regenerate(true);
+    }
+
+    /**
+     * A password hash nobody can match, made with the current default cost so
+     * checking it takes as long as checking a real one. Cached per instance.
+     */
+    private static function decoyHash(): string
+    {
+        return cache()->remember('login_decoy_hash', DAY, static fn () => password_hash(bin2hex(random_bytes(16)), PASSWORD_DEFAULT));
     }
 
     // -------------------------------------------------------------------------
