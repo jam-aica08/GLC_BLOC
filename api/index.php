@@ -11,6 +11,10 @@ if (getenv('CI_ENVIRONMENT') === false) {
     $_SERVER['CI_ENVIRONMENT'] = 'production';
 }
 
+// The runtime's php.ini has expose_php on, which adds "X-Powered-By: PHP/x.y.z"
+// to every response and tells attackers exactly which PHP build to target.
+header_remove('X-Powered-By');
+
 // The function is only reachable through Vercel's edge, which sets this header
 // itself; CI4 would otherwise ignore it because Vercel's proxy IPs aren't fixed.
 if (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https') {
