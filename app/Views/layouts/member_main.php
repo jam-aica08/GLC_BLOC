@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <?= view('partials/page_title', ['suffix' => 'GLC-BLOC Member Portal']) ?>
     <?= view('partials/app_head') ?>
+    <?= view('partials/session_guard') ?>
     <?php if (preg_match('#/(dashboard|analytics)$#', '/' . uri_string())): ?>
     <!-- Chart.js (only the pages with charts need it); deferred so it does not hold up the first paint -->
     <script src="<?= base_url('assets/lib/chart.js-4.4.1/chart.umd.js') ?>" defer></script>
