@@ -17,7 +17,7 @@ class AuthFilter implements FilterInterface
     public const IDLE_MINUTES = 20;
 
     /** Session keys of a sign-in. */
-    public const SIGN_IN_KEYS = ['user_id', 'username', 'role', 'member_id', 'is_super_admin', 'logged_in', 'last_activity', 'password_mark'];
+    public const SIGN_IN_KEYS = ['user_id', 'username', 'role', 'member_id', 'is_super_admin', 'logged_in', 'last_activity', 'password_mark', 'activity_day'];
 
     public function before(RequestInterface $request, $arguments = null)
     {
@@ -31,6 +31,12 @@ class AuthFilter implements FilterInterface
             return $this->signedOut($request, 'You were signed out after ' . self::IDLE_MINUTES . ' minutes without activity. Please sign in again.', true);
         }
         session()->set('last_activity', time());
+
+        // A session kept open for days still counts as activity for the retention review (one write a day).
+        if (session()->get('activity_day') !== date('Y-m-d')) {
+            \App\Services\RetentionService::touch((int) session()->get('user_id'));
+            session()->set('activity_day', date('Y-m-d'));
+        }
 
         // Deactivated since signing in: end the session now, not when it expires.
         $state = AccountAccess::state((int) session()->get('user_id'));

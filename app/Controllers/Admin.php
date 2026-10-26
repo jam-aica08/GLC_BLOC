@@ -151,8 +151,11 @@ class Admin extends BaseController
                        ->orderBy('account_id', 'ASC')
                        ->get()
                        ->getResultArray());
+        // Why an account cannot be deactivated yet (open loan, waiting payments), shown on its button.
+        $blockers = (new \App\Services\AccountStatusService())->blockersFor(array_column($accounts, 'account_id'));
         foreach ($accounts as $acc) {
             $acc['standing'] = $accountModel->getStanding($acc);
+            $acc['blockers'] = $blockers[(int) $acc['account_id']] ?? [];
             $accountsByMember[$acc['member_id']][] = $acc;
         }
         foreach ($members as &$member) {
@@ -161,9 +164,10 @@ class Admin extends BaseController
         unset($member);
 
         return view('admin/members', [
-            'members'         => $members,
-            'search'          => $search,
-            'accountRequests' => (new \App\Services\AccountRequestService())->pending(),
+            'members'          => $members,
+            'search'           => $search,
+            'accountRequests'  => (new \App\Services\AccountRequestService())->pending(),
+            'canDeactivateAccounts' => \App\Services\AccountStatusService::available(),
         ]);
     }
 
@@ -335,13 +339,20 @@ class Admin extends BaseController
             return redirect()->to('/admin/members');
         }
 
+        $type = db_connect()->fieldExists('request_type', 'account_requests')
+            ? (db_connect()->table('account_requests')->select('request_type')->where('request_id', $id)->get()->getRowArray()['request_type'] ?? 'Open')
+            : 'Open';
         [$accountNumber, $error] = (new \App\Services\AccountRequestService())->approve($id, (int) session()->get('user_id'));
         if ($error !== null) {
             session()->setFlashdata('error', $error);
         } else {
             Notifier::resolveForAdmins('review-request-' . $id);
-            session()->setFlashdata('success', "Request approved. Account {$accountNumber} is open and becomes active once PHP "
-                . number_format(CooperativeAccountModel::joinAmount(), 2) . ' (January to ' . date('F') . ') is paid.');
+            session()->setFlashdata('success', match ($type) {
+                'Deactivate' => "Request approved. Account {$accountNumber} is deactivated; its records are kept.",
+                'Reactivate' => "Request approved. Account {$accountNumber} is reactivated.",
+                default      => "Request approved. Account {$accountNumber} is open and becomes active once PHP "
+                    . number_format(CooperativeAccountModel::joinAmount(), 2) . ' (January to ' . date('F') . ') is paid.',
+            });
         }
 
         return redirect()->to('/admin/members');
@@ -431,9 +442,70 @@ class Admin extends BaseController
             return redirect()->to('/admin/members');
         }
 
+        $member = $memberModel->find($id);
+        if (! empty($member['login_data_removed_at'])) {
+            session()->setFlashdata('error', 'This member\'s sign-in data was removed under the data retention policy. Add them again as a new member instead.');
+            return redirect()->to('/admin/members');
+        }
+
         $memberModel->update($id, ['membership_status' => 'Active']);
-        db_connect()->table('users')->where('user_id', (int) $memberModel->find($id)['user_id'])->update(['account_status' => 'Active']);
+        db_connect()->table('users')->where('user_id', (int) $member['user_id'])->update(['account_status' => 'Active']);
+        // Reactivating restarts the inactivity clock, so the next retention review does not deactivate them again.
+        if (\App\Services\RetentionService::available()) {
+            db_connect()->table('members')->where('member_id', $id)->update(['retention_flagged_at' => null]);
+            \App\Services\RetentionService::touch((int) $member['user_id']);
+        }
         session()->setFlashdata('success', 'Member reactivated. They can sign in again.');
+        return redirect()->to('/admin/members');
+    }
+
+    /**
+     * POST: deactivate one account of a member. The member and their other
+     * accounts stay as they are; this account's records are kept.
+     */
+    public function deactivateAccount(int $accountId)
+    {
+        $this->requireAdmin();
+
+        if (! $this->request->is('post')) {
+            return redirect()->to('/admin/members');
+        }
+
+        $service = new \App\Services\AccountStatusService();
+        $account = $service->find($accountId);
+        $error   = $service->deactivate($accountId, (int) session()->get('user_id'), (string) $this->request->getPost('reason'));
+        if ($error !== null) {
+            session()->setFlashdata('error', $error);
+        } else {
+            session()->setFlashdata('success', "Account {$account['account_number']} of {$account['first_name']} {$account['last_name']} is deactivated. "
+                . 'It takes no new contributions or loans and is left out of dividends; its records are kept.');
+        }
+
+        return redirect()->to('/admin/members');
+    }
+
+    /**
+     * POST: reactivate one deactivated account. It is Active again at once if
+     * its joining contributions are paid, otherwise Pending until they are.
+     */
+    public function reactivateAccount(int $accountId)
+    {
+        $this->requireAdmin();
+
+        if (! $this->request->is('post')) {
+            return redirect()->to('/admin/members');
+        }
+
+        $service = new \App\Services\AccountStatusService();
+        $error   = $service->reactivate($accountId);
+        if ($error !== null) {
+            session()->setFlashdata('error', $error);
+        } else {
+            $account = $service->find($accountId);
+            session()->setFlashdata('success', "Account {$account['account_number']} is reactivated"
+                . ($account['account_status'] === 'Active' ? ' and active.' : ' and becomes active once its joining contributions are paid.'));
+        }
+
         return redirect()->to('/admin/members');
     }
 

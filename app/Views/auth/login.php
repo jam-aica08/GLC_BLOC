@@ -155,7 +155,8 @@
                 </form>
             </div>
 
-            <div class="login-foot">&copy; <?= date('Y') ?> GLC-BLOC Cooperative Management System. All rights reserved.</div>
+            <div class="login-foot">&copy; <?= date('Y') ?> GLC-BLOC Cooperative Management System. All rights reserved.
+                · <a href="<?= base_url('privacy') ?>">Privacy &amp; data retention</a></div>
         </div>
     </main>
 </div>

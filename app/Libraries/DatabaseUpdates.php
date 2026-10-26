@@ -53,6 +53,11 @@ class DatabaseUpdates
             if (! $db->tableExists('admin_notifications', false)) {
                 $status['problems'][] = 'admin notifications table is missing';
             }
+            if (! $db->fieldExists('last_activity_at', 'users') || ! $db->fieldExists('legal_hold', 'members')
+                || ! $db->fieldExists('deactivated_at', 'cooperative_accounts')
+                || ($db->tableExists('account_requests', false) && ! $db->fieldExists('request_type', 'account_requests'))) {
+                $status['problems'][] = 'data retention and account deactivation columns are missing';
+            }
         } catch (\Throwable $e) {
             log_message('error', 'DatabaseUpdates::status failed: ' . $e->getMessage());
             $status['error'] = $e->getMessage();
@@ -181,7 +186,7 @@ class DatabaseUpdates
             }
         }
 
-        // Append-only record of who did what. The app never updates or deletes rows here.
+        // Append-only record of who did what. Only the retention review deletes or rewrites rows here.
         if (! $db->tableExists('audit_logs', false)) {
             $forge->addField([
                 'audit_id'    => ['type' => 'BIGINT', 'unsigned' => true, 'auto_increment' => true],
@@ -243,6 +248,48 @@ class DatabaseUpdates
             $forge->addUniqueKey(['user_id', 'event_key'], 'uq_admin_notifications_event');
             $forge->addForeignKey('user_id', 'users', 'user_id', 'CASCADE', 'CASCADE', 'fk_admin_notifications_user');
             $forge->createTable('admin_notifications', true);
+        }
+
+        // Data retention (see Config\Retention): when each login was last used,
+        // and where each member is in the inactivity review.
+        $db->resetDataCache();
+        if (! $db->fieldExists('last_activity_at', 'users')) {
+            $forge->addColumn('users', [
+                'last_activity_at' => ['type' => 'DATETIME', 'null' => true],
+            ]);
+        }
+        $memberColumns = [
+            'retention_flagged_at'  => ['type' => 'DATETIME', 'null' => true],
+            'retention_reviewed_at' => ['type' => 'DATETIME', 'null' => true],
+            'legal_hold'            => ['type' => 'TINYINT', 'constraint' => 1, 'default' => 0, 'null' => false],
+            'legal_hold_reason'     => ['type' => 'VARCHAR', 'constraint' => 255, 'null' => true],
+            'login_data_removed_at' => ['type' => 'DATETIME', 'null' => true],
+            'anonymized_at'         => ['type' => 'DATETIME', 'null' => true],
+        ];
+        foreach ($memberColumns as $name => $def) {
+            if (! $db->fieldExists($name, 'members')) {
+                $forge->addColumn('members', [$name => $def]);
+            }
+        }
+
+        // One account of a member can be deactivated on its own (Inactive), keeping its records.
+        $accountColumns = [
+            'deactivated_at'      => ['type' => 'DATETIME', 'null' => true],
+            'deactivated_by'      => ['type' => 'INT', 'unsigned' => true, 'null' => true],
+            'deactivation_reason' => ['type' => 'VARCHAR', 'constraint' => 255, 'null' => true],
+        ];
+        foreach ($accountColumns as $name => $def) {
+            if (! $db->fieldExists($name, 'cooperative_accounts')) {
+                $forge->addColumn('cooperative_accounts', [$name => $def]);
+            }
+        }
+
+        // Members can also ask to deactivate or reactivate one of their accounts.
+        if (! $db->fieldExists('request_type', 'account_requests')) {
+            $forge->addColumn('account_requests', [
+                'request_type' => ['type' => 'ENUM', 'constraint' => ['Open', 'Deactivate', 'Reactivate'], 'default' => 'Open', 'null' => false, 'after' => 'member_id'],
+                'reason'       => ['type' => 'VARCHAR', 'constraint' => 255, 'null' => true, 'after' => 'account_type'],
+            ]);
         }
 
         $db->resetDataCache();

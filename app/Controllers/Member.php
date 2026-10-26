@@ -648,12 +648,51 @@ class Member extends BaseController
         }
         unset($acc);
 
+        $requests = new \App\Services\AccountRequestService();
+
         return view('member/profile', [
             'member'   => $member,
             'accounts' => $accounts,
-            'requests'    => (new \App\Services\AccountRequestService())->forMember($memberId),
-            'hasPendingRequest' => (new \App\Services\AccountRequestService())->hasPending($memberId),
+            'requests'    => $requests->forMember($memberId),
+            'hasPendingRequest' => $requests->hasPending($memberId),
+            'pendingChanges'    => $requests->pendingChanges($memberId),
+            'canRequestChanges' => $requests->changesAvailable() && ($member['membership_status'] ?? '') === 'Active',
+            'blockers'          => (new \App\Services\AccountStatusService())->blockersFor(array_column($accounts, 'account_id')),
         ]);
+    }
+
+    /**
+     * POST: the member asks an admin to deactivate or reactivate one of their
+     * accounts. Nothing changes until an admin approves the request.
+     */
+    public function requestAccountChange(int $accountId, string $type)
+    {
+        $memberId = $this->requireMember();
+
+        if (! $this->request->is('post')) {
+            return redirect()->to('/member/profile');
+        }
+
+        $member = model(MemberModel::class)->find($memberId);
+        if (($member['membership_status'] ?? '') !== 'Active') {
+            session()->setFlashdata('error', 'Your membership is not active.');
+            return redirect()->to('/member/profile');
+        }
+
+        $result = (new \App\Services\AccountRequestService())
+            ->createChange($memberId, $accountId, $type, (string) $this->request->getPost('reason'));
+        if (is_string($result)) {
+            session()->setFlashdata('error', $result);
+            return redirect()->to('/member/profile');
+        }
+
+        $number = db_connect()->table('cooperative_accounts')->select('account_number')->where('account_id', $accountId)->get()->getRowArray()['account_number'];
+        $verb   = $type === 'Deactivate' ? 'deactivate' : 'reactivate';
+        \App\Services\Notifier::toAdmins('account', 'Account request to review',
+            $this->memberName($memberId) . " asked to {$verb} account {$number}.", 'admin/members', 'review-request-' . $result);
+
+        session()->setFlashdata('success', "Your request to {$verb} account {$number} was sent. An admin will review it.");
+        return redirect()->to('/member/profile');
     }
 
     /**

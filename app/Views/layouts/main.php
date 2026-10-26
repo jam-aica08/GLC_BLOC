@@ -35,7 +35,10 @@ $glcNav = [
 ];
 // Importing is for the super administrator only (enforced again by the controller).
 if (session()->get('is_super_admin')) {
-    $glcNav['Data'] = [['admin/import', 'fa-file-import', 'Import data']];
+    $glcNav['Data'] = [
+        ['admin/import', 'fa-file-import', 'Import data'],
+        ['admin/retention', 'fa-box-archive', 'Data Retention'],
+    ];
 }
 ?>
 <!-- Sidebar -->

@@ -81,12 +81,18 @@
                             <?php if ($acc['account_status'] === 'Pending'): ?>
                                 <span class="badge bg-warning text-dark">Joining — ₱<?= number_format($st['join_balance'], 2) ?> left</span>
                             <?php else: ?>
-                                <span class="badge <?= $acc['account_status'] === 'Active' ? 'bg-success' : 'bg-secondary' ?>"><?= esc($acc['account_status']) ?></span>
+                                <span class="badge <?= $acc['account_status'] === 'Active' ? 'bg-success' : 'bg-secondary' ?>"><?= esc($acc['account_status'] === 'Inactive' ? 'Deactivated' : $acc['account_status']) ?></span>
                             <?php endif; ?>
                         </td>
+                        <?php if (in_array($acc['account_status'], ['Inactive', 'Closed'], true)): /* no contributions are due on a deactivated account */ ?>
+                            <td class="py-3">—</td>
+                            <td class="py-3">₱<?= number_format($st['paid'], 2) ?></td>
+                            <td class="py-3">—</td>
+                        <?php else: ?>
                         <td class="py-3">₱<?= number_format($st['required_to_date'], 2) ?></td>
                         <td class="py-3">₱<?= number_format($st['paid'], 2) ?></td>
                         <td class="py-3 fw-semibold <?= $st['due_balance'] > 0 ? 'text-danger' : 'text-success' ?>">₱<?= number_format($st['due_balance'], 2) ?></td>
+                        <?php endif; ?>
                     </tr>
                     <?php endforeach; ?>
                 </tbody>
