@@ -14,8 +14,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Local development runs 8.2; Vercel (vercel-php 0.7.x) runs 8.3.
-        php-versions: ['8.2', '8.3']
+        # Local development runs 8.2; Vercel (vercel-php 0.8.x) runs 8.4.
+        php-versions: ['8.2', '8.4']
 
     runs-on: ubuntu-24.04
     if: (! contains(github.event.pull_request.title, '[ci skip]'))
