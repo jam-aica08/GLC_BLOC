@@ -462,8 +462,31 @@ code { color: var(--glc-text); }
     .form-switch .form-check-input { width: 2.5rem; }
 }
 
-/* The privacy schedule is a wide table from tablets up (it scrolls in its box); cards on phones. */
-@media (min-width: 768px) { .privacy-schedule { min-width: 900px; } }
+/* Privacy retention schedule: a five-column table needs about 880px. Below
+   that width of its own box (phones, tablets, laptops with the sidebar open)
+   each row becomes a card with labelled fields, so nothing scrolls sideways. */
+.privacy-schedule-wrap { container-type: inline-size; }
+@container (max-width: 879.98px) {
+    .privacy-schedule thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+    .privacy-schedule, .privacy-schedule tbody, .privacy-schedule tr, .privacy-schedule td { display: block; width: auto; }
+    .privacy-schedule tr { margin: 12px; padding: 6px 14px; border: 1px solid var(--glc-border); border-radius: 12px; background: #fff; }
+    .privacy-schedule td { border: 0; padding: 6px 0 !important; overflow-wrap: anywhere; }
+    .privacy-schedule td::before {
+        content: attr(data-label);
+        display: block;
+        margin-bottom: 2px;
+        font-size: .72rem;
+        font-weight: 600;
+        letter-spacing: .04em;
+        text-transform: uppercase;
+        color: var(--glc-muted);
+    }
+}
+/* Wide enough for two columns of fields: label beside value reads faster on tablets. */
+@container (min-width: 560px) and (max-width: 879.98px) {
+    .privacy-schedule td { display: grid; grid-template-columns: 9rem 1fr; gap: 12px; align-items: start; }
+    .privacy-schedule td::before { margin: 2px 0 0; }
+}
 
 /* Long status badges ("Reactivating — PHP 600.00 missed contributions to settle")
    wrap instead of widening a card on narrow phones. */
