@@ -449,6 +449,26 @@ code { color: var(--glc-text); }
 /* Page numbers: at least 24px wide to tap (WCAG 2.5.8); "1" alone was 23px. */
 .pagination .page-link { min-width: 2rem; text-align: center; }
 
+/* Touch screens: every control at least 24px to tap (WCAG 2.5.8). Links in
+   tables ("#11", "2024", "Loan #1"), small stand-alone links ("Open", "Back
+   to sign in"), small and link buttons ("Mark as read") were 19-23px high. */
+@media (max-width: 1023.98px) {
+    .table a:not(.btn), a.small:not(.btn) { display: inline-block; padding-block: .2rem; min-height: 24px; min-width: 24px; text-align: center; }
+    .btn-sm, .btn-link { min-height: 24px; }
+    .form-check-input { width: 24px; height: 24px; }
+    .form-check { min-height: 28px; padding-left: 2.1rem; }
+    .form-check .form-check-input { margin-left: -2.1rem; margin-top: 0; }
+    .form-check-label { line-height: 24px; }
+    .form-switch .form-check-input { width: 2.5rem; }
+}
+
+/* The privacy schedule is a wide table from tablets up (it scrolls in its box); cards on phones. */
+@media (min-width: 768px) { .privacy-schedule { min-width: 900px; } }
+
+/* Long status badges ("Reactivating — PHP 600.00 missed contributions to settle")
+   wrap instead of widening a card on narrow phones. */
+.badge.text-wrap-sm { white-space: normal; text-align: left; line-height: 1.3; }
+
 @media (max-width: 575.98px) {
     .navbar-title { display: none; }
     h4, .h4 { font-size: 1.2rem; }

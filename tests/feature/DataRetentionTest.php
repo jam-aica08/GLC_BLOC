@@ -249,6 +249,17 @@ final class DataRetentionTest extends CIUnitTestCase
         }
     }
 
+    /** Every administrator, not only the super admin, can reach the privacy notice. */
+    public function testOrdinaryAdminHasThePrivacyLink(): void
+    {
+        $page = $this->withSession($this->adminSession)->get('admin/dashboard');
+        $page->assertOK();
+        $page->assertSee('My Data');
+        $page->assertDontSee('Data Retention</a>', 'a');
+
+        $this->withSession($this->adminSession)->get('privacy')->assertOK();
+    }
+
     public function testPrivacyNoticeIsPublic(): void
     {
         $page = $this->get('privacy');
