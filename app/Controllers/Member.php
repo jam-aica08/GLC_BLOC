@@ -858,7 +858,7 @@ class Member extends BaseController
         $memberId = $this->requireMember();
 
         return $this->notificationFeedResponse(
-            \App\Services\Notifier::memberFeed($memberId, (int) $this->request->getGet('since')), 'member');
+            \App\Services\Notifier::memberFeed($memberId, (int) ($this->request->getGet('since') ?? -1)), 'member');
     }
 
     /** GET: every notification of the signed-in member. */

@@ -232,6 +232,7 @@ class Notifier
     /**
      * For the bell's background check: the unread count, the latest few, and
      * the notifications that arrived after $sinceId (to pop up), newest first.
+     * $sinceId 0 means the page had none, so every notification is new.
      *
      * @return array{unread: int, latest: list<array>, new: list<array>, newest: int}
      */
@@ -250,7 +251,8 @@ class Notifier
     {
         [$table, $owner] = $box;
         $latest = self::fetch($box, $ownerId, 6);
-        $new    = $sinceId > 0 && self::available($table)
+        // $sinceId < 0: the caller did not say what it has, so nothing counts as new.
+        $new    = $sinceId >= 0 && self::available($table)
             ? db_connect()->table($table)->where($owner, $ownerId)->where('notification_id >', $sinceId)
                 ->orderBy('notification_id', 'DESC')->limit(5)->get()->getResultArray()
             : [];
@@ -259,7 +261,7 @@ class Notifier
             'unread' => self::countUnread($box, $ownerId),
             'latest' => $latest,
             'new'    => $new,
-            'newest' => (int) max(array_merge([$sinceId], array_column($latest, 'notification_id'))),
+            'newest' => (int) max(array_merge([max(0, $sinceId)], array_column($latest, 'notification_id'))),
         ];
     }
 

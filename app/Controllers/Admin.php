@@ -1475,7 +1475,7 @@ class Admin extends BaseController
         $this->requireAdmin();
 
         return $this->notificationFeedResponse(
-            Notifier::adminFeed((int) session()->get('user_id'), (int) $this->request->getGet('since')), 'admin');
+            Notifier::adminFeed((int) session()->get('user_id'), (int) ($this->request->getGet('since') ?? -1)), 'admin');
     }
 
     /** GET: every notification of the signed-in administrator. */
