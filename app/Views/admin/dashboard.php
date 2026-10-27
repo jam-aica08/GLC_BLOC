@@ -48,13 +48,14 @@
 <!-- Waiting for approval -->
 <div class="row g-2 mb-4">
     <?php foreach ([
-        ['Contributions', $pendingContributions, 'admin/contributions?status=Pending', 'fa-piggy-bank'],
-        ['Loans', $pendingLoans, 'admin/loans?status=Pending', 'fa-hand-holding-dollar'],
-        ['Loan Payments', $pendingPayments, 'admin/payments?status=Pending', 'fa-money-bill-wave'],
-        ['Account Requests', $pendingRequests, 'admin/members#account-requests', 'fa-inbox'],
-    ] as [$label, $count, $url, $icon]): ?>
+        ['contributions', 'Contributions', $pendingContributions, 'admin/contributions?status=Pending', 'fa-piggy-bank'],
+        ['loans', 'Loans', $pendingLoans, 'admin/loans?status=Pending', 'fa-hand-holding-dollar'],
+        ['payments', 'Loan Payments', $pendingPayments, 'admin/payments?status=Pending', 'fa-money-bill-wave'],
+        ['requests', 'Account Requests', $pendingRequests, 'admin/members#account-requests', 'fa-inbox'],
+    ] as [$key, $label, $count, $url, $icon]): ?>
         <div class="col-sm-6 col-lg-3">
-            <a href="<?= base_url($url) ?>" class="card text-decoration-none h-100 <?= $count ? 'border-warning' : '' ?>" style="color:var(--glc-navy);">
+            <a href="<?= base_url($url) ?>" class="card text-decoration-none h-100 <?= $count ? 'border-warning' : '' ?>" style="color:var(--glc-navy);"
+               data-pending="<?= $key ?>" aria-label="Pending <?= $label ?>: <?= (int) $count ?>">
                 <div class="card-body py-2 px-3 d-flex justify-content-between align-items-center">
                     <span class="small"><i class="fa-solid <?= $icon ?> me-2 text-muted"></i>Pending <?= $label ?></span>
                     <span class="badge <?= $count ? 'bg-warning text-dark' : 'bg-light text-muted' ?> fs-6"><?= (int) $count ?></span>
@@ -63,6 +64,48 @@
         </div>
     <?php endforeach; ?>
 </div>
+
+<script>
+// The "Pending …" tiles follow new requests without reloading: checked every
+// 20 seconds while the page is visible, at once on returning to the tab, and
+// when the bell gets something new. Background checks do not extend the sign-in.
+(function () {
+    var url = <?= json_encode(base_url('admin/dashboard/pending')) ?>, timer = null, busy = false;
+    function paint(key, n) {
+        var tile = document.querySelector('[data-pending="' + key + '"]');
+        if (!tile) return;
+        var badge = tile.querySelector('.badge');
+        var was = parseInt(badge.textContent, 10) || 0;
+        badge.textContent = n;
+        badge.className = 'badge fs-6 ' + (n ? 'bg-warning text-dark' : 'bg-light text-muted');
+        tile.classList.toggle('border-warning', n > 0);
+        tile.setAttribute('aria-label', tile.textContent.trim().replace(/\s+\d+$/, '') + ': ' + n);
+        if (n > was) { tile.classList.add('pending-bump'); setTimeout(function () { tile.classList.remove('pending-bump'); }, 1500); }
+    }
+    function check() {
+        if (busy || document.visibilityState !== 'visible') return;
+        busy = true;
+        fetch(url, { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-Background-Poll': '1' }, cache: 'no-store' })
+            .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+            .then(function (d) { Object.keys(d).forEach(function (k) { paint(k, d[k]); }); })
+            .catch(function () {})
+            .then(function () { busy = false; });
+    }
+    function start() { if (!timer) timer = setInterval(check, 20000); }
+    document.addEventListener('visibilitychange', function () {
+        if (document.visibilityState === 'visible') { check(); start(); } else { clearInterval(timer); timer = null; }
+    });
+    document.querySelectorAll('.notif-toggle').forEach(function (b) { b.addEventListener('glc:new-notifications', check); });
+    if (document.visibilityState === 'visible') start();
+})();
+</script>
+<style>
+    /* A tile whose count just went up glows briefly (skipped when reduced motion is preferred). */
+    @media (prefers-reduced-motion: no-preference) {
+        .pending-bump { animation: pending-bump 1.5s ease-out; }
+        @keyframes pending-bump { 0% { box-shadow: 0 0 0 4px rgba(250, 178, 25, .55); } 100% { box-shadow: 0 0 0 0 rgba(250, 178, 25, 0); } }
+    }
+</style>
 
 <div class="d-flex justify-content-between align-items-center mb-2">
     <span class="text-muted small"><i class="fa-solid fa-users me-1"></i><?= number_format($totalMembers) ?> member(s) · <?= number_format($totalAccounts) ?> account(s)</span>

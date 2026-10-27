@@ -19,6 +19,7 @@ $routes->get('cron/retention', 'Retention::cron');
 // Admin routes (protected by auth + admin filter)
 $routes->group('admin', ['filter' => 'auth:admin'], function ($routes) {
     $routes->get('dashboard', 'Admin::dashboard');
+    $routes->get('dashboard/pending', 'Admin::pendingSummary');   // live counts for the dashboard tiles
 
     // Members
     $routes->get('members', 'Admin::members');
