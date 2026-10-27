@@ -90,14 +90,44 @@ final class SuperAdminTest extends CIUnitTestCase
         $this->seeInDatabase('users', ['username' => 'admin3', 'is_super_admin' => 0]);
     }
 
+    public function testOnlyTheSuperAdminCanLoadDemoData(): void
+    {
+        $members = $this->db->table('members')->countAllResults();
+
+        $this->withSession($this->adminSession)->post('admin/settings/demo', ['confirm' => 'DEMO', 'password' => 'Admin2@123']);
+        $this->withSession($this->superSession)->post('admin/settings/demo', ['confirm' => 'demo', 'password' => 'Admin@123']);
+        $this->withSession($this->superSession)->post('admin/settings/demo', ['confirm' => 'DEMO', 'password' => 'wrong']);
+
+        $this->assertSame($members, $this->db->table('members')->countAllResults(), 'Refused: ordinary admin, wrong confirmation, wrong password.');
+    }
+
+    public function testLoadingDemoDataReplacesMembersAndAddsTheShowcase(): void
+    {
+        $this->withSession($this->superSession)->post('admin/settings/demo', ['confirm' => 'DEMO', 'password' => 'Admin@123'])
+             ->assertRedirectTo('/admin/settings');
+
+        $this->assertSame(40, $this->db->table('members')->countAllResults());
+        $this->dontSeeInDatabase('users', ['username' => 'jdoe']);                 // the old members are gone
+        $this->seeInDatabase('users', ['username' => 'admin', 'is_super_admin' => 1]);   // admins are kept
+        $this->seeInDatabase('withdrawals', ['status' => 'Pending']);
+        $this->seeInDatabase('withdrawals', ['status' => 'Approved']);
+        $this->seeInDatabase('cooperative_accounts', ['account_status' => 'Inactive']);
+        $this->seeInDatabase('financial_records', ['record_type' => 'Loan Offset', 'approval_status' => 'Approved']);
+        $this->seeInDatabase('account_requests', ['request_type' => 'Deactivate', 'status' => 'Pending']);
+        $this->assertGreaterThan(0, $this->db->table('cooperative_accounts')->where('reactivation_from IS NOT NULL')->countAllResults());
+        $this->seeInDatabase('audit_logs', ['action' => 'Loaded demo data', 'result' => 'Success']);
+    }
+
     public function testSettingsPageShowsTheToolsToTheSuperAdminOnly(): void
     {
         $ordinary = $this->withSession($this->adminSession)->get('admin/settings');
         $ordinary->assertDontSee('Add Administrator');
         $ordinary->assertDontSee('Reset Data');
+        $ordinary->assertDontSee('Load Demo Data');
 
         $super = $this->withSession($this->superSession)->get('admin/settings');
         $super->assertSee('Add Administrator');
         $super->assertSee('Reset Data');
+        $super->assertSee('Load Demo Data');
     }
 }

@@ -49,6 +49,7 @@ class AuditLog
         'admin/settings/admins'              => ['Added administrator', 'user'],
         'admin/settings/updates'             => ['Applied database updates', null],
         'admin/settings/reset'               => ['Reset data', null],
+        'admin/settings/demo'                => ['Loaded demo data', null],
         'member/contributions/submit'        => ['Submitted contribution', 'contribution'],
         'member/loans/apply'                 => ['Applied for loan', 'loan'],
         'member/loans/pay'                   => ['Submitted loan payment', 'loan'],
@@ -120,7 +121,8 @@ class AuditLog
      */
     public static function recordRequest(string $path, ?string $jsonBody = null): void
     {
-        $path   = trim($path, '/');
+        // Without URL rewriting the path starts with "index.php/"; the action names do not.
+        $path   = preg_replace('#^index\.php/#', '', trim($path, '/'));
         $id     = null;
         $parts  = [];
         foreach (explode('/', $path) as $segment) {

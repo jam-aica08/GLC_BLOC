@@ -120,6 +120,34 @@
 </div>
 
 <?php if ($isSuper): ?>
+    <div class="card shadow-sm mt-4 border-warning">
+        <div class="card-header fw-semibold bg-warning-subtle"><i class="fa-solid fa-wand-magic-sparkles me-2"></i>Load Demo Data</div>
+        <div class="card-body">
+            <p class="small mb-2">Replaces <strong>every member and transaction</strong> with made-up demo data for presentations:
+                about 40 members since 2022 with their accounts, contributions, loans, payments and past dividends, plus examples of
+                withdrawals (one waiting for approval), deactivated and reactivating accounts, a loan settled by an offset, an overdue loan,
+                and a deactivation request. Administrator logins are kept. This cannot be undone.</p>
+            <p class="small text-muted mb-3">Demo members sign in with their username and the password <code>Member@123</code>. Takes up to a minute.</p>
+            <form method="post" action="<?= base_url($base . '/demo') ?>" autocomplete="off"
+                  onsubmit="return confirm('Replace all members and transactions with demo data? This cannot be undone.') && !(this.querySelector('button').disabled = true);">
+                <?= csrf_field() ?>
+                <div class="row g-2">
+                    <div class="col-md-4">
+                        <label for="demo_confirm" class="form-label small fw-semibold">Type DEMO to confirm</label>
+                        <input type="text" class="form-control" id="demo_confirm" name="confirm" pattern="DEMO" required>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="demo_password" class="form-label small fw-semibold">Your Password</label>
+                        <input type="password" class="form-control" id="demo_password" name="password" required autocomplete="current-password">
+                    </div>
+                    <div class="col-md-4 d-flex align-items-end">
+                        <button type="submit" class="btn btn-warning w-100"><i class="fa-solid fa-wand-magic-sparkles me-1"></i>Load Demo Data</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <div class="card shadow-sm mt-4 border-danger">
         <div class="card-header fw-semibold bg-danger-subtle text-danger"><i class="fa-solid fa-trash-can me-2"></i>Reset Data</div>
         <div class="card-body">
