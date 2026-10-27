@@ -50,16 +50,18 @@ abstract class BaseController extends Controller
     /**
      * JSON for the bell's background check (Notifier::adminFeed / memberFeed):
      * the unread count, the refreshed dropdown list, and the new notifications
-     * to pop up. Never cached: it is private to the signed-in user.
+     * to pop up, plus $extra (the admin's pending counts for the dashboard
+     * tiles, so one background request serves both). Never cached: it is
+     * private to the signed-in user.
      */
-    protected function notificationFeedResponse(array $feed, string $area)
+    protected function notificationFeedResponse(array $feed, string $area, array $extra = [])
     {
         $next = trim((string) $this->request->getGet('next'), '/');
         if (! preg_match('#^(admin|member)(/[A-Za-z0-9_/-]*)?$#', $next)) {
             $next = $area . '/dashboard';
         }
 
-        return $this->response->setHeader('Cache-Control', 'no-store')->setJSON([
+        return $this->response->setHeader('Cache-Control', 'no-store')->setJSON($extra + [
             'unread' => $feed['unread'],
             'newest' => $feed['newest'],
             'html'   => view('partials/notification_list', ['notifications' => $feed['latest'], 'next' => $next, 'area' => $area]),

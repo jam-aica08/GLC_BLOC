@@ -129,6 +129,8 @@ final class NotificationSeenTest extends CIUnitTestCase
         $this->assertGreaterThan(0, $data['unread']);
         $this->assertGreaterThan($before, $data['newest']);
         $this->assertStringContainsString('Loan application to review', $data['html']);
+        // One background request serves the bell and the dashboard's pending tiles.
+        $this->assertSame(1, $data['pending']['loans']);
 
         // Asked again with the newest id: nothing new to pop up.
         $again = $this->withSession($this->admin)->withHeaders(['X-Background-Poll' => '1'])
