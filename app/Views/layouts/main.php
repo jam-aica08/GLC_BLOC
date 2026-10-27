@@ -34,13 +34,15 @@ $glcNav = [
         ['admin/reports', 'fa-file-lines', 'Reports'],
     ],
 ];
-// Importing is for the super administrator only (enforced again by the controller).
-if (session()->get('is_super_admin')) {
-    $glcNav['Data'] = [
+// Importing and retention tools are for the super administrator only (enforced
+// again by the controllers); the privacy notice is for every administrator.
+$glcNav['Data'] = session()->get('is_super_admin')
+    ? [
         ['admin/import', 'fa-file-import', 'Import data'],
         ['admin/retention', 'fa-box-archive', 'Data Retention'],
-    ];
-}
+        ['privacy', 'fa-user-shield', 'Privacy & My Data'],
+    ]
+    : [['privacy', 'fa-user-shield', 'Privacy & My Data']];
 ?>
 <!-- Sidebar -->
 <aside id="sidebar" aria-label="Main navigation">

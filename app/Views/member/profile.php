@@ -107,7 +107,7 @@
                         <td class="py-3"><?= esc($acc['account_start_date']) ?></td>
                         <td class="py-3">
                             <?php if (! empty($st['reactivating'])): ?>
-                                <span class="badge bg-warning text-dark">Reactivating — ₱<?= number_format($st['join_balance'], 2) ?> missed contributions to settle</span>
+                                <span class="badge bg-warning text-dark text-wrap-sm">Reactivating — ₱<?= number_format($st['join_balance'], 2) ?> missed contributions to settle</span>
                                 <div class="small text-muted">From <?= esc(date('F Y', strtotime($st['reactivation_from'] . '-01'))) ?> to <?= esc(date('F Y')) ?></div>
                             <?php elseif ($acc['account_status'] === 'Pending'): ?>
                                 <span class="badge bg-warning text-dark">Joining — ₱<?= number_format($st['join_balance'], 2) ?> left</span>

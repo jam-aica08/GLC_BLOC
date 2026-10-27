@@ -24,19 +24,21 @@
 <div class="card shadow-sm mb-4">
     <div class="card-header fw-semibold bg-white"><i class="fa-solid fa-table-list me-2"></i>Retention schedule</div>
     <!-- Wider than a phone: the box scrolls sideways, so it takes keyboard focus. -->
-    <div class="table-responsive" tabindex="0" role="region" aria-label="Retention schedule (scrolls sideways)">
-        <table class="table align-middle mb-0" style="font-size:0.85rem; min-width: 900px;">
+    <!-- Cards whenever this box is narrower than the table needs (container query in glc.css),
+         so it fits phones, tablets and laptops with the sidebar open; the full table otherwise. -->
+    <div class="privacy-schedule-wrap">
+        <table class="table align-middle mb-0 privacy-schedule" data-no-stack style="font-size:0.85rem;">
             <thead class="table-light">
                 <tr><th class="px-3">Information</th><th>Stored in</th><th>Why it is kept</th><th>How long</th><th>Then</th></tr>
             </thead>
             <tbody>
                 <?php foreach ($schedule as $row): ?>
                     <tr>
-                        <td class="px-3"><div class="fw-semibold"><?= esc($row['category']) ?></div><small class="text-muted"><?= esc($row['data']) ?></small></td>
-                        <td><small><?= esc($row['stored']) ?></small></td>
-                        <td><?= esc($row['purpose']) ?></td>
-                        <td><?= esc($row['period']) ?></td>
-                        <td><?= esc($row['action']) ?><br><span class="badge bg-light text-dark border"><?= esc($row['mode']) ?></span></td>
+                        <td class="px-3" data-label="Information"><div><div class="fw-semibold"><?= esc($row['category']) ?></div><small class="text-muted"><?= esc($row['data']) ?></small></div></td>
+                        <td data-label="Stored in"><small><?= esc($row['stored']) ?></small></td>
+                        <td data-label="Why it is kept"><?= esc($row['purpose']) ?></td>
+                        <td data-label="How long"><?= esc($row['period']) ?></td>
+                        <td data-label="Then"><div><?= esc($row['action']) ?><br><span class="badge bg-light text-dark border text-wrap-sm"><?= esc($row['mode']) ?></span></div></td>
                     </tr>
                 <?php endforeach; ?>
             </tbody>

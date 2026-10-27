@@ -66,7 +66,7 @@ $sumOf = function (array $s, array $typeList, string $status = 'Approved'): arra
     .chart-box { position: relative; height: 300px; }
     .chart-box.short { height: 220px; }
     .legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: .8rem; color: var(--glc-muted); }
-    .legend button { background: none; border: 0; padding: 2px 0; color: inherit; display: inline-flex; align-items: center; gap: 6px; }
+    .legend button { background: none; border: 0; padding: 4px 0; min-height: 28px; color: inherit; display: inline-flex; align-items: center; gap: 6px; }   /* 24px+ to tap (WCAG 2.5.8) */
     .legend button[aria-pressed="false"] { opacity: .45; text-decoration: line-through; }
     .swatch { width: 12px; height: 12px; border-radius: 3px; display: inline-block; flex-shrink: 0; }
     .series-name { display: inline-flex; align-items: center; gap: 8px; }
@@ -637,10 +637,15 @@ document.addEventListener('DOMContentLoaded', function () {
                 },
             };
             const max = Math.max(1, ...d.byType.map(t => t.amount));
+            // On a phone "Loan Disbursement" is wider than the axis allows and was cut off:
+            // two-word labels go on two lines there.
+            const narrow = typeEl.parentElement.clientWidth < 480;
+            // Room for every type's bar and label (six types since withdrawals and offsets).
+            typeEl.parentElement.style.minHeight = (d.byType.length * (narrow ? 44 : 34) + 40) + 'px';
             out.push(new Chart(typeEl, {
                 type: 'bar',
                 data: {
-                    labels: d.byType.map(t => t.type),
+                    labels: d.byType.map(t => narrow && t.type.includes(' ') ? t.type.split(' ') : t.type),
                     datasets: [{
                         data: d.byType.map(t => t.amount), backgroundColor: d.byType.map(t => t.color),
                         hoverBackgroundColor: d.byType.map(t => t.color + 'cc'), borderRadius: 4, borderSkipped: 'start', maxBarThickness: 22,
@@ -648,10 +653,13 @@ document.addEventListener('DOMContentLoaded', function () {
                 },
                 options: {
                     indexAxis: 'y', responsive: true, maintainAspectRatio: false,
-                    layout: { padding: { right: 44 } },
+                    layout: { padding: { left: 6, right: 44 } },   // left: wrapped labels touched the card edge
                     scales: {
                         x: { beginAtZero: true, suggestedMax: max * 1.05, grid: { color: grid }, border: { display: false }, ticks: { callback: v => compact(v), maxTicksLimit: 4 } },
-                        y: { grid: { display: false }, border: { color: '#d7d9e6' }, ticks: { color: '#16152b' } },
+                        // autoSkip off: Chart.js dropped some type names when space was tight.
+                        // Chart.js measures two-line labels a few pixels short ("isbursement"): add room.
+                        y: { grid: { display: false }, border: { color: '#d7d9e6' }, ticks: { color: '#16152b', autoSkip: false },
+                             afterFit: scale => { scale.width += 10; } },
                     },
                     plugins: {
                         legend: { display: false },
@@ -666,6 +674,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 },
                 plugins: [endLabels],
             }));
+        }
+        // Axis labels are measured when a chart is built; if the web font was still
+        // loading they were measured too narrow and drawn cut off. Measure again once it is in.
+        if (document.fonts && document.fonts.status !== 'loaded') {
+            document.fonts.ready.then(() => out.forEach(c => c.canvas && c.canvas.isConnected && c.update('none')));
         }
         return out;
     }
