@@ -8,7 +8,7 @@
 $peso  = fn($n) => ((float) $n < 0 ? '−' : '') . '₱' . number_format(abs((float) $n), 2);
 $who   = $isAdmin ? 'Cooperative' : 'My';
 $badge = ['Approved' => 'bg-success', 'Rejected' => 'bg-danger', 'Pending' => 'bg-warning text-dark'];
-$icons = ['Contribution' => 'fa-piggy-bank', 'Loan Disbursement' => 'fa-hand-holding-dollar', 'Loan Payment' => 'fa-money-bill-wave', 'Dividend' => 'fa-coins'];
+$icons = ['Contribution' => 'fa-piggy-bank', 'Loan Disbursement' => 'fa-hand-holding-dollar', 'Loan Payment' => 'fa-money-bill-wave', 'Dividend' => 'fa-coins', 'Withdrawal' => 'fa-money-bill-transfer', 'Loan Offset' => 'fa-scale-balanced'];
 $loanLink = fn($loan) => $isAdmin ? base_url('admin/loans/' . (int) $loan['loan_id'] . '/schedule') : base_url('member/loans');
 ?>
 <style>
@@ -27,7 +27,7 @@ $loanLink = fn($loan) => $isAdmin ? base_url('admin/loans/' . (int) $loan['loan_
         <div class="card dash-tile dash-equity h-100"><div class="card-body">
             <div class="label"><i class="fa-solid fa-scale-balanced me-1"></i><?= $who ?> Total Equity</div>
             <div class="value"><?= $peso($d['equity']) ?></div>
-            <div class="small mt-2" style="color:#c9d1d9;">Contributions + dividends received</div>
+            <div class="small mt-2" style="color:#c9d1d9;">Contributions held + dividends received</div>
             <div class="small" style="color:#c9d1d9;">Net after unpaid loans: <span class="fw-semibold text-white text-nowrap"><?= $peso($d['netPosition']) ?></span></div>
         </div></div>
     </div>
@@ -35,6 +35,7 @@ $loanLink = fn($loan) => $isAdmin ? base_url('admin/loans/' . (int) $loan['loan_
         <div class="card dash-tile h-100"><div class="card-body">
             <div class="label"><i class="fa-solid fa-piggy-bank me-1 text-success"></i>Total Contributions</div>
             <div class="value text-success"><?= $peso($d['contributions']) ?></div>
+            <?php if ($d['withdrawn'] > 0): ?><div class="small text-muted">After ₱<?= number_format($d['withdrawn'], 2) ?> withdrawn / offset</div><?php endif; ?>
             <a class="small" href="<?= base_url(($isAdmin ? 'admin' : 'member') . '/contributions') ?>">View contributions</a>
         </div></div>
     </div>
@@ -62,7 +63,8 @@ $loanLink = fn($loan) => $isAdmin ? base_url('admin/loans/' . (int) $loan['loan_
             <div class="fw-semibold"><i class="fa-solid fa-coins me-2 glc-icon"></i><?= (int) $dp['year'] ?> Dividends (estimate)</div>
             <div class="small text-muted mt-2">Profit pool</div>
             <div class="pool-figure"><?= $peso($dp['profit_pool']) ?></div>
-            <div class="small text-muted"><?= $dp['basic_count'] ?> Basic, <?= $dp['pioneer_count'] ?> Pioneer active account(s)</div>
+            <div class="small text-muted">Administration <?= rtrim(rtrim(number_format($dp['admin_share_rate'], 2), '0'), '.') ?>%: <?= $peso($dp['admin_share']) ?> · Members: <?= $peso($dp['members_pool']) ?></div>
+            <div class="small text-muted"><?= $dp['basic_count'] ?> Basic, <?= $dp['pioneer_count'] ?> Pioneer eligible account(s)</div>
         </div>
         <div class="d-flex flex-wrap gap-4">
             <div>

@@ -118,11 +118,30 @@
                                             </button>
                                         </form>
                                     </div>
-                                <?php elseif ($status === 'Active' || $status === 'Paid'): ?>
+                                <?php elseif ($status === 'Active' || $status === 'Paid' || $status === 'Defaulted'): ?>
                                     <a href="<?= base_url('admin/loans/' . (int) $loan['id'] . '/schedule') ?>" class="btn btn-sm btn-outline-primary js-schedule"
                                        data-loan-id="<?= (int) $loan['id'] ?>" data-title="Loan #<?= (int) $loan['id'] ?> · <?= esc($loan['member_name'] ?? '') ?>">
                                         <i class="fa-solid fa-calendar-days me-1"></i>Schedule
                                     </a>
+                                    <?php if (! empty($loan['offset'])): $o = $loan['offset']; ?>
+                                        <div class="mt-1">
+                                            <span class="badge bg-danger-subtle text-danger-emphasis">Missed payment<?= $o['overdue'] > 0 ? ' · ₱' . number_format($o['overdue'], 2) . ' overdue' : '' ?></span>
+                                        </div>
+                                        <?php if ($o['eligible']): ?>
+                                            <button type="button" class="btn btn-sm btn-outline-danger mt-1 text-nowrap"
+                                                    data-bs-toggle="modal" data-bs-target="#offsetModal"
+                                                    data-loan-id="<?= (int) $loan['id'] ?>"
+                                                    data-member="<?= esc($loan['member_name'] ?? '') ?>"
+                                                    data-balance="<?= esc(number_format($o['balance'], 2)) ?>"
+                                                    data-overdue="<?= esc(number_format($o['overdue'], 2)) ?>"
+                                                    data-max="<?= esc(number_format($o['max'], 2, '.', '')) ?>"
+                                                    data-sources="<?= esc(implode(', ', array_map(fn($s) => $s['account_number'] . ' (₱' . number_format($s['available'], 2) . ')', $o['sources']))) ?>">
+                                                <i class="fa-solid fa-scale-balanced me-1"></i>Apply Offset
+                                            </button>
+                                        <?php else: ?>
+                                            <div class="small text-muted mt-1" style="max-width:14rem;margin:auto;">Offset: <?= esc($o['reason']) ?></div>
+                                        <?php endif; ?>
+                                    <?php endif; ?>
                                 <?php else: ?>
                                     <span class="text-muted small">—</span>
                                 <?php endif; ?>
@@ -145,5 +164,52 @@
 </div>
 
 <?= view('partials/schedule_modal') ?>
+
+<!-- Loan offset (Loan Offset Policy) -->
+<div class="modal fade" id="offsetModal" tabindex="-1" aria-labelledby="offsetModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <form class="modal-content" id="offsetForm" method="post" action="" onsubmit="this.querySelector('[type=submit]').disabled = true;">
+            <?= csrf_field() ?>
+            <div class="modal-header modal-header-brand">
+                <h5 class="modal-title text-white" id="offsetModalLabel"><i class="fa-solid fa-scale-balanced me-2 glc-icon"></i>Apply Loan Offset</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <p class="mb-2">Settle loan <strong id="offsetLoan"></strong> of <strong id="offsetMember"></strong> from the member's contributions, because a repayment was missed.</p>
+                <table class="table table-sm small mb-3">
+                    <tr><th class="fw-normal text-muted">Overdue</th><td class="text-end" id="offsetOverdue"></td></tr>
+                    <tr><th class="fw-normal text-muted">Loan balance</th><td class="text-end" id="offsetBalance"></td></tr>
+                    <tr><th class="fw-normal text-muted">Taken from (in this order)</th><td class="text-end" id="offsetSources"></td></tr>
+                </table>
+                <label for="offsetAmount" class="form-label fw-semibold small">Amount to offset (₱)</label>
+                <input type="number" id="offsetAmount" name="amount" class="form-control" min="0.01" step="0.01" required aria-describedby="offsetHelp">
+                <div id="offsetHelp" class="form-text mb-3"></div>
+                <label for="offsetConfirm" class="form-label fw-semibold small">Type OFFSET to confirm</label>
+                <input type="text" id="offsetConfirm" name="confirm" class="form-control" pattern="OFFSET" required autocomplete="off">
+                <p class="small text-muted mt-3 mb-0">The amount is applied to the loan's months, oldest first, and taken out of the member's contributions.
+                    It is recorded in the blockchain ledger and the audit log, and the member is notified. It cannot be undone.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn btn-danger"><i class="fa-solid fa-scale-balanced me-2"></i>Apply Offset</button>
+            </div>
+        </form>
+    </div>
+</div>
+<script>
+document.getElementById('offsetModal').addEventListener('show.bs.modal', function (e) {
+    const b = e.relatedTarget.dataset;
+    document.getElementById('offsetForm').action = <?= json_encode(rtrim(base_url('admin/loans'), '/') . '/') ?> + encodeURIComponent(b.loanId) + '/offset';
+    document.getElementById('offsetLoan').textContent = '#' + b.loanId;
+    document.getElementById('offsetMember').textContent = b.member;
+    document.getElementById('offsetOverdue').textContent = '₱' + b.overdue;
+    document.getElementById('offsetBalance').textContent = '₱' + b.balance;
+    document.getElementById('offsetSources').textContent = b.sources;
+    const amount = document.getElementById('offsetAmount');
+    amount.max = b.max; amount.value = b.max;
+    document.getElementById('offsetHelp').textContent = 'Up to ₱' + Number(b.max).toLocaleString('en-PH', { minimumFractionDigits: 2 }) + ' (the smaller of the loan balance and the available contributions).';
+    document.getElementById('offsetConfirm').value = '';
+});
+</script>
 
 <?= $this->endSection() ?>

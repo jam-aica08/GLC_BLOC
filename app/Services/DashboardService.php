@@ -7,12 +7,13 @@ namespace App\Services;
  * own accounts) and for an admin (every account in the cooperative), so both
  * dashboards read the same way.
  *
- * Equity = approved contributions + dividends received.
+ * Equity = contributions held (approved contributions − withdrawals − loan
+ * offsets) + dividends received.
  * Net position = equity − unpaid loan balance.
  */
 class DashboardService
 {
-    private const RECORD_TYPES = ['Contribution', 'Loan Disbursement', 'Loan Payment', 'Dividend'];
+    private const RECORD_TYPES = ['Contribution', 'Loan Disbursement', 'Loan Payment', 'Dividend', 'Withdrawal', 'Loan Offset'];
 
     /**
      * @param list<int>|null $accountIds Accounts to include; null = the whole cooperative.
@@ -30,11 +31,18 @@ class DashboardService
             return $builder;
         };
 
-        $contributions = (float) ($scope($db->table('financial_records'), 'account_id')
+        $paidIn = (float) ($scope($db->table('financial_records'), 'account_id')
             ->selectSum('amount')
             ->where('record_type', 'Contribution')
             ->where('approval_status', 'Approved')
             ->get()->getRowArray()['amount'] ?? 0);
+        // Contributions taken back out: withdrawals and loan offsets.
+        $withdrawn = (float) ($scope($db->table('financial_records'), 'account_id')
+            ->selectSum('amount')
+            ->whereIn('record_type', ContributionBalance::DEDUCTIONS)
+            ->where('approval_status', 'Approved')
+            ->get()->getRowArray()['amount'] ?? 0);
+        $contributions = max(0.0, $paidIn - $withdrawn);
 
         $dividends = (float) ($scope($db->table('dividends'), 'account_id')
             ->selectSum('dividend_amount')
@@ -48,6 +56,7 @@ class DashboardService
         return [
             'equity'        => round($equity, 2),
             'contributions' => round($contributions, 2),
+            'withdrawn'     => round($withdrawn, 2),
             'dividends'     => round($dividends, 2),
             'loanBalance'   => round($loanBalance, 2),
             'netPosition'   => round($equity - $loanBalance, 2),

@@ -401,7 +401,7 @@
                         <tbody id="viewAccountsBody"></tbody>
                     </table>
                 </div>
-                <p class="small text-muted px-4 py-3 mb-0 border-top">Deactivating an account stops new contributions and loans and leaves it out of dividends.
+                <p class="small text-muted px-4 py-3 mb-0 border-top">Deactivating an account stops new contributions and loans; it stays eligible for dividends.
                     The member's other accounts and sign-in are not affected, and the account's records are kept.
                     It cannot be deactivated while it has an open loan or payments waiting for approval.</p>
             </div>
@@ -493,7 +493,7 @@
 
             const note = document.createElement('div');
             note.className = 'w-100 small text-muted';
-            note.textContent = 'It will take no new contributions or loans and is left out of dividends. The member\'s other accounts and sign-in are not affected; its records are kept.';
+            note.textContent = 'It will take no new contributions or loans but stays eligible for dividends. The member\'s other accounts and sign-in are not affected; its records are kept.';
 
             form.append(field, confirmBtn, cancel, note);
             form.addEventListener('submit', function () { confirmBtn.disabled = true; });

@@ -58,6 +58,14 @@ class DatabaseUpdates
                 || ($db->tableExists('account_requests', false) && ! $db->fieldExists('request_type', 'account_requests'))) {
                 $status['problems'][] = 'data retention and account deactivation columns are missing';
             }
+            if (! $db->tableExists('withdrawals', false) || ! $db->fieldExists('admin_share', 'dividend_distributions')) {
+                $status['problems'][] = 'withdrawals, loan offsets or the administration dividend share are missing';
+            }
+            if ($db->fieldExists('carried_over', 'loan_installments') && ($lost = \App\Services\LoanService::lostCarryOver())) {
+                $status['problems'][] = count($lost) . ' loan(s) lost unpaid amounts from missed months (PHP '
+                    . number_format(array_sum($lost), 2) . ' in all: loan ' . implode(', ', array_map(fn($id) => '#' . $id, array_keys($lost)))
+                    . '); applying the updates puts them back';
+            }
         } catch (\Throwable $e) {
             log_message('error', 'DatabaseUpdates::status failed: ' . $e->getMessage());
             $status['error'] = $e->getMessage();
@@ -292,6 +300,40 @@ class DatabaseUpdates
             ]);
         }
 
+        // Withdrawals of contributions and loan offsets are financial records too
+        // (appending ENUM values keeps existing rows valid, and TiDB supports it).
+        $db->query("ALTER TABLE financial_records MODIFY record_type ENUM('Contribution','Loan Disbursement','Loan Payment','Dividend','Withdrawal','Loan Offset') NOT NULL");
+
+        // A member's request to withdraw contributions from one account; an admin approves it.
+        if (! $db->tableExists('withdrawals', false)) {
+            $forge->addField([
+                'withdrawal_id'       => ['type' => 'INT', 'unsigned' => true, 'auto_increment' => true],
+                'account_id'          => ['type' => 'INT', 'unsigned' => true],
+                'amount'              => ['type' => 'DECIMAL', 'constraint' => '15,2'],
+                'method'              => ['type' => 'VARCHAR', 'constraint' => 30, 'null' => true],
+                'reason'              => ['type' => 'VARCHAR', 'constraint' => 255, 'null' => true],
+                'status'              => ['type' => 'ENUM', 'constraint' => ['Pending', 'Approved', 'Rejected'], 'default' => 'Pending'],
+                'financial_record_id' => ['type' => 'INT', 'unsigned' => true, 'null' => true],
+                'requested_by'        => ['type' => 'INT', 'unsigned' => true, 'null' => true],
+                'created_at'          => ['type' => 'DATETIME', 'null' => true],
+                'updated_at'          => ['type' => 'DATETIME', 'null' => true],
+            ]);
+            $forge->addKey('withdrawal_id', true);
+            $forge->addKey(['account_id', 'status']);
+            $forge->addKey('financial_record_id');
+            $forge->addForeignKey('account_id', 'cooperative_accounts', 'account_id', 'CASCADE', 'RESTRICT', 'fk_withdrawals_account');
+            $forge->createTable('withdrawals', true);
+        }
+
+        // The share of each dividend pool kept for administration (3% from Oct 2026).
+        $db->resetDataCache();
+        if (! $db->fieldExists('admin_share', 'dividend_distributions')) {
+            $forge->addColumn('dividend_distributions', [
+                'admin_share_rate' => ['type' => 'DECIMAL', 'constraint' => '5,2', 'default' => 0.00, 'null' => false, 'after' => 'profit_pool'],
+                'admin_share'      => ['type' => 'DECIMAL', 'constraint' => '15,2', 'default' => 0.00, 'null' => false, 'after' => 'admin_share_rate'],
+            ]);
+        }
+
         $db->resetDataCache();
     }
 
@@ -314,6 +356,13 @@ class DatabaseUpdates
             service('migrations')->latest();
             // Also repair directly, in case migration files are missing from the deployment.
             self::repairSchema(db_connect(), \Config\Database::forge());
+
+            // Restore loan amounts dropped by the carry-over bug (fixed 27 Oct 2026), and record it.
+            if ($repaired = \App\Services\LoanService::repairLostCarryOver()) {
+                AuditLog::record('Repaired loan balances', 'loan', null,
+                    'Restored unpaid amounts lost by the carry-over bug: ' . implode(', ', array_map(
+                        fn($id, $amount) => "loan #{$id} PHP " . number_format($amount, 2), array_keys($repaired), $repaired)) . '.');
+            }
         } catch (\Throwable $e) {
             log_message('error', 'DatabaseUpdates::apply failed: ' . $e->getMessage());
             return $e->getMessage();

@@ -23,6 +23,7 @@ $glcNav = [
         ['member/contributions', 'fa-piggy-bank', 'My Contributions'],
         ['member/loans', 'fa-hand-holding-dollar', 'My Loans'],
         ['member/payments', 'fa-money-check-dollar', 'My Payments'],
+        ['member/withdrawals', 'fa-money-bill-transfer', 'My Withdrawals'],
         ['member/dividends', 'fa-percent', 'My Dividends'],
     ],
     'Ledger & Reports' => [

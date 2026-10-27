@@ -18,6 +18,7 @@ class DataReset
         'loan_installments',
         'loans',
         'contributions',
+        'withdrawals',
         'dividends',
         'dividend_distributions',
         'blockchain_ledger',

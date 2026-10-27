@@ -9,12 +9,21 @@ use CodeIgniter\Database\BaseConnection;
  * Yearly dividends.
  *
  * Profit pool: interest on loans approved in the year (Active or Paid loans).
- * The pool is shared by every Active account; a Basic account weighs 1.00 and
- * a Pioneer account 1.02, so a Pioneer share is 2% more than a Basic share and
- * the bonus comes out of the same pool:
+ * First 3% of the pool is allocated to the administration
+ * (CooperativeAccountModel::ADMIN_DIVIDEND_SHARE); the remaining 97% is the
+ * members' pool.
+ *
+ * Eligible accounts: every Active account, and every deactivated (Inactive)
+ * account that completed its joining contributions — deactivating an account
+ * does not forfeit its dividends. Accounts still joining (Pending) and Closed
+ * accounts are not eligible.
+ *
+ * The members' pool is shared by the eligible accounts; a Basic account weighs
+ * 1.00 and a Pioneer account 1.02, so a Pioneer share is 2% more than a Basic
+ * share and the bonus comes out of the same pool:
  *
  *   totalWeight  = basicCount + pioneerCount × 1.02
- *   basicShare   = profitPool / totalWeight
+ *   basicShare   = membersPool / totalWeight
  *   pioneerShare = basicShare × 1.02
  *
  * Money is handled in whole centavos with integer weights (Basic 100,
@@ -106,10 +115,17 @@ class DividendService
         model(CooperativeAccountModel::class)->syncStatuses();
 
         // Only accounts that were open by the end of that year share its profit
-        // (matters when an earlier year is distributed after imports).
+        // (matters when an earlier year is distributed after imports). A
+        // deactivated account keeps its dividends if it had completed joining:
+        // approved contributions for January up to its opening month.
+        $joined = '(SELECT COALESCE(SUM(c.amount), 0) FROM contributions c WHERE c.account_id = cooperative_accounts.account_id'
+                . " AND c.payment_status = 'Approved') >= MONTH(account_start_date) * " . CooperativeAccountModel::MONTHLY_CONTRIBUTION;
         $accounts = $this->db->table('cooperative_accounts')
-            ->select('account_id, account_number, account_type')
-            ->where('account_status', 'Active')
+            ->select('account_id, account_number, account_type, account_status')
+            ->groupStart()
+                ->where('account_status', 'Active')
+                ->orGroupStart()->where('account_status', 'Inactive')->where($joined, null, false)->groupEnd()
+            ->groupEnd()
             ->where('account_start_date <=', "{$year}-12-31")
             ->orderBy('account_id', 'ASC')
             ->get()->getResultArray();
@@ -117,10 +133,13 @@ class DividendService
         $pioneers    = count(array_filter($accounts, fn($a) => $a['account_type'] === 'Pioneer'));
         $basics      = count($accounts) - $pioneers;
         $poolC       = $this->profitPoolCentavos($year);
+        $adminRate   = CooperativeAccountModel::ADMIN_DIVIDEND_SHARE;
+        $adminC      = (int) round($poolC * $adminRate / 100);
+        $membersC    = $poolC - $adminC;
         $bonus       = 1 + CooperativeAccountModel::PIONEER_DIVIDEND_BONUS / 100;
         $totalWeight = $basics + $pioneers * $bonus;
-        $basicShare  = ($poolC > 0 && $totalWeight > 0) ? ($poolC / 100) / $totalWeight : 0.0;
-        $allocation  = self::allocate($poolC, $accounts);
+        $basicShare  = ($membersC > 0 && $totalWeight > 0) ? ($membersC / 100) / $totalWeight : 0.0;
+        $allocation  = self::allocate($membersC, $accounts);
 
         $errors = [];
         if (! self::validYear($year)) {
@@ -130,12 +149,16 @@ class DividendService
             $errors[] = "There is no profit pool for {$year}: no interest was earned on loans approved that year.";
         }
         if ($accounts === []) {
-            $errors[] = 'There are no Active accounts to receive dividends.';
+            $errors[] = 'There are no eligible accounts to receive dividends.';
         }
 
         return [
             'year'              => $year,
             'profit_pool'       => $poolC / 100,
+            'admin_share_rate'  => $adminRate,
+            'admin_share'       => $adminC / 100,
+            'members_pool'      => $membersC / 100,
+            'inactive_count'    => count(array_filter($accounts, fn($a) => $a['account_status'] === 'Inactive')),
             'basic_count'       => $basics,
             'pioneer_count'     => $pioneers,
             'total_weight'      => $totalWeight,
@@ -204,9 +227,14 @@ class DividendService
         $now    = date('Y-m-d H:i:s');
         $basicC = (int) round($plan['basic_share'] * 100);
 
+        // Recorded with the batch when the database has the columns (Apply Database Updates).
+        $adminShare = $this->db->fieldExists('admin_share', 'dividend_distributions')
+            ? ['admin_share_rate' => $plan['admin_share_rate'], 'admin_share' => $plan['admin_share']]
+            : [];
+
         $this->db->transBegin();
         try {
-            $this->db->table('dividend_distributions')->insert([
+            $this->db->table('dividend_distributions')->insert($adminShare + [
                 'distribution_year' => $year,
                 'year_lock'         => $year,
                 'profit_pool'       => $plan['profit_pool'],

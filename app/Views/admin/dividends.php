@@ -45,6 +45,8 @@ $canPlan  = $available && $plan['errors'] === [] && ! $plan['existing'] && ! $pl
                     <div class="pool-label"><i class="fa-solid fa-sack-dollar me-2"></i>Profit pool <?= esc($year) ?></div>
                     <div class="pool-value"><?= $peso($plan['profit_pool']) ?></div>
                     <div class="pool-sub">Interest earned on loans approved this year · calculated automatically</div>
+                    <div class="pool-sub mt-1">Administration <?= rtrim(rtrim(number_format($plan['admin_share_rate'], 2), '0'), '.') ?>%: <?= $peso($plan['admin_share']) ?> ·
+                        Members <?= rtrim(rtrim(number_format(100 - $plan['admin_share_rate'], 2), '0'), '.') ?>%: <?= $peso($plan['members_pool']) ?></div>
                 </div>
             </div>
             <div class="col-6 col-md-3">
@@ -69,7 +71,8 @@ $canPlan  = $available && $plan['errors'] === [] && ! $plan['existing'] && ! $pl
             <div class="alert alert-info small mb-0 mt-3">Dividends for <?= esc($year) ?> were already recorded.</div>
         <?php else: ?>
             <div class="text-muted small mt-3 text-center">
-                Each Basic account counts as 1.00 share and each Pioneer account as 1.02 · Total to distribute: <?= $peso($plan['total_distributed']) ?>
+                Each Basic account counts as 1.00 share and each Pioneer account as 1.02 · Total to members: <?= $peso($plan['total_distributed']) ?>
+                <?php if ($plan['inactive_count'] > 0): ?><br><?= (int) $plan['inactive_count'] ?> deactivated account(s) included: deactivation does not forfeit dividends.<?php endif; ?>
             </div>
         <?php endif; ?>
     </div>
@@ -81,7 +84,7 @@ $canPlan  = $available && $plan['errors'] === [] && ! $plan['existing'] && ! $pl
     <div class="table-responsive">
         <table class="table align-middle mb-0" style="font-size:.875rem;">
             <thead class="table-light">
-                <tr><th>#</th><th>Year</th><th class="text-end">Profit Pool</th><th>Accounts</th><th class="text-end">Basic / Pioneer share</th><th class="text-end">Total</th><th>Approvals</th><th>Status</th><th></th></tr>
+                <tr><th>#</th><th>Year</th><th class="text-end">Profit Pool</th><th class="text-end">Administration</th><th>Accounts</th><th class="text-end">Basic / Pioneer share</th><th class="text-end">Total</th><th>Approvals</th><th>Status</th><th></th></tr>
             </thead>
             <tbody>
                 <?php foreach ($distributions as $dist): ?>
@@ -94,6 +97,7 @@ $canPlan  = $available && $plan['errors'] === [] && ! $plan['existing'] && ! $pl
                         <td><code>#<?= (int) $dist['distribution_id'] ?></code></td>
                         <td><a href="<?= base_url('admin/dividends?year=' . (int) $dist['distribution_year']) ?>"><?= (int) $dist['distribution_year'] ?></a></td>
                         <td class="text-end"><?= $peso($dist['profit_pool']) ?></td>
+                        <td class="text-end"><?= ! empty($dist['admin_share_rate']) && (float) $dist['admin_share_rate'] > 0 ? $peso($dist['admin_share']) . ' <span class="text-muted small">(' . rtrim(rtrim(number_format((float) $dist['admin_share_rate'], 2), '0'), '.') . '%)</span>' : '—' ?></td>
                         <td><?= (int) $dist['basic_count'] ?> Basic, <?= (int) $dist['pioneer_count'] ?> Pioneer</td>
                         <td class="text-end"><?= $peso($dist['basic_share']) ?> / <?= $peso($dist['pioneer_share']) ?></td>
                         <td class="text-end fw-semibold"><?= $peso($dist['total_distributed']) ?></td>
@@ -201,12 +205,14 @@ $canPlan  = $available && $plan['errors'] === [] && ! $plan['existing'] && ! $pl
                         <table class="table table-sm mb-3">
                             <tbody>
                                 <tr><th class="fw-normal text-muted">Profit pool</th><td class="text-end fw-semibold"><?= $peso($plan['profit_pool']) ?></td></tr>
+                                <tr><th class="fw-normal text-muted">Administration (<?= rtrim(rtrim(number_format($plan['admin_share_rate'], 2), '0'), '.') ?>%)</th><td class="text-end"><?= $peso($plan['admin_share']) ?></td></tr>
+                                <tr><th class="fw-normal text-muted">Members' pool</th><td class="text-end"><?= $peso($plan['members_pool']) ?></td></tr>
                                 <tr><th class="fw-normal text-muted">Basic accounts</th><td class="text-end"><?= $plan['basic_count'] ?> × <?= $peso($plan['basic_share']) ?></td></tr>
                                 <tr><th class="fw-normal text-muted">Pioneer accounts (+2%)</th><td class="text-end"><?= $plan['pioneer_count'] ?> × <?= $peso($plan['pioneer_share']) ?></td></tr>
-                                <tr><th>Total to distribute</th><td class="text-end fw-bold"><?= $peso($plan['total_distributed']) ?></td></tr>
+                                <tr><th>Total to members</th><td class="text-end fw-bold"><?= $peso($plan['total_distributed']) ?></td></tr>
                             </tbody>
                         </table>
-                        <p class="small text-muted">Amounts are rounded to the centavo; any leftover centavos go to the accounts with the largest remainders, so the total equals the pool exactly.
+                        <p class="small text-muted">Amounts are rounded to the centavo; any leftover centavos go to the accounts with the largest remainders, so the total equals the members' pool exactly.
                             The distribution is saved as <strong>waiting for approval</strong>; an administrator must approve it before it is recorded.</p>
                         <label for="distribution_date" class="form-label fw-semibold">Distribution Date</label>
                         <input type="date" id="distribution_date" name="distribution_date" class="form-control" value="<?= date('Y-m-d') ?>" required>

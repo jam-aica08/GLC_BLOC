@@ -119,7 +119,11 @@ class LoanService
         $now   = date('Y-m-d H:i:s');
         $last  = count($rows) - 1;
 
-        foreach ($rows as $i => $row) {
+        // Read each month fresh from $rows: a month just given a carried amount
+        // must pass all of it on when it is missed too. (foreach by value would
+        // read a copy without it, losing the earlier months' unpaid amounts.)
+        foreach (array_keys($rows) as $i) {
+            $row = $rows[$i];
             if ($i === $last || in_array($row['payment_status'], self::CLOSED, true) || $row['due_date'] >= $today) {
                 continue;
             }
@@ -365,33 +369,77 @@ class LoanService
         }
     }
 
+    /**
+     * Loans whose open months owe less than their unpaid regular amounts: the
+     * carry-over bug (fixed 27 Oct 2026) dropped earlier missed months when
+     * several were missed in a row.
+     *
+     * @return array<int, float> loan_id => amount lost
+     */
+    public static function lostCarryOver(): array
+    {
+        $rows = db_connect()->query("SELECT l.loan_id,
+                ROUND(SUM(li.amount_due) - SUM(li.amount_paid), 2) AS should_owe,
+                ROUND(SUM(CASE WHEN li.payment_status NOT IN ('Paid', 'Partial')
+                               THEN GREATEST(li.amount_due + li.carried_over - li.amount_paid, 0) ELSE 0 END), 2) AS owed
+            FROM loans l JOIN loan_installments li ON li.loan_id = l.loan_id
+            WHERE l.loan_status IN ('Active', 'Defaulted')
+            GROUP BY l.loan_id")->getResultArray();
+
+        $lost = [];
+        foreach ($rows as $r) {
+            $gap = round((float) $r['should_owe'] - (float) $r['owed'], 2);
+            if ($gap > 0.009) {
+                $lost[(int) $r['loan_id']] = $gap;
+            }
+        }
+
+        return $lost;
+    }
+
+    /**
+     * Put the amounts lost by the carry-over bug back on each loan's first
+     * open month. Returns the loans repaired (loan_id => amount restored).
+     *
+     * @return array<int, float>
+     */
+    public static function repairLostCarryOver(): array
+    {
+        $db       = db_connect();
+        $repaired = [];
+        foreach (self::lostCarryOver() as $loanId => $gap) {
+            $open = $db->table('loan_installments')->where('loan_id', $loanId)
+                ->whereNotIn('payment_status', self::CLOSED)->orderBy('installment_number')->limit(1)->get()->getRowArray();
+            if (! $open) {
+                continue;
+            }
+            $carried = round((float) $open['carried_over'] + $gap, 2);
+            $db->table('loan_installments')->where('installment_id', $open['installment_id'])->update([
+                'carried_over'      => $carried,
+                'remaining_balance' => round((float) $open['amount_due'] + $carried - (float) $open['amount_paid'], 2),
+                'updated_at'        => date('Y-m-d H:i:s'),
+            ]);
+            $repaired[$loanId] = $gap;
+        }
+
+        return $repaired;
+    }
+
     // -------------------------------------------------------------------------
     // Loan limit
     // -------------------------------------------------------------------------
 
     /**
      * Compute the maximum loan amount a member's cooperative account may apply for.
-     * Maximum = 2 × total approved contributions for that account.
+     * Maximum = 2 × the contributions the account still holds (approved
+     * contributions less approved withdrawals and loan offsets), so money
+     * already taken out cannot back a loan.
      *
      * @param  int   $accountId
      * @return float
      */
     public function checkMaxLoanLimit(int $accountId): float
     {
-        $db = db_connect();
-
-        $row = $db->table('financial_records')
-                  ->selectSum('amount', 'total_contributions')
-                  ->where('account_id', $accountId)
-                  ->where('record_type', 'Contribution')
-                  ->where('approval_status', 'Approved')
-                  ->get()
-                  ->getRowArray();
-
-        $totalContributions = ($row && $row['total_contributions'] !== null)
-            ? (float) $row['total_contributions']
-            : 0.0;
-
-        return round($totalContributions * 2, 2);
+        return round(ContributionBalance::forAccount($accountId)['balance'] * 2, 2);
     }
 }

@@ -36,7 +36,7 @@ class FinancialRecordModel extends Model
     // Validation
     protected $validationRules = [
         'account_id'       => 'required|integer|greater_than[0]',
-        'record_type'      => 'required|in_list[Contribution,Loan Disbursement,Loan Payment,Dividend]',
+        'record_type'      => 'required|in_list[Contribution,Loan Disbursement,Loan Payment,Dividend,Withdrawal,Loan Offset]',
         'transaction_date' => 'required|valid_date',
         'amount'           => 'required|decimal|greater_than[0]',
         'approval_status'  => 'permit_empty|in_list[Pending,Approved,Rejected]',
@@ -54,7 +54,7 @@ class FinancialRecordModel extends Model
         ],
         'record_type' => [
             'required' => 'Record type is required.',
-            'in_list'  => 'Record type must be one of: Contribution, Loan Disbursement, Loan Payment, Dividend.',
+            'in_list'  => 'Record type must be one of: Contribution, Loan Disbursement, Loan Payment, Dividend, Withdrawal, Loan Offset.',
         ],
         'transaction_date' => [
             'required'   => 'Transaction date is required.',

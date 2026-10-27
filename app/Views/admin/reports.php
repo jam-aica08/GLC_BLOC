@@ -18,7 +18,7 @@ $titles   = ['summary' => 'Financial summary', 'transactions' => 'Transaction li
 $tabIcons = ['summary' => 'fa-chart-column', 'transactions' => 'fa-list', 'membership' => 'fa-users', 'ledger' => 'fa-link'];
 $periods  = ['month' => 'This month', '30days' => 'Last 30 days', 'year' => 'This year', 'all' => 'All time', 'custom' => 'Custom'];
 // Series colours for the four record types (validated as a categorical set).
-$colors   = ['Contribution' => '#3a37c4', 'Loan Disbursement' => '#e0067a', 'Loan Payment' => '#0f9fbf', 'Dividend' => '#eb6834'];
+$colors   = ['Contribution' => '#3a37c4', 'Loan Disbursement' => '#e0067a', 'Loan Payment' => '#0f9fbf', 'Dividend' => '#eb6834', 'Withdrawal' => '#7a4fd6', 'Loan Offset' => '#6b7280'];
 $badges   = ['Approved' => 'bg-success', 'Pending' => 'bg-warning text-dark', 'Rejected' => 'bg-danger'];
 $statusIcon = ['Approved' => 'fa-circle-check', 'Pending' => 'fa-clock', 'Rejected' => 'fa-circle-xmark'];
 $range    = fn($from, $to) => date('M j, Y', strtotime($from)) . ' – ' . date('M j, Y', strtotime($to));
@@ -152,7 +152,8 @@ $sumOf = function (array $s, array $typeList, string $status = 'Approved'): arra
 
     <?php if ($f['category'] === 'summary'):
         $inTypes  = array_values(array_intersect($types, ['Contribution', 'Loan Payment']));
-        $outTypes = array_values(array_intersect($types, ['Loan Disbursement', 'Dividend']));
+        // A loan offset moves contributions to a loan inside the cooperative: neither in nor out.
+        $outTypes = array_values(array_intersect($types, ['Loan Disbursement', 'Dividend', 'Withdrawal']));
         $kpis = [
             'in'      => $sumOf($summary, $inTypes),
             'out'     => $sumOf($summary, $outTypes),

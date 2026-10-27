@@ -9,8 +9,10 @@ use App\Models\CooperativeAccountModel;
  * Deactivating and reactivating one cooperative account of a member, without
  * touching the member's other accounts or their login.
  *
- * An Inactive account takes no new contributions or loans and is left out of
- * dividends; every record it already has is kept. It cannot be deactivated
+ * An Inactive account takes no new contributions or loans; it stays eligible
+ * for dividends once its joining contributions are complete (see
+ * DividendService), and every record it already has is kept. Its available
+ * contributions can still be withdrawn. It cannot be deactivated
  * while it has an open loan or anything waiting for approval, so no debt or
  * payment is stranded. Reactivating returns it to Pending, and it becomes
  * Active again once its joining contributions are paid, as for a new account.
@@ -123,7 +125,7 @@ class AccountStatusService
 
         Notifier::toMember((int) $account['member_id'], 'account', 'Account ' . $account['account_number'] . ' deactivated',
             "Your {$account['account_type']} account {$account['account_number']} was deactivated"
-            . ($reason !== '' ? " ({$reason})" : '') . '. It takes no new contributions or loans and is not counted for dividends; its records are kept.',
+            . ($reason !== '' ? " ({$reason})" : '') . '. It takes no new contributions or loans; it stays eligible for dividends and its records are kept.',
             'member/profile', 'account-deactivated-' . $accountId . '-' . time());
 
         return null;

@@ -22,6 +22,7 @@ $names    = [
     'settings'          => 'Settings',
     'profile'           => 'My Profile',
     'retention'         => 'Data Retention',
+    'withdrawals'       => $segments[0] === 'member' ? 'My Withdrawals' : 'Withdrawals',
 ];
 $page = $segments[0] === 'privacy' ? 'Privacy & Data Retention' : ($names[$segments[1] ?? ''] ?? null);
 ?>
