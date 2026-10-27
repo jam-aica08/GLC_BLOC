@@ -86,6 +86,8 @@ class Notifier
      * Keep one "activate your account" reminder per Pending account in the
      * member's notifications, with the amount still needed. A changed amount
      * replaces the old reminder; an account that is no longer Pending loses it.
+     * A deactivated (Inactive) account never gets one: deactivation stops
+     * contribution reminders, nothing else.
      *
      * @param list<array> $accounts rows with account_id, account_number, account_status and standing.join_balance
      */

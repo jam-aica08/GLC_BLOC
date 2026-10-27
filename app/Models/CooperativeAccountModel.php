@@ -24,6 +24,12 @@ class CooperativeAccountModel extends Model
      */
     public const ADMIN_DIVIDEND_SHARE = 3.00;
 
+    /**
+     * Contributions an account must complete in a year (12 × PHP 300) to be
+     * eligible for that year's dividends (Dividend Eligibility Policy).
+     */
+    public const ANNUAL_CONTRIBUTION = 3600.00;
+
     /** Allowed amount for any single contribution, including the opening one (PHP). */
     public const CONTRIBUTION_MIN = 300.00;
     public const CONTRIBUTION_MAX = 3600.00;
@@ -42,6 +48,7 @@ class CooperativeAccountModel extends Model
         'account_start_date',
         'monthly_contribution',
         'account_status',
+        'reactivation_from',
     ];
 
     // Timestamps
@@ -168,6 +175,53 @@ class CooperativeAccountModel extends Model
         return $accounts;
     }
 
+    /** False until "Apply Database Updates" has added cooperative_accounts.reactivation_from. */
+    public static function reactivationAvailable(): bool
+    {
+        try {
+            return \App\Libraries\SchemaCache::passes('reactivation_from', static fn () => db_connect()->fieldExists('reactivation_from', 'cooperative_accounts'));
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    /** Months from $from (YYYY-MM) up to and including the current month; 1 when $from is this month. */
+    public static function monthsFrom(string $from, ?int $now = null): int
+    {
+        [$y, $m] = array_map('intval', explode('-', $from) + [1 => 1]);
+        $now ??= time();
+
+        return max(1, ((int) date('Y', $now) - $y) * 12 + (int) date('n', $now) - $m + 1);
+    }
+
+    /**
+     * Whether the account was reactivated and is still settling the months it
+     * missed (Account Reactivation Policy).
+     */
+    public static function isReactivating(array $account): bool
+    {
+        return ! empty($account['reactivation_from']) && ($account['account_status'] ?? '') === 'Pending';
+    }
+
+    /**
+     * What a reactivated account still owes before it is Active again: PHP 300
+     * for every month from the month it was deactivated to the current month,
+     * less the approved contributions for those months.
+     */
+    public function reactivationArrears(array $account): float
+    {
+        if (! self::isReactivating($account)) {
+            return 0.0;
+        }
+        $required = self::monthsFrom($account['reactivation_from']) * self::MONTHLY_CONTRIBUTION;
+        $paid     = (float) ($this->db->table('contributions')->selectSum('amount', 'total')
+            ->where('account_id', (int) $account['account_id'])->where('payment_status', 'Approved')
+            ->where('contribution_period >=', $account['reactivation_from'])
+            ->get()->getRow()->total ?? 0);
+
+        return round(max(0.0, $required - $paid), 2);
+    }
+
     /**
      * Contribution standing for an account. Every account joins the
      * cooperative only after paying every month from January of its start
@@ -190,12 +244,17 @@ class CooperativeAccountModel extends Model
             ? (float) $account['approved_total']
             : $this->getTotalContributions((int) $account['account_id']);
 
+        // A reactivated account's "left to activate" is the missed months it must settle.
+        $reactivating = self::isReactivating($account);
+
         return [
-            'required_to_join' => $requiredToJoin,
-            'required_to_date' => $requiredToDate,
-            'paid'             => $paid,
-            'join_balance'     => max(0.0, round($requiredToJoin - $paid, 2)),
-            'due_balance'      => max(0.0, round($requiredToDate - $paid, 2)),
+            'required_to_join'  => $requiredToJoin,
+            'required_to_date'  => $requiredToDate,
+            'paid'              => $paid,
+            'join_balance'      => $reactivating ? $this->reactivationArrears($account) : max(0.0, round($requiredToJoin - $paid, 2)),
+            'due_balance'       => max(0.0, round($requiredToDate - $paid, 2)),
+            'reactivating'      => $reactivating,
+            'reactivation_from' => $reactivating ? $account['reactivation_from'] : null,
         ];
     }
 
@@ -254,16 +313,31 @@ class CooperativeAccountModel extends Model
               . ' WHERE c.account_id = cooperative_accounts.account_id AND c.payment_status = \'Approved\')';
         $join = 'MONTH(account_start_date) * ' . self::MONTHLY_CONTRIBUTION;
 
+        // A reactivated account follows its own rule (the missed months), not the joining one.
+        $reactivation = self::reactivationAvailable();
+        $notReactivating = $reactivation ? ' AND reactivation_from IS NULL' : '';
+
         $wrongActive  = "account_status = 'Active' AND {$paid} < {$join}";
-        $wrongPending = "account_status = 'Pending' AND {$paid} >= {$join}";
+        $wrongPending = "account_status = 'Pending' AND {$paid} >= {$join}{$notReactivating}";
 
         // Usually nothing is out of line, so look first and write only when needed.
         $mismatch = $this->db->query("SELECT 1 FROM cooperative_accounts WHERE ({$wrongActive}) OR ({$wrongPending}) LIMIT 1")->getRow();
-        if (! $mismatch) {
-            return;
+        if ($mismatch) {
+            $this->db->query("UPDATE cooperative_accounts SET account_status = 'Pending' WHERE {$wrongActive}");
+            $this->db->query("UPDATE cooperative_accounts SET account_status = 'Active' WHERE {$wrongPending}");
         }
-        $this->db->query("UPDATE cooperative_accounts SET account_status = 'Pending' WHERE {$wrongActive}");
-        $this->db->query("UPDATE cooperative_accounts SET account_status = 'Active' WHERE {$wrongPending}");
+
+        // Reactivated accounts that have settled every missed month are Active again.
+        if ($reactivation) {
+            $reactivating = $this->db->table($this->table)->where('account_status', 'Pending')
+                ->where('reactivation_from IS NOT NULL')->get()->getResultArray();
+            foreach ($reactivating as $account) {
+                if ($this->reactivationArrears($account) <= 0) {
+                    $this->db->table($this->table)->where('account_id', $account['account_id'])->where('account_status', 'Pending')
+                        ->update(['account_status' => 'Active', 'reactivation_from' => null]);
+                }
+            }
+        }
     }
 
     /**

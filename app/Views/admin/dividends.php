@@ -72,7 +72,9 @@ $canPlan  = $available && $plan['errors'] === [] && ! $plan['existing'] && ! $pl
         <?php else: ?>
             <div class="text-muted small mt-3 text-center">
                 Each Basic account counts as 1.00 share and each Pioneer account as 1.02 · Total to members: <?= $peso($plan['total_distributed']) ?>
-                <?php if ($plan['inactive_count'] > 0): ?><br><?= (int) $plan['inactive_count'] ?> deactivated account(s) included: deactivation does not forfeit dividends.<?php endif; ?>
+                <br>Eligible: accounts with ₱<?= number_format($plan['required'], 2) ?> of approved contributions for <?= esc($year) ?>
+                (<?= count($plan['accounts']) ?> eligible<?= $plan['below_count'] ? ', ' . (int) $plan['below_count'] . ' below the requirement and not included' : '' ?>).
+                <?php if ($plan['inactive_count'] > 0): ?><?= (int) $plan['inactive_count'] ?> deactivated account(s) included: deactivation does not disqualify an account that completed its contributions.<?php endif; ?>
             </div>
         <?php endif; ?>
     </div>

@@ -64,7 +64,8 @@ class DashboardService
             'records'       => $this->recordSummary($scope),
             'recent'        => $this->recentActivity($scope),
             'chart'         => $this->monthlyContributions($scope),
-            'dividendPlan'  => (new DividendService())->plan((int) date('Y')),
+            // An estimate: accounts on track for this year's PHP 3,600 so far.
+            'dividendPlan'  => (new DividendService())->plan((int) date('Y'), true),
         ];
     }
 

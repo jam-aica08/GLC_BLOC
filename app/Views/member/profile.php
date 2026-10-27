@@ -106,7 +106,10 @@
                         <td class="py-3"><?= esc($acc['account_type']) ?></td>
                         <td class="py-3"><?= esc($acc['account_start_date']) ?></td>
                         <td class="py-3">
-                            <?php if ($acc['account_status'] === 'Pending'): ?>
+                            <?php if (! empty($st['reactivating'])): ?>
+                                <span class="badge bg-warning text-dark">Reactivating — ₱<?= number_format($st['join_balance'], 2) ?> missed contributions to settle</span>
+                                <div class="small text-muted">From <?= esc(date('F Y', strtotime($st['reactivation_from'] . '-01'))) ?> to <?= esc(date('F Y')) ?></div>
+                            <?php elseif ($acc['account_status'] === 'Pending'): ?>
                                 <span class="badge bg-warning text-dark">Joining — ₱<?= number_format($st['join_balance'], 2) ?> left</span>
                             <?php elseif ($acc['account_status'] === 'Inactive'): ?>
                                 <span class="badge bg-secondary">Deactivated</span>
@@ -128,7 +131,7 @@
                                 <span class="small text-muted">—</span>
                             <?php elseif ($acc['account_status'] === 'Inactive'): ?>
                                 <form method="post" action="<?= base_url('member/profile/accounts/' . $id . '/reactivate') ?>"
-                                      onsubmit="return confirm('Ask an admin to reactivate account <?= esc($acc['account_number'], 'js') ?>?');">
+                                      onsubmit="return confirm('Ask an admin to reactivate account <?= esc($acc['account_number'], 'js') ?>? Once approved, pay the monthly contributions missed since <?= esc(! empty($acc['deactivated_at']) ? date('F Y', strtotime($acc['deactivated_at'])) : 'it was deactivated', 'js') ?> to make it active again.');">
                                     <?= csrf_field() ?>
                                     <button type="submit" class="btn btn-sm btn-outline-success"><i class="fa-solid fa-rotate-left me-1"></i>Request reactivation</button>
                                 </form>
@@ -175,13 +178,13 @@
     </div>
     <div class="card-footer bg-white small text-muted">
         <?php if (in_array('Pending', array_column($accounts ?? [], 'account_status'), true)): ?>
-            Accounts marked <em>Joining</em> activate once the amount shown is paid.
+            Accounts marked <em>Joining</em> or <em>Reactivating</em> become active once the amount shown is paid.
             <a href="<?= base_url('member/contributions') ?>">Contribute</a><br>
         <?php endif; ?>
         <?php if (empty($canRequestChanges) && ($member['membership_status'] ?? '') === 'Active'): ?>
             <span class="text-warning-emphasis"><i class="fa-solid fa-circle-info me-1"></i>Requests to deactivate or reactivate an account are not available yet. Please try again later or contact the cooperative office.</span><br>
         <?php endif; ?>
-        A deactivated account takes no new contributions or loans but stays eligible for dividends; your other accounts are not affected and its records are kept.
+        A deactivated account is not closed: you get no contribution reminders for it and it takes no new loans, but you can still contribute to it, its contributions stay with the cooperative, and it can still receive dividends for a year in which it completed ₱3,600. To reactivate it, settle the monthly contributions missed since it was deactivated. Your other accounts are not affected.
         <a href="<?= base_url('privacy') ?>">How long records are kept</a>
     </div>
 </div>
@@ -201,7 +204,9 @@
                 <div class="modal-body p-4">
                     <p class="mb-2">Ask an admin to deactivate account <strong id="deactivateAccountNumber"></strong>.</p>
                     <ul class="small text-muted mb-3">
-                        <li>It will take no new contributions or loans. It stays eligible for dividends once its joining contributions are complete.</li>
+                        <li>It is not closed: you stop getting contribution reminders for it and it takes no new loans. You can still contribute to it, and your contributions stay with the cooperative.</li>
+                        <li>It can still receive dividends for a year in which it completed ₱3,600 (12 × ₱300).</li>
+                        <li>To reactivate later, you settle the monthly contributions missed since deactivation.</li>
                         <li>Your other accounts and your sign-in are not affected.</li>
                         <li>Its contributions and records are kept, and you can ask to reactivate it later.</li>
                     </ul>

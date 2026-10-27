@@ -89,7 +89,8 @@ final class AccountDeactivationTest extends CIUnitTestCase
         $this->seeInDatabase('notifications', ['member_id' => $this->memberId, 'title' => 'Account ACC-2026-900 deactivated']);
     }
 
-    public function testDeactivatedAccountTakesNoContributionsOrLoans(): void
+    /** Deactivated is not closed: contributions are still accepted; new loans are not. */
+    public function testDeactivatedAccountTakesContributionsButNoLoans(): void
     {
         $this->withSession($this->adminSession)->post("admin/members/accounts/{$this->firstAccount}/deactivate");
         $before = $this->db->table('contributions')->countAllResults();
@@ -99,8 +100,22 @@ final class AccountDeactivationTest extends CIUnitTestCase
         $this->withSession($this->memberSession)->post('member/loans/apply',
             ['account_id' => $this->firstAccount, 'loan_amount' => 100, 'loan_term_months' => 3]);
 
-        $this->assertSame($before, $this->db->table('contributions')->countAllResults());
+        $this->assertSame($before + 1, $this->db->table('contributions')->countAllResults());
+        $this->assertSame('Inactive', $this->accountStatus($this->firstAccount), 'Contributing does not reactivate it.');
         $this->assertSame(0, $this->db->table('loans')->where('account_id', $this->firstAccount)->countAllResults());
+    }
+
+    /** A deactivated account gets no contribution reminders. */
+    public function testDeactivatedAccountGetsNoContributionReminders(): void
+    {
+        // The second account is joining, so it has an "activate" reminder.
+        $this->withSession($this->memberSession)->get('member/dashboard');
+        $this->seeInDatabase('notifications', ['member_id' => $this->memberId, 'title' => 'Activate account ACC-2026-900']);
+
+        $this->withSession($this->adminSession)->post("admin/members/accounts/{$this->secondAccount}/deactivate");
+        $this->withSession($this->memberSession)->get('member/dashboard');
+
+        $this->dontSeeInDatabase('notifications', ['member_id' => $this->memberId, 'title' => 'Activate account ACC-2026-900']);
     }
 
     public function testAccountWithAnOpenLoanCannotBeDeactivated(): void
@@ -115,16 +130,71 @@ final class AccountDeactivationTest extends CIUnitTestCase
         $this->assertSame('Active', $this->accountStatus($this->firstAccount));
     }
 
-    public function testReactivatedAccountIsActiveAgainWhenItsJoiningIsPaid(): void
+    /** Approved contributions on the first account for each YYYY-MM given. */
+    private function paid(array $periods): void
+    {
+        foreach ($periods as $period) {
+            $this->db->table('contributions')->insert(['account_id' => $this->firstAccount, 'contribution_period' => $period,
+                'amount' => 300, 'payment_date' => date('Y-m-d'), 'payment_status' => 'Approved', 'created_at' => date('Y-m-d H:i:s')]);
+        }
+    }
+
+    /** YYYY-MM of $n months ago. */
+    private static function monthsAgo(int $n): string
+    {
+        return date('Y-m', strtotime("first day of -{$n} months"));
+    }
+
+    public function testReactivationWaitsForTheMissedMonthsToBePaid(): void
     {
         $this->withSession($this->adminSession)->post("admin/members/accounts/{$this->firstAccount}/deactivate");
-        $this->assertSame('Inactive', $this->accountStatus($this->firstAccount));
+        // Stopped three months ago: that month up to this one is four months, PHP 1,200.
+        $this->db->table('cooperative_accounts')->where('account_id', $this->firstAccount)
+            ->update(['deactivated_at' => self::monthsAgo(3) . '-10 09:00:00']);
 
         $this->withSession($this->adminSession)->post("admin/members/accounts/{$this->firstAccount}/reactivate");
 
         $account = $this->db->table('cooperative_accounts')->where('account_id', $this->firstAccount)->get()->getRowArray();
-        $this->assertSame('Active', $account['account_status']);
+        $this->assertSame('Pending', $account['account_status'], 'Not active until the missed months are paid.');
+        $this->assertSame(self::monthsAgo(3), $account['reactivation_from']);
         $this->assertNull($account['deactivated_at']);
+        $this->assertSame(1200.0, model(\App\Models\CooperativeAccountModel::class)->reactivationArrears($account));
+
+        // Three of the four months: still Pending.
+        $this->paid([self::monthsAgo(3), self::monthsAgo(2), self::monthsAgo(1)]);
+        model(\App\Models\CooperativeAccountModel::class)->syncStatuses();
+        $this->assertSame('Pending', $this->accountStatus($this->firstAccount));
+
+        // The current month too: Active again.
+        $this->paid([date('Y-m')]);
+        model(\App\Models\CooperativeAccountModel::class)->syncStatuses();
+        $account = $this->db->table('cooperative_accounts')->where('account_id', $this->firstAccount)->get()->getRowArray();
+        $this->assertSame('Active', $account['account_status']);
+        $this->assertNull($account['reactivation_from']);
+    }
+
+    public function testDeactivatingAgainBeforeSettlingKeepsTheEarlierMissedMonths(): void
+    {
+        $this->withSession($this->adminSession)->post("admin/members/accounts/{$this->firstAccount}/deactivate");
+        $this->db->table('cooperative_accounts')->where('account_id', $this->firstAccount)
+            ->update(['deactivated_at' => self::monthsAgo(5) . '-01 09:00:00']);
+        $this->withSession($this->adminSession)->post("admin/members/accounts/{$this->firstAccount}/reactivate");
+
+        $this->withSession($this->adminSession)->post("admin/members/accounts/{$this->firstAccount}/deactivate");
+        $this->withSession($this->adminSession)->post("admin/members/accounts/{$this->firstAccount}/reactivate");
+
+        $account = $this->db->table('cooperative_accounts')->where('account_id', $this->firstAccount)->get()->getRowArray();
+        $this->assertSame(self::monthsAgo(5), $account['reactivation_from']);
+    }
+
+    public function testReactivatingAccountShowsWhatIsLeftToSettle(): void
+    {
+        $this->withSession($this->adminSession)->post("admin/members/accounts/{$this->firstAccount}/deactivate");
+        $this->withSession($this->adminSession)->post("admin/members/accounts/{$this->firstAccount}/reactivate");
+
+        $page = $this->withSession($this->memberSession)->get('member/contributions');
+        $page->assertOK();
+        $page->assertSee('Reactivating');
     }
 
     public function testMemberRequestIsAppliedOnlyWhenAnAdminApprovesIt(): void
@@ -165,6 +235,10 @@ final class AccountDeactivationTest extends CIUnitTestCase
         $this->assertSame('Reactivate', $request['request_type']);
 
         $this->withSession($this->adminSession)->post("admin/members/requests/{$request['request_id']}/approve");
+        // Reactivated, then Active once this month's missed contribution is paid.
+        $this->assertSame('Pending', $this->accountStatus($this->firstAccount));
+        $this->paid([date('Y-m')]);
+        model(\App\Models\CooperativeAccountModel::class)->syncStatuses();
         $this->assertSame('Active', $this->accountStatus($this->firstAccount));
     }
 
@@ -195,7 +269,7 @@ final class AccountDeactivationTest extends CIUnitTestCase
     {
         $admin = $this->withSession($this->adminSession)->get('admin/members');
         $admin->assertOK();
-        $admin->assertSee('Deactivating an account stops new contributions');
+        $admin->assertSee('Deactivating an account does not close it');
 
         $member = $this->withSession($this->memberSession)->get('member/profile');
         $member->assertOK();

@@ -174,21 +174,55 @@ final class WithdrawalOffsetDividendTest extends CIUnitTestCase
 
     // ── 3. Deactivated accounts keep their dividends ───────────────────
 
-    public function testDeactivatedJoinedAccountStaysEligibleButJoiningAccountDoesNot(): void
+    /** Approved PHP 300 contributions for months 1..$months of $year on an account. */
+    private function contributed(int $accountId, int $year, int $months): void
+    {
+        for ($m = 1; $m <= $months; $m++) {
+            $this->db->table('contributions')->insert(['account_id' => $accountId, 'contribution_period' => sprintf('%04d-%02d', $year, $m),
+                'amount' => 300, 'payment_date' => date('Y-m-d'), 'payment_status' => 'Approved', 'created_at' => date('Y-m-d H:i:s')]);
+        }
+    }
+
+    private function poolForThisYear(): void
     {
         $this->db->table('loans')->insert(['account_id' => $this->accountId, 'loan_amount' => 5000, 'interest_rate' => 2, 'interest_amount' => 100,
             'loan_term_months' => 3, 'application_date' => date('Y-m-d'), 'approval_date' => date('Y-m-d'), 'loan_status' => 'Paid']);
-        $this->db->table('cooperative_accounts')->where('account_id', $this->accountId)->update(['account_status' => 'Inactive']);
-        $this->db->table('cooperative_accounts')->insert(['member_id' => $this->memberId, 'account_number' => 'ACC-2026-950',
-            'account_type' => 'Basic', 'account_start_date' => date('Y-m-d'), 'account_status' => 'Pending']);
-        $joining = (int) $this->db->insertID();
+    }
 
-        $plan = (new DividendService())->plan((int) date('Y'));
+    public function testOnlyAccountsWithTheFullYearOfContributionsAreEligible(): void
+    {
+        $year = (int) date('Y');
+        $this->poolForThisYear();
+        // jdoe's account: deactivated, but with all 12 months of the year paid.
+        $this->db->table('contributions')->where('account_id', $this->accountId)->delete();
+        $this->contributed($this->accountId, $year, 12);
+        $this->db->table('cooperative_accounts')->where('account_id', $this->accountId)->update(['account_status' => 'Inactive']);
+        // An Active account with only 11 months paid.
+        $this->db->table('cooperative_accounts')->insert(['member_id' => $this->memberId, 'account_number' => 'ACC-2026-950',
+            'account_type' => 'Basic', 'account_start_date' => "{$year}-01-01", 'account_status' => 'Active']);
+        $short = (int) $this->db->insertID();
+        $this->contributed($short, $year, 11);
+
+        $plan = (new DividendService())->plan($year);
 
         $ids = array_map('intval', array_column($plan['accounts'], 'account_id'));
-        $this->assertContains($this->accountId, $ids, 'Deactivation does not forfeit dividends.');
-        $this->assertNotContains($joining, $ids, 'An account still joining is not eligible.');
+        $this->assertContains($this->accountId, $ids, 'Deactivation does not disqualify an account that completed PHP 3,600.');
+        $this->assertNotContains($short, $ids, 'PHP 3,300 is below the PHP 3,600 requirement, even for an Active account.');
         $this->assertSame(1, $plan['inactive_count']);
+        $this->assertSame(1, $plan['below_count']);
+    }
+
+    public function testDashboardEstimateCountsAccountsOnTrackThisYear(): void
+    {
+        $year = (int) date('Y');
+        $this->poolForThisYear();
+        $this->db->table('contributions')->where('account_id', $this->accountId)->delete();
+        $this->contributed($this->accountId, $year, (int) date('n'));   // every month so far
+
+        $this->assertCount(1, (new DividendService())->plan($year, true)['accounts']);
+        if ((int) date('n') < 12) {
+            $this->assertCount(0, (new DividendService())->plan($year)['accounts'], 'A distribution needs the full PHP 3,600.');
+        }
     }
 
     // ── 4. Loan offset ─────────────────────────────────────────────────
@@ -280,9 +314,10 @@ final class WithdrawalOffsetDividendTest extends CIUnitTestCase
 
     public function testThreePercentOfThePoolGoesToAdministration(): void
     {
-        $this->db->table('loans')->insert(['account_id' => $this->accountId, 'loan_amount' => 5000, 'interest_rate' => 2, 'interest_amount' => 100,
-            'loan_term_months' => 3, 'application_date' => date('Y-m-d'), 'approval_date' => date('Y-m-d'), 'loan_status' => 'Paid']);
+        $this->poolForThisYear();
         $year = (int) date('Y');
+        $this->db->table('contributions')->where('account_id', $this->accountId)->delete();
+        $this->contributed($this->accountId, $year, 12);
 
         $plan = (new DividendService())->plan($year);
         $this->assertSame(100.0, (float) $plan['profit_pool']);
