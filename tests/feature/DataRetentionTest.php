@@ -140,6 +140,29 @@ final class DataRetentionTest extends CIUnitTestCase
         $this->assertNotNull($this->member()['retention_flagged_at']);
     }
 
+    /** Audit pass 4 (D-03): a Defaulted loan is still an open loan. */
+    public function testMemberWithADefaultedLoanIsNotDeactivated(): void
+    {
+        $this->db->table('loans')->insert(['account_id' => $this->accountId, 'loan_amount' => 100, 'interest_rate' => 2,
+            'loan_term_months' => 3, 'application_date' => date('Y-m-d'), 'loan_status' => 'Defaulted']);
+
+        $this->reviewAt('+13 months');
+
+        $this->assertSame('Active', $this->member()['membership_status']);
+    }
+
+    /** Audit pass 4 (D-01): a withdrawal waiting to be paid out blocks deactivation. */
+    public function testMemberWithAPendingWithdrawalIsNotDeactivated(): void
+    {
+        $this->db->table('withdrawals')->insert(['account_id' => $this->accountId, 'amount' => 100, 'method' => 'Cash',
+            'status' => 'Pending', 'created_at' => date('Y-m-d H:i:s')]);
+
+        $this->reviewAt('+13 months');
+
+        $this->assertSame('Active', $this->member()['membership_status']);
+        $this->assertContains('has payments waiting for approval', (new RetentionService())->blockers($this->memberId));
+    }
+
     public function testLegalHoldStopsTheReview(): void
     {
         $this->withSession($this->superSession)

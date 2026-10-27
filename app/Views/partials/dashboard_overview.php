@@ -33,7 +33,7 @@ $loanLink = fn($loan) => $isAdmin ? base_url('admin/loans/' . (int) $loan['loan_
     </div>
     <div class="col-md-6 col-xl-3">
         <div class="card dash-tile h-100"><div class="card-body">
-            <div class="label"><i class="fa-solid fa-piggy-bank me-1 text-success"></i>Total Contributions</div>
+            <div class="label"><i class="fa-solid fa-piggy-bank me-1 text-success"></i>Contributions Held</div>
             <div class="value text-success"><?= $peso($d['contributions']) ?></div>
             <?php if ($d['withdrawn'] > 0): ?><div class="small text-muted">After ₱<?= number_format($d['withdrawn'], 2) ?> withdrawn / offset</div><?php endif; ?>
             <a class="small" href="<?= base_url(($isAdmin ? 'admin' : 'member') . '/contributions') ?>">View contributions</a>
