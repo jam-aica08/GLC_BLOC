@@ -478,7 +478,7 @@ class Admin extends BaseController
             session()->setFlashdata('error', $error);
         } else {
             session()->setFlashdata('success', "Account {$account['account_number']} of {$account['first_name']} {$account['last_name']} is deactivated. "
-                . 'It takes no new contributions or loans and is left out of dividends; its records are kept.');
+                . 'It takes no new contributions or loans; it stays eligible for dividends and its records are kept.');
         }
 
         return redirect()->to($this->membersPage());
@@ -620,7 +620,23 @@ class Admin extends BaseController
         $this->searchMemberColumns($query, $search, 'l.loan_id');
         $query->orderBy('l.loan_id', 'DESC');
 
+        // A missed payment: a month past its due date and still open, or an open
+        // month still carrying unpaid money moved in from missed months.
+        $query->select("EXISTS (SELECT 1 FROM loan_installments lo WHERE lo.loan_id = l.loan_id AND lo.payment_status NOT IN ('Paid', 'Partial')
+                        AND (lo.due_date < CURDATE() OR lo.carried_over > lo.amount_paid)) AS has_missed", false);
+
         [$loans, $page] = $this->paginate($query);
+
+        // What a contribution offset could settle, for loans with a missed payment.
+        if (\App\Services\WithdrawalService::available()) {
+            $offsets = new \App\Services\LoanOffsetService();
+            foreach ($loans as &$loan) {
+                if ($loan['has_missed'] && in_array($loan['status'], ['Active', 'Defaulted'], true)) {
+                    $loan['offset'] = $offsets->preview((int) $loan['id']);
+                }
+            }
+            unset($loan);
+        }
 
         return view('admin/loans', [
             'loans'        => $loans,
@@ -813,6 +829,95 @@ class Admin extends BaseController
         return redirect()->to('/admin/loans');
     }
 
+    /**
+     * POST: settle an unpaid loan from the member's contributions (Loan Offset
+     * Policy). Only for a loan with a missed payment; see LoanOffsetService.
+     */
+    public function offsetLoan(int $id)
+    {
+        $this->requireAdmin();
+
+        if (! $this->request->is('post')) {
+            return redirect()->to('/admin/loans');
+        }
+        if (! \App\Services\WithdrawalService::available()) {
+            session()->setFlashdata('error', 'Loan offsets need a database update. Open Settings and apply database updates.');
+            return redirect()->to('/admin/loans');
+        }
+        if (trim((string) $this->request->getPost('confirm')) !== 'OFFSET') {
+            session()->setFlashdata('error', 'Type OFFSET to confirm the loan offset.');
+            return redirect()->to('/admin/loans');
+        }
+
+        $raw    = trim((string) $this->request->getPost('amount'));
+        $amount = $raw === '' ? null : round((float) $raw, 2);
+        $error  = (new \App\Services\LoanOffsetService())->apply($id, $amount, (int) session()->get('user_id'));
+        if ($error !== null) {
+            session()->setFlashdata('error', "Loan #{$id}: {$error}");
+        } else {
+            session()->setFlashdata('success', "Offset applied to loan #{$id} from the member's contributions. It is in the ledger and the member was notified.");
+        }
+
+        return redirect()->to('/admin/loans');
+    }
+
+    // =========================================================================
+    // Withdrawals
+    // =========================================================================
+
+    public function withdrawals()
+    {
+        $this->requireAdmin();
+
+        if (! \App\Services\WithdrawalService::available()) {
+            session()->setFlashdata('error', 'Withdrawals need a database update. Open Settings and apply database updates.');
+            return redirect()->to('/admin/settings');
+        }
+
+        $status = (string) $this->request->getGet('status');
+        $search = trim((string) $this->request->getGet('q'));
+        [$rows, $page] = $this->paginate((new \App\Services\WithdrawalService())->query($status, $search));
+
+        // Show at a glance which waiting requests are blocked by an outstanding loan.
+        foreach ($rows as &$row) {
+            $row['loans'] = $row['status'] === 'Pending' ? \App\Services\ContributionBalance::outstandingLoans((int) $row['member_id']) : [];
+        }
+        unset($row);
+
+        return view('admin/withdrawals', ['withdrawals' => $rows, 'page' => $page, 'filterStatus' => $status, 'search' => $search]);
+    }
+
+    /** POST: approve a waiting withdrawal (checked again against the policy). */
+    public function approveWithdrawal(int $id)
+    {
+        $this->requireAdmin();
+
+        $w = db_connect()->table('withdrawals')->where('withdrawal_id', $id)->get()->getRowArray();
+        if (! $this->request->is('post') || ! $w) {
+            return redirect()->to('/admin/withdrawals');
+        }
+        [$ok, $message] = $this->approveRecord((int) $w['financial_record_id']);
+        session()->setFlashdata($ok ? 'success' : 'error', $ok ? 'Withdrawal approved and recorded in the blockchain ledger. Release PHP '
+            . number_format((float) $w['amount'], 2) . " to the member by {$w['method']}." : $message);
+
+        return redirect()->to('/admin/withdrawals');
+    }
+
+    /** POST: reject a waiting withdrawal. */
+    public function rejectWithdrawal(int $id)
+    {
+        $this->requireAdmin();
+
+        $w = db_connect()->table('withdrawals')->where('withdrawal_id', $id)->get()->getRowArray();
+        if (! $this->request->is('post') || ! $w) {
+            return redirect()->to('/admin/withdrawals');
+        }
+        [$ok, $message] = $this->rejectRecord((int) $w['financial_record_id']);
+        session()->setFlashdata($ok ? 'success' : 'error', $message);
+
+        return redirect()->to('/admin/withdrawals');
+    }
+
     // =========================================================================
     // Payments
     // =========================================================================
@@ -919,6 +1024,10 @@ class Admin extends BaseController
                 return [false, $problem];
             }
         }
+        // A withdrawal is checked again: no outstanding loan, and the money is still there.
+        if ($fr['record_type'] === 'Withdrawal' && ($problem = (new \App\Services\WithdrawalService())->checkBeforeApproval($frId))) {
+            return [false, $problem];
+        }
 
         $account = $db->table('cooperative_accounts')->where('account_id', $fr['account_id'])->get()->getRowArray();
 
@@ -966,7 +1075,7 @@ class Admin extends BaseController
         $this->notifyRecord($fr, 'approved', $account);
         Notifier::resolveForAdmins('review-record-' . $frId);
 
-        $label = ['Contribution' => 'Contribution', 'Loan Payment' => 'Payment'][$fr['record_type']] ?? 'Financial record';
+        $label = ['Contribution' => 'Contribution', 'Loan Payment' => 'Payment', 'Withdrawal' => 'Withdrawal'][$fr['record_type']] ?? 'Financial record';
         return [true, "{$label} approved and recorded in the blockchain ledger."];
     }
 
@@ -993,11 +1102,13 @@ class Admin extends BaseController
            ->where('financial_record_id', $frId)->where('approval_status', 'Pending')
            ->update(['approval_status' => 'Rejected', 'updated_at' => $now]);
         $changed = $db->affectedRows() > 0;
-        $source  = ['Contribution' => 'contributions', 'Loan Payment' => 'loan_payments'][$fr['record_type']] ?? null;
+        $source  = ['Contribution' => ['contributions', 'payment_status'], 'Loan Payment' => ['loan_payments', 'payment_status'],
+                    'Withdrawal' => ['withdrawals', 'status']][$fr['record_type']] ?? null;
         if ($changed && $source) {
-            $db->table($source)
-               ->where('financial_record_id', $frId)->where('payment_status', 'Pending')
-               ->update(['payment_status' => 'Rejected', 'updated_at' => $now]);
+            [$table, $column] = $source;
+            $db->table($table)
+               ->where('financial_record_id', $frId)->where($column, 'Pending')
+               ->update([$column => 'Rejected', 'updated_at' => $now]);
         }
         $db->transComplete();
 
@@ -1008,7 +1119,7 @@ class Admin extends BaseController
         $this->notifyRecord($fr, 'rejected');
         Notifier::resolveForAdmins('review-record-' . $frId);
 
-        $label = ['Contribution' => 'Contribution', 'Loan Payment' => 'Payment'][$fr['record_type']] ?? 'Financial record';
+        $label = ['Contribution' => 'Contribution', 'Loan Payment' => 'Payment', 'Withdrawal' => 'Withdrawal'][$fr['record_type']] ?? 'Financial record';
         return [true, "{$label} rejected."];
     }
 
@@ -1041,6 +1152,16 @@ class Admin extends BaseController
                     "Your payment of {$amount} for loan #{$p['loan_id']} was {$decision}.",
                     'member/loans', "payment-{$decision}-{$p['payment_id']}");
             }
+        } elseif ($fr['record_type'] === 'Withdrawal') {
+            $w = $db->table('withdrawals w')->select('w.withdrawal_id, w.method, ca.account_number')
+                    ->join('cooperative_accounts ca', 'ca.account_id = w.account_id')
+                    ->where('w.financial_record_id', $frId)->get()->getRowArray();
+            if ($w) {
+                Notifier::toAccountOwner((int) $fr['account_id'], 'withdrawal', "Withdrawal {$decision}",
+                    "Your withdrawal of {$amount} from account {$w['account_number']} was {$decision}"
+                    . ($decision === 'approved' ? " ({$w['method']})." : '.'),
+                    'member/withdrawals', "withdrawal-{$decision}-{$w['withdrawal_id']}");
+            }
         }
     }
 
@@ -1064,6 +1185,10 @@ class Admin extends BaseController
             if ($payment && $payment['payment_status'] === 'Pending') {
                 $this->applyLoanPayment($payment);
             }
+        } elseif ($fr['record_type'] === 'Withdrawal') {
+            $db->table('withdrawals')
+               ->where('financial_record_id', $frId)->where('status', 'Pending')
+               ->update(['status' => 'Approved', 'updated_at' => date('Y-m-d H:i:s')]);
         }
     }
 
@@ -1510,7 +1635,7 @@ class Admin extends BaseController
             [$from, $to] = [$to, $from];
         }
 
-        $types    = ['Contribution', 'Loan Disbursement', 'Loan Payment', 'Dividend'];
+        $types    = ['Contribution', 'Loan Disbursement', 'Loan Payment', 'Dividend', 'Withdrawal', 'Loan Offset'];
         $category = in_array($get('category'), ['summary', 'transactions', 'membership', 'ledger'], true) ? $get('category') : 'summary';
 
         return [

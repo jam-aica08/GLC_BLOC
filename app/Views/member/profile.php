@@ -181,7 +181,7 @@
         <?php if (empty($canRequestChanges) && ($member['membership_status'] ?? '') === 'Active'): ?>
             <span class="text-warning-emphasis"><i class="fa-solid fa-circle-info me-1"></i>Requests to deactivate or reactivate an account are not available yet. Please try again later or contact the cooperative office.</span><br>
         <?php endif; ?>
-        A deactivated account takes no new contributions or loans and is not counted for dividends; your other accounts are not affected and its records are kept.
+        A deactivated account takes no new contributions or loans but stays eligible for dividends; your other accounts are not affected and its records are kept.
         <a href="<?= base_url('privacy') ?>">How long records are kept</a>
     </div>
 </div>
@@ -201,7 +201,7 @@
                 <div class="modal-body p-4">
                     <p class="mb-2">Ask an admin to deactivate account <strong id="deactivateAccountNumber"></strong>.</p>
                     <ul class="small text-muted mb-3">
-                        <li>It will take no new contributions or loans and is not counted for dividends.</li>
+                        <li>It will take no new contributions or loans. It stays eligible for dividends once its joining contributions are complete.</li>
                         <li>Your other accounts and your sign-in are not affected.</li>
                         <li>Its contributions and records are kept, and you can ask to reactivate it later.</li>
                     </ul>

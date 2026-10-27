@@ -17,6 +17,13 @@ class CooperativeAccountModel extends Model
     /** Pioneer accounts receive this much more (%) than a Basic share of dividends. */
     public const PIONEER_DIVIDEND_BONUS = 2.00;
 
+    /**
+     * Share (%) of each year's dividend pool allocated to the administration
+     * before the rest is distributed to members (Administrative Dividend
+     * Allocation Policy).
+     */
+    public const ADMIN_DIVIDEND_SHARE = 3.00;
+
     /** Allowed amount for any single contribution, including the opening one (PHP). */
     public const CONTRIBUTION_MIN = 300.00;
     public const CONTRIBUTION_MAX = 3600.00;

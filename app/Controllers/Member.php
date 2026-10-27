@@ -737,6 +737,70 @@ class Member extends BaseController
         return redirect()->to('/member/profile');
     }
 
+    // =========================================================================
+    // Withdrawals
+    // =========================================================================
+
+    /** GET: what the member can withdraw from each account, and their requests. */
+    public function withdrawals(): string
+    {
+        $memberId = $this->requireMember();
+        $service  = new \App\Services\WithdrawalService();
+
+        $accounts = db_connect()->table('cooperative_accounts')->where('member_id', $memberId)
+            ->where('account_status !=', 'Closed')->orderBy('account_id')->get()->getResultArray();
+        $balances = \App\Services\ContributionBalance::forAccounts(array_column($accounts, 'account_id'));
+        foreach ($accounts as &$acc) {
+            $acc['balance'] = $balances[(int) $acc['account_id']];
+        }
+        unset($acc);
+
+        return view('member/withdrawals', [
+            'available'   => \App\Services\WithdrawalService::available(),
+            'accounts'    => $accounts,
+            'blockers'    => $service->memberBlockers($memberId),
+            'requests'    => $service->forMember($memberId),
+            'methods'     => \App\Services\WithdrawalService::METHODS,
+            'waitingFor'  => \App\Services\WithdrawalService::available()
+                ? array_column(db_connect()->table('withdrawals')->select('account_id')->where('status', 'Pending')
+                    ->whereIn('account_id', array_column($accounts, 'account_id') ?: [0])->get()->getResultArray(), 'account_id')
+                : [],
+        ]);
+    }
+
+    /** POST: ask to withdraw contributions from one account; an admin approves it. */
+    public function requestWithdrawal()
+    {
+        $memberId = $this->requireMember();
+
+        if (! $this->request->is('post')) {
+            return redirect()->to('/member/withdrawals');
+        }
+
+        $accountId = (int) $this->request->getPost('account_id');
+        $amount    = (float) $this->request->getPost('amount');
+        $method    = (string) $this->request->getPost('method');
+        $result    = (new \App\Services\WithdrawalService())->request($memberId, $accountId, $amount, $method,
+            (string) $this->request->getPost('reason'), (int) session()->get('user_id'));
+        if (is_string($result)) {
+            session()->setFlashdata('error', $result);
+            return redirect()->to('/member/withdrawals');
+        }
+
+        $w = db_connect()->table('withdrawals w')->select('w.amount, w.financial_record_id, ca.account_number')
+            ->join('cooperative_accounts ca', 'ca.account_id = w.account_id')->where('w.withdrawal_id', $result)->get()->getRowArray();
+        $amountText = 'PHP ' . number_format((float) $w['amount'], 2);
+        \App\Services\Notifier::toMember($memberId, 'withdrawal', 'Withdrawal requested',
+            "Your request to withdraw {$amountText} from account {$w['account_number']} ({$method}) is waiting for approval.",
+            'member/withdrawals', 'withdrawal-received-' . $result);
+        \App\Services\Notifier::toAdmins('withdrawal', 'Withdrawal to review',
+            $this->memberName($memberId) . " asked to withdraw {$amountText} from account {$w['account_number']} ({$method}).",
+            'admin/withdrawals', 'review-record-' . $w['financial_record_id']);
+
+        session()->setFlashdata('success', "Your request to withdraw {$amountText} was sent. An admin will review it.");
+        return redirect()->to('/member/withdrawals');
+    }
+
     /** "First Last (M-0001)" for administrator notifications. */
     private function memberName(int $memberId): string
     {

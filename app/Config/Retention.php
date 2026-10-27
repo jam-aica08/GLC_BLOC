@@ -94,8 +94,8 @@ class Retention extends BaseConfig
             ],
             [
                 'category' => 'Financial records',
-                'data'     => 'Contributions, loans, installments, loan payments, dividends, approvals, blockchain ledger hashes',
-                'stored'   => 'contributions, loans, loan_installments, loan_payments, dividends, financial_records, blockchain_ledger',
+                'data'     => 'Contributions, withdrawals, loans, installments, loan payments and offsets, dividends, approvals, blockchain ledger hashes',
+                'stored'   => 'contributions, withdrawals, loans, loan_installments, loan_payments, dividends, financial_records, blockchain_ledger',
                 'purpose'  => 'Books of account, audit, dividend computation, dispute resolution',
                 'period'   => "{$this->financialYears} years after the end of the year of the last transaction (to confirm with the auditor)",
                 'action'   => 'Reviewed by the super administrator and auditor; the app never deletes them on its own (the ledger hash chain must stay whole)',

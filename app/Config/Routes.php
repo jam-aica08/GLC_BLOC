@@ -42,6 +42,12 @@ $routes->group('admin', ['filter' => 'auth:admin'], function ($routes) {
     $routes->get('loans/(:num)/schedule', 'Admin::loanSchedule/$1');
     $routes->post('loans/approve/(:num)', 'Admin::approveLoan/$1');
     $routes->post('loans/reject/(:num)', 'Admin::rejectLoan/$1');
+    $routes->post('loans/(:num)/offset', 'Admin::offsetLoan/$1');
+
+    // Withdrawals of contributions
+    $routes->get('withdrawals', 'Admin::withdrawals');
+    $routes->post('withdrawals/(:num)/approve', 'Admin::approveWithdrawal/$1');
+    $routes->post('withdrawals/(:num)/reject', 'Admin::rejectWithdrawal/$1');
 
     // Loan Payments
     $routes->get('payments', 'Admin::payments');
@@ -107,6 +113,8 @@ $routes->group('member', ['filter' => 'auth:member'], function ($routes) {
     $routes->get('dashboard', 'Member::dashboard');
     $routes->get('contributions', 'Member::contributions');
     $routes->post('contributions/submit', 'Member::submitContribution');
+    $routes->get('withdrawals', 'Member::withdrawals');
+    $routes->post('withdrawals/request', 'Member::requestWithdrawal');
     $routes->get('loans', 'Member::loans');
     $routes->post('loans/apply', 'Member::applyLoan');
     $routes->get('loans/(:num)/installments', 'Member::loanInstallments/$1');

@@ -45,17 +45,19 @@ class AnalyticsService
             ];
         }
 
+        // Contributions and dividends add to equity; withdrawals and loan offsets take contributions back out.
         $equity = fn () => $db->table('financial_records')
-            ->whereIn('record_type', ['Contribution', 'Dividend'])
+            ->whereIn('record_type', ['Contribution', 'Dividend', 'Withdrawal', 'Loan Offset'])
             ->where('approval_status', 'Approved');
+        $signed = "SUM(CASE WHEN record_type IN ('Withdrawal', 'Loan Offset') THEN -amount ELSE amount END)";
 
         // Everything before the first month, then each month's additions: two queries in all.
-        $total = (float) ($equity()->selectSum('amount', 'total')
+        $total = (float) ($equity()->select("{$signed} AS total", false)
             ->where('transaction_date <', $periods[0]['start'])
             ->get()->getRowArray()['total'] ?? 0);
 
         $added = [];
-        foreach ($equity()->select("DATE_FORMAT(transaction_date, '%Y-%m') AS ym, SUM(amount) AS total", false)
+        foreach ($equity()->select("DATE_FORMAT(transaction_date, '%Y-%m') AS ym, {$signed} AS total", false)
                      ->where('transaction_date >=', $periods[0]['start'])
                      ->where('transaction_date <=', $periods[count($periods) - 1]['end'])
                      ->groupBy('ym')->get()->getResultArray() as $row) {
@@ -230,7 +232,7 @@ class AnalyticsService
                 'active_loans'        => $db->table('loans')
                     ->whereIn('loan_status', ['Approved', 'Active'])
                     ->countAllResults(),
-                'current_equity'      => $sum(['Contribution', 'Dividend']),
+                'current_equity'      => $sum(['Contribution', 'Dividend']) - $sum(ContributionBalance::DEDUCTIONS),
             ],
             'note' => 'Forecast values are ESTIMATES / PREDICTIONS based on historical trends.',
         ];
