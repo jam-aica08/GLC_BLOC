@@ -106,6 +106,7 @@ $routes->group('admin', ['filter' => 'auth:admin'], function ($routes) {
     $routes->post('settings/admins', 'Settings::addAdmin');
     $routes->post('settings/updates', 'Settings::applyUpdates');
     $routes->post('settings/reset', 'Settings::resetData');
+    $routes->post('settings/demo', 'Settings::loadDemo');
 });
 
 // Member routes (protected by auth filter)

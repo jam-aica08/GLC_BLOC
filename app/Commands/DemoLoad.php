@@ -2,17 +2,17 @@
 
 namespace App\Commands;
 
-use App\Libraries\DataReset;
 use App\Libraries\DemoData;
+use App\Libraries\DemoLoader;
 use App\Libraries\ImportWorkbook;
-use App\Services\DataImportService;
-use App\Services\DividendService;
 use CodeIgniter\CLI\BaseCommand;
 use CodeIgniter\CLI\CLI;
 
 /**
- * Loads made-up demo records through the same importer clients use, then
- * distributes dividends for each finished year so every screen has data.
+ * Loads made-up demo records through the same importer clients use,
+ * distributes dividends for each finished year, then sets up the showcase
+ * situations (withdrawals, deactivations, offsets…) so every screen has data.
+ * See DemoLoader.
  */
 class DemoLoad extends BaseCommand
 {
@@ -54,48 +54,23 @@ class DemoLoad extends BaseCommand
             return;
         }
 
-        if ($fresh) {
-            $result = DataReset::run(true, $db);
-            if (is_string($result)) {
-                CLI::error('Reset failed: ' . $result);
-                return EXIT_ERROR;
-            }
-            CLI::write('Cleared existing members and transactions.', 'yellow');
-        }
-
-        $service = new DataImportService();
-        $check   = $service->validate($data);
-        if ($check['errors'] !== []) {
-            foreach (array_slice($check['errors'], 0, 15) as $e) {
-                CLI::error("{$e['sheet']} row {$e['row']} {$e['column']}: {$e['message']}");
-            }
-            CLI::error(count($check['errors']) . ' problem(s); nothing was loaded. Use --fresh to replace earlier demo data.');
+        $result = DemoLoader::run((int) $admin['user_id'], $members, $fresh);
+        if (is_string($result)) {
+            CLI::error($result . ($fresh ? '' : ' Use --fresh to replace earlier demo data.'));
             return EXIT_ERROR;
         }
 
-        $started = microtime(true);
-        $result  = $service->import($check['plan'], (int) $admin['user_id']);
         foreach ($result['counts'] as $sheet => $n) {
             CLI::write(str_pad($sheet, 16) . $n);
         }
         CLI::write(str_pad('Ledger entries', 16) . $result['ledger']);
-
-        // Dividends for each finished year that earned loan interest.
-        $dividends = new DividendService($db);
-        for ($year = 2022; $year < (int) date('Y'); $year++) {
-            $plan = $dividends->plan($year);
-            if ($plan['errors'] !== [] || $plan['existing'] || $plan['legacy_paid']) {
-                continue;
-            }
-            [$id, $error] = $dividends->create($year, "{$year}-12-20", (int) $admin['user_id'], $plan['profit_pool'], count($plan['accounts']));
-            if ($id) {
-                $dividends->approve((int) $id, (int) $admin['user_id']);
-                CLI::write("Dividends {$year}: PHP " . number_format($plan['profit_pool'], 2) . ' to ' . count($plan['accounts']) . ' accounts');
-            } elseif ($error) {
-                CLI::write("Dividends {$year}: {$error}", 'yellow');
-            }
+        foreach ($result['dividends'] as $line) {
+            CLI::write($line);
+        }
+        foreach ($result['showcase'] as $line) {
+            CLI::write('  ' . $line, 'cyan');
         }
 
-        CLI::write(sprintf('Done in %.1fs. Demo members sign in with their username and the password %s.', microtime(true) - $started, DemoData::PASSWORD), 'green');
+        CLI::write(sprintf('Done in %.1fs. Demo members sign in with their username and the password %s.', $result['seconds'], DemoData::PASSWORD), 'green');
     }
 }

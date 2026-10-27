@@ -118,6 +118,45 @@ class Settings extends BaseController
             . ($summary === [] ? 'nothing (already empty).' : implode(', ', $summary) . '.'));
     }
 
+    /**
+     * POST (super admin): replace every member and transaction with fresh demo
+     * data (DemoLoader). Needs "DEMO" and the admin's password, like Reset Data.
+     */
+    public function loadDemo(): RedirectResponse
+    {
+        if ($this->role() !== 'admin') {
+            return redirect()->to('/login');
+        }
+        if (! $this->isSuper()) {
+            return redirect()->to($this->home())->with('error', 'Only the super administrator can load demo data.');
+        }
+
+        $user = model(UserModel::class)->find((int) session()->get('user_id'));
+        if (trim((string) $this->request->getPost('confirm')) !== 'DEMO') {
+            return redirect()->to($this->home())->with('error', 'Type DEMO in the box to confirm.');
+        }
+        if (! $user || ! password_verify((string) $this->request->getPost('password'), $user['password_hash'])) {
+            return redirect()->to($this->home())->with('error', 'Your password is incorrect. Nothing was changed.');
+        }
+        // The tables the demo uses (withdrawals, retention, reactivation…) must exist.
+        $schema = DatabaseUpdates::status();
+        if ($schema['problems'] !== [] || $schema['error'] !== null) {
+            return redirect()->to($this->home())->with('error', 'Apply the database updates first, then load the demo data.');
+        }
+
+        @set_time_limit(55);   // the hosted function stops at 60 seconds
+        $result = \App\Libraries\DemoLoader::run((int) $user['user_id']);
+        if (is_string($result)) {
+            return redirect()->to($this->home())->with('error', $result);
+        }
+
+        return redirect()->to($this->home())->with('success', sprintf('Demo data loaded in %.1fs: %d members, %d accounts, %d contributions, %d loans, %d loan payments; ',
+            $result['seconds'], $result['counts']['Members'] ?? 0, $result['counts']['Accounts'] ?? 0, $result['counts']['Contributions'] ?? 0,
+            $result['counts']['Loans'] ?? 0, $result['counts']['Loan Payments'] ?? 0)
+            . count($result['dividends']) . ' past dividend distribution(s); ' . implode('; ', $result['showcase'])
+            . '. Demo members sign in with their username and the password ' . \App\Libraries\DemoData::PASSWORD . '.');
+    }
+
     public function changePassword(): RedirectResponse
     {
         $userModel = model(UserModel::class);
