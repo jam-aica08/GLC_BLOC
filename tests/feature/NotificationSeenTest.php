@@ -149,6 +149,23 @@ final class NotificationSeenTest extends CIUnitTestCase
         $this->assertGreaterThan($session['last_activity'], $_SESSION['last_activity'], 'A normal request does count.');
     }
 
+    /** The dashboard's "Pending …" tiles follow new requests through this endpoint. */
+    public function testPendingSummaryCountsNewRequests(): void
+    {
+        $get = fn () => json_decode($this->withSession($this->admin)->withHeaders(['X-Background-Poll' => '1'])
+            ->get('admin/dashboard/pending')->getJSON(), true);
+        $before = $get();
+        $this->assertSame(['contributions', 'loans', 'payments', 'requests'], array_keys($before));
+
+        $account = $this->db->table('cooperative_accounts')->where('member_id', $this->member['member_id'])->get()->getRowArray();
+        $this->withSession($this->member)->withHeaders([])->post('member/contributions/submit',
+            ['account_id' => $account['account_id'], 'contribution_period' => date('Y-m'), 'amount' => 300]);
+
+        $after = $get();
+        $this->assertSame($before['contributions'] + 1, $after['contributions']);
+        $this->withSession($this->member)->withHeaders([])->get('admin/dashboard/pending')->assertRedirectTo('/login');
+    }
+
     public function testFeedsAreForTheirOwnRoleOnly(): void
     {
         $this->withSession($this->member)->get('admin/notifications/feed')->assertRedirectTo('/login');

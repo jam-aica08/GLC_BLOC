@@ -88,30 +88,43 @@ class Admin extends BaseController
     {
         $this->requireAdmin();
 
-        $db = db_connect();
-
-        $pendingContributions = $db->table('contributions')
-                                   ->where('payment_status', 'Pending')
-                                   ->countAllResults();
-
-        $pendingLoans = $db->table('loans')
-                           ->where('loan_status', 'Pending')
-                           ->countAllResults();
-
-        $pendingPayments = $db->table('loan_payments')
-                              ->where('payment_status', 'Pending')
-                              ->countAllResults();
+        $db      = db_connect();
+        $pending = $this->pendingCounts();
 
         return view('admin/dashboard', [
             'needsDbUpdate'        => \App\Libraries\DatabaseUpdates::needsUpdate(),
             'totalMembers'         => $db->table('members')->countAllResults(),
             'totalAccounts'        => $db->table('cooperative_accounts')->countAllResults(),
-            'pendingContributions' => $pendingContributions,
-            'pendingLoans'         => $pendingLoans,
-            'pendingPayments'      => $pendingPayments,
-            'pendingRequests'      => (new \App\Services\AccountRequestService())->pendingCount(),
+            'pendingContributions' => $pending['contributions'],
+            'pendingLoans'         => $pending['loans'],
+            'pendingPayments'      => $pending['payments'],
+            'pendingRequests'      => $pending['requests'],
             'overview'             => (new \App\Services\DashboardService())->build(null),
         ]);
+    }
+
+    /** What is waiting for an administrator, for the dashboard tiles. */
+    private function pendingCounts(): array
+    {
+        $db = db_connect();
+
+        return [
+            'contributions' => $db->table('contributions')->where('payment_status', 'Pending')->countAllResults(),
+            'loans'         => $db->table('loans')->where('loan_status', 'Pending')->countAllResults(),
+            'payments'      => $db->table('loan_payments')->where('payment_status', 'Pending')->countAllResults(),
+            'requests'      => (new \App\Services\AccountRequestService())->pendingCount(),
+        ];
+    }
+
+    /**
+     * GET (background, every 20s while the dashboard is visible, and when the
+     * bell gets something new): the counts for the "Pending …" tiles.
+     */
+    public function pendingSummary()
+    {
+        $this->requireAdmin();
+
+        return $this->response->setHeader('Cache-Control', 'no-store')->setJSON($this->pendingCounts());
     }
 
     // =========================================================================
