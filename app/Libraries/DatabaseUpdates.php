@@ -293,11 +293,15 @@ class DatabaseUpdates
         }
 
         // Members can also ask to deactivate or reactivate one of their accounts.
-        if (! $db->fieldExists('request_type', 'account_requests')) {
-            $forge->addColumn('account_requests', [
-                'request_type' => ['type' => 'ENUM', 'constraint' => ['Open', 'Deactivate', 'Reactivate'], 'default' => 'Open', 'null' => false, 'after' => 'member_id'],
-                'reason'       => ['type' => 'VARCHAR', 'constraint' => 255, 'null' => true, 'after' => 'account_type'],
-            ]);
+        $requestColumns = [
+            'request_type' => ['type' => 'ENUM', 'constraint' => ['Open', 'Deactivate', 'Reactivate'], 'default' => 'Open', 'null' => false, 'after' => 'member_id'],
+            'reason'       => ['type' => 'VARCHAR', 'constraint' => 255, 'null' => true, 'after' => 'account_type'],
+        ];
+        foreach ($requestColumns as $name => $def) {
+            if (! $db->fieldExists($name, 'account_requests')) {
+                $forge->addColumn('account_requests', [$name => $def]);
+                $db->resetDataCache();
+            }
         }
 
         // Withdrawals of contributions and loan offsets are financial records too
@@ -327,11 +331,16 @@ class DatabaseUpdates
 
         // The share of each dividend pool kept for administration (3% from Oct 2026).
         $db->resetDataCache();
-        if (! $db->fieldExists('admin_share', 'dividend_distributions')) {
-            $forge->addColumn('dividend_distributions', [
-                'admin_share_rate' => ['type' => 'DECIMAL', 'constraint' => '5,2', 'default' => 0.00, 'null' => false, 'after' => 'profit_pool'],
-                'admin_share'      => ['type' => 'DECIMAL', 'constraint' => '15,2', 'default' => 0.00, 'null' => false, 'after' => 'admin_share_rate'],
-            ]);
+        // One column per ALTER: TiDB rejects "AFTER" a column added in the same statement.
+        $adminShareColumns = [
+            'admin_share_rate' => ['type' => 'DECIMAL', 'constraint' => '5,2', 'default' => 0.00, 'null' => false, 'after' => 'profit_pool'],
+            'admin_share'      => ['type' => 'DECIMAL', 'constraint' => '15,2', 'default' => 0.00, 'null' => false, 'after' => 'admin_share_rate'],
+        ];
+        foreach ($adminShareColumns as $name => $def) {
+            if (! $db->fieldExists($name, 'dividend_distributions')) {
+                $forge->addColumn('dividend_distributions', [$name => $def]);
+                $db->resetDataCache();
+            }
         }
 
         $db->resetDataCache();
