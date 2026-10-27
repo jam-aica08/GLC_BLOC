@@ -213,14 +213,19 @@ class RetentionService
         $blockers = [];
 
         $openLoans = $db->table('loans l')->join('cooperative_accounts ca', 'ca.account_id = l.account_id')
-            ->where('ca.member_id', $memberId)->whereIn('l.loan_status', ['Pending', 'Approved', 'Active'])->countAllResults();
+            ->where('ca.member_id', $memberId)->whereIn('l.loan_status', ContributionBalance::OUTSTANDING_LOAN)->countAllResults();
         if ($openLoans > 0) {
-            $blockers[] = 'has an open loan';
+            $blockers[] = 'has an open loan';   // including a Defaulted one
         }
         $waiting = $db->table('contributions c')->join('cooperative_accounts ca', 'ca.account_id = c.account_id')
             ->where('ca.member_id', $memberId)->where('c.payment_status', 'Pending')->countAllResults()
             + $db->table('loan_payments lp')->join('loans l', 'l.loan_id = lp.loan_id')->join('cooperative_accounts ca', 'ca.account_id = l.account_id')
             ->where('ca.member_id', $memberId)->where('lp.payment_status', 'Pending')->countAllResults();
+        // A withdrawal waiting to be paid out is a payment waiting for approval too.
+        if (WithdrawalService::available()) {
+            $waiting += $db->table('withdrawals w')->join('cooperative_accounts ca', 'ca.account_id = w.account_id')
+                ->where('ca.member_id', $memberId)->where('w.status', 'Pending')->countAllResults();
+        }
         if ($waiting > 0) {
             $blockers[] = 'has payments waiting for approval';
         }
