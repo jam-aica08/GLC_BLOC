@@ -78,7 +78,10 @@
                     <tr>
                         <td class="px-4 py-3"><code><?= esc($acc['account_number']) ?></code> <span class="text-muted small">(<?= esc($acc['account_type']) ?>)</span></td>
                         <td class="py-3">
-                            <?php if ($acc['account_status'] === 'Pending'): ?>
+                            <?php if (! empty($st['reactivating'])): ?>
+                                <span class="badge bg-warning text-dark">Reactivating — ₱<?= number_format($st['join_balance'], 2) ?> missed contributions to settle</span>
+                                <div class="small text-muted">From <?= esc(date('F Y', strtotime($st['reactivation_from'] . '-01'))) ?> to <?= esc(date('F Y')) ?></div>
+                            <?php elseif ($acc['account_status'] === 'Pending'): ?>
                                 <span class="badge bg-warning text-dark">Joining — ₱<?= number_format($st['join_balance'], 2) ?> left</span>
                             <?php else: ?>
                                 <span class="badge <?= $acc['account_status'] === 'Active' ? 'bg-success' : 'bg-secondary' ?>"><?= esc($acc['account_status'] === 'Inactive' ? 'Deactivated' : $acc['account_status']) ?></span>
@@ -166,9 +169,9 @@
                     <div class="mb-3">
                         <label for="account_id" class="form-label fw-semibold small">Account <span class="text-danger">*</span></label>
                         <select class="form-select" id="account_id" name="account_id" required>
-                            <?php foreach (($accounts ?? []) as $acc): if (! in_array($acc['account_status'], ['Active', 'Pending'], true)) continue; ?>
-                                <option value="<?= esc($acc['account_id']) ?>" data-min="<?= esc(number_format($acc['min_contribution'], 2, '.', '')) ?>" data-left="<?= esc(number_format($acc['left_to_activate'], 2, '.', '')) ?>">
-                                    <?= esc($acc['account_number']) ?> (<?= esc($acc['account_type']) ?><?= $acc['account_status'] === 'Pending' ? ' — joining, ₱' . number_format($acc['standing']['join_balance'], 2) . ' left' : '' ?>)
+                            <?php foreach (($accounts ?? []) as $acc): if (! in_array($acc['account_status'], ['Active', 'Pending', 'Inactive'], true)) continue; ?>
+                                <option value="<?= esc($acc['account_id']) ?>" data-min="<?= esc(number_format($acc['min_contribution'], 2, '.', '')) ?>" data-left="<?= esc(number_format($acc['left_to_activate'], 2, '.', '')) ?>" data-reactivating="<?= ! empty($acc['standing']['reactivating']) ? '1' : '' ?>">
+                                    <?= esc($acc['account_number']) ?> (<?= esc($acc['account_type']) ?><?= $acc['account_status'] === 'Pending' ? (! empty($acc['standing']['reactivating']) ? ' — reactivating, ₱' : ' — joining, ₱') . number_format($acc['standing']['join_balance'], 2) . ' left' : '' ?>)
                                 </option>
                             <?php endforeach; ?>
                         </select>
@@ -217,7 +220,7 @@
         amount.min = min;
         if (!amount.value || parseFloat(amount.value) < min) amount.value = min.toFixed(2);
         help.textContent = left > 0
-            ? peso(left) + ' left to activate this account. You can pay it in parts.'
+            ? peso(left) + (option.dataset.reactivating ? ' of missed monthly contributions left before this account is active again.' : ' left to activate this account.') + ' You can pay it in parts.'
             : '₱300 a month. You can pay up to ₱3,600 at once.';
     }
     select.addEventListener('change', apply);

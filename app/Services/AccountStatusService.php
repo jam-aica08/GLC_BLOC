@@ -9,13 +9,15 @@ use App\Models\CooperativeAccountModel;
  * Deactivating and reactivating one cooperative account of a member, without
  * touching the member's other accounts or their login.
  *
- * An Inactive account takes no new contributions or loans; it stays eligible
- * for dividends once its joining contributions are complete (see
- * DividendService), and every record it already has is kept. Its available
+ * An Inactive (deactivated) account is not closed: it gets no contribution
+ * reminders and takes no new loans, but can still take contributions; its contributions
+ * stay, and it is eligible for a year's dividends if it completed PHP 3,600
+ * for that year (see DividendService). Every record it has is kept. Its available
  * contributions can still be withdrawn. It cannot be deactivated
  * while it has an open loan or anything waiting for approval, so no debt or
- * payment is stranded. Reactivating returns it to Pending, and it becomes
- * Active again once its joining contributions are paid, as for a new account.
+ * payment is stranded. Reactivating returns it to Pending until the monthly
+ * contributions missed from the month it was deactivated up to the current
+ * month are paid (Account Reactivation Policy); then it is Active again.
  */
 class AccountStatusService
 {
@@ -111,6 +113,8 @@ class AccountStatusService
         }
 
         $reason = mb_substr(trim(strip_tags($reason)), 0, 255);
+        // Deactivated again while still settling a reactivation: reactivation_from
+        // is kept, so the months missed since the first stop stay owed.
         $this->db()->table('cooperative_accounts')->where('account_id', $accountId)->update([
             'account_status'      => 'Inactive',
             'deactivated_at'      => date('Y-m-d H:i:s'),
@@ -125,7 +129,7 @@ class AccountStatusService
 
         Notifier::toMember((int) $account['member_id'], 'account', 'Account ' . $account['account_number'] . ' deactivated',
             "Your {$account['account_type']} account {$account['account_number']} was deactivated"
-            . ($reason !== '' ? " ({$reason})" : '') . '. It takes no new contributions or loans; it stays eligible for dividends and its records are kept.',
+            . ($reason !== '' ? " ({$reason})" : '') . '. It is not closed: you will not get contribution reminders for it and it takes no new loans, but you can still contribute to it, your contributions stay, and it can still receive dividends for a year in which it completed PHP 3,600.',
             'member/profile', 'account-deactivated-' . $accountId . '-' . time());
 
         return null;
@@ -150,21 +154,47 @@ class AccountStatusService
             return 'Reactivate the member first.';
         }
 
-        // Pending, then Active at once if its joining contributions are already paid.
-        $this->db()->table('cooperative_accounts')->where('account_id', $accountId)->update([
+        // Account Reactivation Policy: the account is Pending until the monthly
+        // contributions missed from the month it was deactivated up to this
+        // month are paid; then syncStatuses() makes it Active again.
+        $update = [
             'account_status'      => 'Pending',
             'deactivated_at'      => null,
             'deactivated_by'      => null,
             'deactivation_reason' => null,
-        ]);
-        model(CooperativeAccountModel::class)->syncStatuses();
-        $status = $this->find($accountId)['account_status'];
+        ];
+        if (CooperativeAccountModel::reactivationAvailable()) {
+            // From the month it stopped: an earlier unsettled stop if there is one, else this deactivation.
+            $update['reactivation_from'] = ($account['reactivation_from'] ?? null) ?: date('Y-m', strtotime($account['deactivated_at'] ?: 'now'));
+        }
+        $this->db()->table('cooperative_accounts')->where('account_id', $accountId)->update($update);
+        $accountModel = model(CooperativeAccountModel::class);
+        $accountModel->syncStatuses();
+        $fresh  = $this->find($accountId);
+        $status = $fresh['account_status'];
 
+        $owed = $accountModel->reactivationArrears($fresh);
         Notifier::toMember((int) $account['member_id'], 'account', 'Account ' . $account['account_number'] . ' reactivated',
             "Your {$account['account_type']} account {$account['account_number']} was reactivated"
-            . ($status === 'Active' ? ' and is active.' : ' and becomes active once its joining contributions are paid.'),
-            'member/profile', 'account-reactivated-' . $accountId . '-' . time());
+            . match (true) {
+                $status === 'Active' => ' and is active.',
+                $owed > 0            => '. Pay the missed monthly contributions from ' . date('F Y', strtotime(($fresh['reactivation_from'] ?? date('Y-m')) . '-01'))
+                                        . ' to ' . date('F Y') . ' (PHP ' . number_format($owed, 2) . ') to make it active again.',
+                default              => ' and becomes active once its joining contributions are paid.',
+            },
+            'member/contributions', 'account-reactivated-' . $accountId . '-' . time());
 
         return null;
+    }
+
+    /** What a reactivated account still owes, and from which month (for messages). */
+    public function arrears(int $accountId): array
+    {
+        $account = $this->find($accountId);
+
+        return [
+            'owed' => $account ? model(CooperativeAccountModel::class)->reactivationArrears($account) : 0.0,
+            'from' => $account['reactivation_from'] ?? null,
+        ];
     }
 }

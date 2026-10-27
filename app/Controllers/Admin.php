@@ -349,7 +349,8 @@ class Admin extends BaseController
             Notifier::resolveForAdmins('review-request-' . $id);
             session()->setFlashdata('success', match ($type) {
                 'Deactivate' => "Request approved. Account {$accountNumber} is deactivated; its records are kept.",
-                'Reactivate' => "Request approved. Account {$accountNumber} is reactivated.",
+                'Reactivate' => "Request approved. Account {$accountNumber} is reactivated" . $this->reactivationNote(
+                    (int) (db_connect()->table('account_requests')->select('account_id')->where('request_id', $id)->get()->getRowArray()['account_id'] ?? 0)),
                 default      => "Request approved. Account {$accountNumber} is open and becomes active once PHP "
                     . number_format(CooperativeAccountModel::joinAmount(), 2) . ' (January to ' . date('F') . ') is paid.',
             });
@@ -478,10 +479,27 @@ class Admin extends BaseController
             session()->setFlashdata('error', $error);
         } else {
             session()->setFlashdata('success', "Account {$account['account_number']} of {$account['first_name']} {$account['last_name']} is deactivated. "
-                . 'It takes no new contributions or loans; it stays eligible for dividends and its records are kept.');
+                . 'It is not closed: it gets no contribution reminders and no new loans, but can still take contributions and receives dividends for a year in which it completed PHP 3,600.');
         }
 
         return redirect()->to($this->membersPage());
+    }
+
+    /** " and active." or what must still be paid before a reactivated account is Active again. */
+    private function reactivationNote(int $accountId): string
+    {
+        $service = new \App\Services\AccountStatusService();
+        $account = $service->find($accountId);
+        if (($account['account_status'] ?? '') === 'Active') {
+            return ' and active.';
+        }
+        $arrears = $service->arrears($accountId);
+        if ($arrears['owed'] > 0) {
+            return '. It becomes active once the missed monthly contributions from '
+                . date('F Y', strtotime($arrears['from'] . '-01')) . ' to ' . date('F Y') . ' (PHP ' . number_format($arrears['owed'], 2) . ') are paid.';
+        }
+
+        return ' and becomes active once its joining contributions are paid.';
     }
 
     /** The Members page with the search the admin was on, so the account stays in view. */
@@ -510,8 +528,7 @@ class Admin extends BaseController
             session()->setFlashdata('error', $error);
         } else {
             $account = $service->find($accountId);
-            session()->setFlashdata('success', "Account {$account['account_number']} is reactivated"
-                . ($account['account_status'] === 'Active' ? ' and active.' : ' and becomes active once its joining contributions are paid.'));
+            session()->setFlashdata('success', "Account {$account['account_number']} is reactivated" . $this->reactivationNote($accountId));
         }
 
         return redirect()->to($this->membersPage());

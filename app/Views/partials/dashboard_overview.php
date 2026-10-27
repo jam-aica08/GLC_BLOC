@@ -64,7 +64,8 @@ $loanLink = fn($loan) => $isAdmin ? base_url('admin/loans/' . (int) $loan['loan_
             <div class="small text-muted mt-2">Profit pool</div>
             <div class="pool-figure"><?= $peso($dp['profit_pool']) ?></div>
             <div class="small text-muted">Administration <?= rtrim(rtrim(number_format($dp['admin_share_rate'], 2), '0'), '.') ?>%: <?= $peso($dp['admin_share']) ?> · Members: <?= $peso($dp['members_pool']) ?></div>
-            <div class="small text-muted"><?= $dp['basic_count'] ?> Basic, <?= $dp['pioneer_count'] ?> Pioneer eligible account(s)</div>
+            <div class="small text-muted"><?= $dp['basic_count'] ?> Basic, <?= $dp['pioneer_count'] ?> Pioneer account(s) on track for ₱<?= number_format(\App\Models\CooperativeAccountModel::ANNUAL_CONTRIBUTION, 2) ?> this year</div>
+            <div class="small text-muted">Only accounts that complete ₱<?= number_format(\App\Models\CooperativeAccountModel::ANNUAL_CONTRIBUTION, 2) ?> for the year receive dividends.</div>
         </div>
         <div class="d-flex flex-wrap gap-4">
             <div>

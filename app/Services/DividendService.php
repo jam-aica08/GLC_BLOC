@@ -13,10 +13,11 @@ use CodeIgniter\Database\BaseConnection;
  * (CooperativeAccountModel::ADMIN_DIVIDEND_SHARE); the remaining 97% is the
  * members' pool.
  *
- * Eligible accounts: every Active account, and every deactivated (Inactive)
- * account that completed its joining contributions — deactivating an account
- * does not forfeit its dividends. Accounts still joining (Pending) and Closed
- * accounts are not eligible.
+ * Eligible accounts (Dividend Eligibility Policy): every account that is not
+ * Closed and has completed PHP 3,600 (12 × PHP 300) of approved contributions
+ * for the year's periods (January–December of that year, whenever paid).
+ * Deactivation does not disqualify an account by itself; an account below
+ * PHP 3,600 for the year is not eligible, whatever its status.
  *
  * The members' pool is shared by the eligible accounts; a Basic account weighs
  * 1.00 and a Pioneer account 1.02, so a Pioneer share is 2% more than a Basic
@@ -109,26 +110,36 @@ class DividendService
 
     /**
      * Preview for a year from current data. Nothing is saved.
+     *
+     * $projected (the dashboard's estimate for the current year): before the
+     * year ends nobody has PHP 3,600 yet, so count the accounts on track — paid
+     * PHP 300 for every month of the year so far. A distribution always uses
+     * the full PHP 3,600.
      */
-    public function plan(int $year): array
+    public function plan(int $year, bool $projected = false): array
     {
         model(CooperativeAccountModel::class)->syncStatuses();
 
+        $projected = $projected && $year === (int) date('Y');
+        $required  = $projected
+            ? (int) date('n') * CooperativeAccountModel::MONTHLY_CONTRIBUTION
+            : CooperativeAccountModel::ANNUAL_CONTRIBUTION;
+
+        // Approved contributions for the year's months, whenever they were paid.
+        $yearPaid = '(SELECT COALESCE(SUM(c.amount), 0) FROM contributions c WHERE c.account_id = cooperative_accounts.account_id'
+                  . " AND c.payment_status = 'Approved' AND c.contribution_period >= '" . sprintf('%04d', $year) . "-01'"
+                  . " AND c.contribution_period <= '" . sprintf('%04d', $year) . "-12')";
+
         // Only accounts that were open by the end of that year share its profit
-        // (matters when an earlier year is distributed after imports). A
-        // deactivated account keeps its dividends if it had completed joining:
-        // approved contributions for January up to its opening month.
-        $joined = '(SELECT COALESCE(SUM(c.amount), 0) FROM contributions c WHERE c.account_id = cooperative_accounts.account_id'
-                . " AND c.payment_status = 'Approved') >= MONTH(account_start_date) * " . CooperativeAccountModel::MONTHLY_CONTRIBUTION;
-        $accounts = $this->db->table('cooperative_accounts')
-            ->select('account_id, account_number, account_type, account_status')
-            ->groupStart()
-                ->where('account_status', 'Active')
-                ->orGroupStart()->where('account_status', 'Inactive')->where($joined, null, false)->groupEnd()
-            ->groupEnd()
+        // (matters when an earlier year is distributed after imports).
+        $candidates = $this->db->table('cooperative_accounts')
+            ->select("account_id, account_number, account_type, account_status, {$yearPaid} AS year_paid", false)
+            ->where('account_status !=', 'Closed')
             ->where('account_start_date <=', "{$year}-12-31")
             ->orderBy('account_id', 'ASC')
             ->get()->getResultArray();
+        $accounts = array_values(array_filter($candidates, fn($a) => (float) $a['year_paid'] + 0.004 >= $required));
+        $below    = count($candidates) - count($accounts);
 
         $pioneers    = count(array_filter($accounts, fn($a) => $a['account_type'] === 'Pioneer'));
         $basics      = count($accounts) - $pioneers;
@@ -149,11 +160,15 @@ class DividendService
             $errors[] = "There is no profit pool for {$year}: no interest was earned on loans approved that year.";
         }
         if ($accounts === []) {
-            $errors[] = 'There are no eligible accounts to receive dividends.';
+            $errors[] = "No account has completed the PHP " . number_format(CooperativeAccountModel::ANNUAL_CONTRIBUTION, 2)
+                . " annual contribution for {$year}, so none is eligible for dividends.";
         }
 
         return [
             'year'              => $year,
+            'projected'         => $projected,
+            'required'          => (float) $required,
+            'below_count'       => $below,
             'profit_pool'       => $poolC / 100,
             'admin_share_rate'  => $adminRate,
             'admin_share'       => $adminC / 100,

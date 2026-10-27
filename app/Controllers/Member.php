@@ -168,7 +168,7 @@ class Member extends BaseController
             return redirect()->to('/member/contributions');
         }
 
-        if (! in_array($account['account_status'], ['Active', 'Pending'], true)) {
+        if (! in_array($account['account_status'], ['Active', 'Pending', 'Inactive'], true)) {
             session()->setFlashdata('error', 'This account is not open for contributions.');
             return redirect()->to('/member/contributions');
         }

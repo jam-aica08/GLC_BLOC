@@ -58,6 +58,9 @@ class DatabaseUpdates
                 || ($db->tableExists('account_requests', false) && ! $db->fieldExists('request_type', 'account_requests'))) {
                 $status['problems'][] = 'data retention and account deactivation columns are missing';
             }
+            if (! $db->fieldExists('reactivation_from', 'cooperative_accounts')) {
+                $status['problems'][] = 'cooperative_accounts.reactivation_from (reactivation after paying missed months) is missing';
+            }
             if (! $db->tableExists('withdrawals', false) || ! $db->fieldExists('admin_share', 'dividend_distributions')) {
                 $status['problems'][] = 'withdrawals, loan offsets or the administration dividend share are missing';
             }
@@ -341,6 +344,15 @@ class DatabaseUpdates
                 $forge->addColumn('dividend_distributions', [$name => $def]);
                 $db->resetDataCache();
             }
+        }
+
+        // A reactivated account owes PHP 300 for every month from this one (YYYY-MM,
+        // the month it was deactivated) to the current month before it is Active again.
+        $db->resetDataCache();
+        if (! $db->fieldExists('reactivation_from', 'cooperative_accounts')) {
+            $forge->addColumn('cooperative_accounts', [
+                'reactivation_from' => ['type' => 'VARCHAR', 'constraint' => 7, 'null' => true],
+            ]);
         }
 
         $db->resetDataCache();
