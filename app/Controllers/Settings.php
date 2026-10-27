@@ -144,7 +144,11 @@ class Settings extends BaseController
             return redirect()->to($this->home())->with('error', 'Apply the database updates first, then load the demo data.');
         }
 
-        @set_time_limit(55);   // the hosted function stops at 60 seconds
+        // The hosted function stops at 60 seconds. Web requests only: on the command
+        // line (the test suite) the limit would apply to everything that runs after.
+        if (! is_cli()) {
+            @set_time_limit(55);
+        }
         $result = \App\Libraries\DemoLoader::run((int) $user['user_id']);
         if (is_string($result)) {
             return redirect()->to($this->home())->with('error', $result);

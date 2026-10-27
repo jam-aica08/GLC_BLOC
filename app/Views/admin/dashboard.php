@@ -66,11 +66,11 @@
 </div>
 
 <script>
-// The "Pending …" tiles follow new requests without reloading: checked every
-// 20 seconds while the page is visible, at once on returning to the tab, and
-// when the bell gets something new. Background checks do not extend the sign-in.
+// The "Pending …" tiles follow new requests without reloading. They read the
+// bell's background check (every 20 seconds while the page is visible, at once
+// on returning to the tab), which carries the pending counts, so the dashboard
+// adds no requests of its own.
 (function () {
-    var url = <?= json_encode(base_url('admin/dashboard/pending')) ?>, timer = null, busy = false;
     function paint(key, n) {
         var tile = document.querySelector('[data-pending="' + key + '"]');
         if (!tile) return;
@@ -82,21 +82,10 @@
         tile.setAttribute('aria-label', tile.textContent.trim().replace(/\s+\d+$/, '') + ': ' + n);
         if (n > was) { tile.classList.add('pending-bump'); setTimeout(function () { tile.classList.remove('pending-bump'); }, 1500); }
     }
-    function check() {
-        if (busy || document.visibilityState !== 'visible') return;
-        busy = true;
-        fetch(url, { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-Background-Poll': '1' }, cache: 'no-store' })
-            .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-            .then(function (d) { Object.keys(d).forEach(function (k) { paint(k, d[k]); }); })
-            .catch(function () {})
-            .then(function () { busy = false; });
-    }
-    function start() { if (!timer) timer = setInterval(check, 20000); }
-    document.addEventListener('visibilitychange', function () {
-        if (document.visibilityState === 'visible') { check(); start(); } else { clearInterval(timer); timer = null; }
+    document.addEventListener('glc:feed', function (e) {
+        var pending = e.detail && e.detail.pending;
+        if (pending) Object.keys(pending).forEach(function (k) { paint(k, pending[k]); });
     });
-    document.querySelectorAll('.notif-toggle').forEach(function (b) { b.addEventListener('glc:new-notifications', check); });
-    if (document.visibilityState === 'visible') start();
 })();
 </script>
 <style>

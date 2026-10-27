@@ -182,6 +182,8 @@
                     // Leave the list alone while it is open, so it does not jump under the pointer.
                     if (list && typeof data.html === 'string' && !menu.querySelector('.dropdown-menu.show')) list.innerHTML = data.html;
                     if ((data['new'] || []).length) bell.dispatchEvent(new CustomEvent('glc:new-notifications'));
+                    // Other parts of the page (the dashboard's pending tiles) read the same answer.
+                    document.dispatchEvent(new CustomEvent('glc:feed', { detail: data }));
                 })
                 .catch(function () {})
                 .then(function () { busy = false; });
