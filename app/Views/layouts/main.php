@@ -87,6 +87,8 @@ $glcNav['Data'] = session()->get('is_super_admin')
             ?>
             <div class="dropdown">
                 <button type="button" class="notif-toggle position-relative" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" data-seen-url="<?= base_url('admin/notifications/seen') ?>"
+                        data-feed-url="<?= base_url('admin/notifications/feed') ?>" data-here="<?= esc($glcHere) ?>"
+                        data-newest="<?= (int) max(array_merge([0], array_column($glcLatest, 'notification_id'))) ?>"
                         aria-label="Notifications<?= $glcUnread ? ', ' . $glcUnread . ' unread' : '' ?>">
                     <i class="fa-solid fa-bell fa-lg"></i>
                     <?php if ($glcUnread): ?><span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger notif-count" style="font-size:.65rem;"><?= $glcUnread ?></span><?php endif; ?>
@@ -94,12 +96,11 @@ $glcNav['Data'] = session()->get('is_super_admin')
                 <div class="dropdown-menu dropdown-menu-end shadow notif-menu p-0">
                     <div class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom">
                         <span class="fw-semibold">Notifications<?= $glcUnread ? ' <span class="badge bg-danger ms-1 notif-count">' . $glcUnread . '</span>' : '' ?></span>
-                        <?php if ($glcUnread): ?>
-                            <form method="post" action="<?= base_url('admin/notifications/read-all') ?>">
-                                <?= csrf_field() ?><input type="hidden" name="next" value="<?= esc($glcHere) ?>">
-                                <button class="btn btn-link btn-sm p-0">Mark all as read</button>
-                            </form>
-                        <?php endif; ?>
+                        <!-- Always present (hidden when nothing is unread) so the live bell can show it. -->
+                        <form method="post" action="<?= base_url('admin/notifications/read-all') ?>"<?= $glcUnread ? '' : ' hidden' ?>>
+                            <?= csrf_field() ?><input type="hidden" name="next" value="<?= esc($glcHere) ?>">
+                            <button class="btn btn-link btn-sm p-0">Mark all as read</button>
+                        </form>
                     </div>
                     <div class="notif-scroll">
                         <?= view('partials/notification_list', ['notifications' => $glcLatest, 'next' => $glcHere, 'area' => 'admin']) ?>

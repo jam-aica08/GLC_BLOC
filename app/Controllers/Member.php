@@ -852,6 +852,15 @@ class Member extends BaseController
         return $this->response->setJSON(['unread' => \App\Services\Notifier::unreadCount($memberId), 'csrf' => csrf_hash()]);
     }
 
+    /** GET (background, every 20s while the page is visible): what is new for the bell. */
+    public function notificationFeed()
+    {
+        $memberId = $this->requireMember();
+
+        return $this->notificationFeedResponse(
+            \App\Services\Notifier::memberFeed($memberId, (int) $this->request->getGet('since')), 'member');
+    }
+
     /** GET: every notification of the signed-in member. */
     public function notifications(): string
     {

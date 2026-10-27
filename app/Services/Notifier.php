@@ -229,6 +229,40 @@ class Notifier
         return self::read(self::ADMIN, $userId, $notificationId);
     }
 
+    /**
+     * For the bell's background check: the unread count, the latest few, and
+     * the notifications that arrived after $sinceId (to pop up), newest first.
+     *
+     * @return array{unread: int, latest: list<array>, new: list<array>, newest: int}
+     */
+    public static function adminFeed(int $userId, int $sinceId): array
+    {
+        return self::feed(self::ADMIN, $userId, $sinceId);
+    }
+
+    /** @return array{unread: int, latest: list<array>, new: list<array>, newest: int} */
+    public static function memberFeed(int $memberId, int $sinceId): array
+    {
+        return self::feed(self::MEMBER, $memberId, $sinceId);
+    }
+
+    private static function feed(array $box, int $ownerId, int $sinceId): array
+    {
+        [$table, $owner] = $box;
+        $latest = self::fetch($box, $ownerId, 6);
+        $new    = $sinceId > 0 && self::available($table)
+            ? db_connect()->table($table)->where($owner, $ownerId)->where('notification_id >', $sinceId)
+                ->orderBy('notification_id', 'DESC')->limit(5)->get()->getResultArray()
+            : [];
+
+        return [
+            'unread' => self::countUnread($box, $ownerId),
+            'latest' => $latest,
+            'new'    => $new,
+            'newest' => (int) max(array_merge([$sinceId], array_column($latest, 'notification_id'))),
+        ];
+    }
+
     private static function countUnread(array $box, int $ownerId): int
     {
         [$table, $owner] = $box;

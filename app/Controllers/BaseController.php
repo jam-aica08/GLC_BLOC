@@ -46,4 +46,29 @@ abstract class BaseController extends Controller
         // Preload any models, libraries, etc, here.
         // $this->session = service('session');
     }
+
+    /**
+     * JSON for the bell's background check (Notifier::adminFeed / memberFeed):
+     * the unread count, the refreshed dropdown list, and the new notifications
+     * to pop up. Never cached: it is private to the signed-in user.
+     */
+    protected function notificationFeedResponse(array $feed, string $area)
+    {
+        $next = trim((string) $this->request->getGet('next'), '/');
+        if (! preg_match('#^(admin|member)(/[A-Za-z0-9_/-]*)?$#', $next)) {
+            $next = $area . '/dashboard';
+        }
+
+        return $this->response->setHeader('Cache-Control', 'no-store')->setJSON([
+            'unread' => $feed['unread'],
+            'newest' => $feed['newest'],
+            'html'   => view('partials/notification_list', ['notifications' => $feed['latest'], 'next' => $next, 'area' => $area]),
+            'new'    => array_map(static fn ($n) => [
+                'id'      => (int) $n['notification_id'],
+                'title'   => $n['title'],
+                'message' => $n['message'],
+                'link'    => $n['link'] ? base_url($n['link']) : null,
+            ], $feed['new']),
+        ]);
+    }
 }

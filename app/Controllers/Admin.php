@@ -1469,6 +1469,15 @@ class Admin extends BaseController
         return $this->response->setJSON(['unread' => Notifier::adminUnreadCount($userId), 'csrf' => csrf_hash()]);
     }
 
+    /** GET (background, every 20s while the page is visible): what is new for the bell. */
+    public function notificationFeed()
+    {
+        $this->requireAdmin();
+
+        return $this->notificationFeedResponse(
+            Notifier::adminFeed((int) session()->get('user_id'), (int) $this->request->getGet('since')), 'admin');
+    }
+
     /** GET: every notification of the signed-in administrator. */
     public function notifications(): string
     {
