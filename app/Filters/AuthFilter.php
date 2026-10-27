@@ -30,10 +30,16 @@ class AuthFilter implements FilterInterface
         if (time() - $last > self::IDLE_MINUTES * 60) {
             return $this->signedOut($request, 'You were signed out after ' . self::IDLE_MINUTES . ' minutes without activity. Please sign in again.', true);
         }
-        session()->set('last_activity', time());
+        // A background check (the bell, header X-Background-Poll) is not the user
+        // doing anything, so it must not keep an unattended sign-in alive, nor
+        // count as activity for the retention review.
+        $background = $request->hasHeader('X-Background-Poll');
+        if (! $background) {
+            session()->set('last_activity', time());
+        }
 
         // A session kept open for days still counts as activity for the retention review (one write a day).
-        if (session()->get('activity_day') !== date('Y-m-d')) {
+        if (! $background && session()->get('activity_day') !== date('Y-m-d')) {
             \App\Services\RetentionService::touch((int) session()->get('user_id'));
             session()->set('activity_day', date('Y-m-d'));
         }

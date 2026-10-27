@@ -109,4 +109,49 @@ final class NotificationSeenTest extends CIUnitTestCase
     {
         $this->withSession($this->member)->post('admin/notifications/seen')->assertRedirectTo('/login');
     }
+
+    /** The bell's background check sees a loan application made after the page loaded. */
+    public function testAdminFeedReportsANewLoanApplication(): void
+    {
+        $before = (int) ($this->db->table('admin_notifications')->selectMax('notification_id')->get()->getRow()->notification_id ?? 0);
+        // Opened in January, with its approved PHP 300: Active, limit PHP 600.
+        $this->db->table('cooperative_accounts')->where('member_id', $this->member['member_id'])
+            ->update(['account_start_date' => date('Y-01-01'), 'account_status' => 'Active']);
+        $account = $this->db->table('cooperative_accounts')->where('member_id', $this->member['member_id'])->get()->getRowArray();
+        $this->withSession($this->member)->post('member/loans/apply', ['account_id' => $account['account_id'], 'loan_amount' => 500, 'loan_term_months' => 3]);
+
+        $res = $this->withSession($this->admin)->withHeaders(['X-Requested-With' => 'XMLHttpRequest', 'X-Background-Poll' => '1'])
+            ->get('admin/notifications/feed?since=' . $before . '&next=admin/dashboard');
+        $res->assertOK();
+        $data = json_decode($res->getJSON(), true);
+
+        $this->assertSame('Loan application to review', $data['new'][0]['title'] ?? null);
+        $this->assertGreaterThan(0, $data['unread']);
+        $this->assertGreaterThan($before, $data['newest']);
+        $this->assertStringContainsString('Loan application to review', $data['html']);
+
+        // Asked again with the newest id: nothing new to pop up.
+        $again = $this->withSession($this->admin)->withHeaders(['X-Background-Poll' => '1'])
+            ->get('admin/notifications/feed?since=' . $data['newest']);
+        $this->assertSame([], json_decode($again->getJSON(), true)['new']);
+    }
+
+    /** Background checks do not keep an unattended sign-in alive. */
+    public function testBackgroundCheckDoesNotCountAsActivity(): void
+    {
+        $session = $this->admin;
+        $session['last_activity'] = time() - 600;   // idle for 10 minutes
+
+        $this->withSession($session)->withHeaders(['X-Background-Poll' => '1'])->get('admin/notifications/feed')->assertOK();
+        $this->assertSame($session['last_activity'], $_SESSION['last_activity']);
+
+        $this->withSession($session)->withHeaders([])->get('admin/notifications/feed')->assertOK();
+        $this->assertGreaterThan($session['last_activity'], $_SESSION['last_activity'], 'A normal request does count.');
+    }
+
+    public function testFeedsAreForTheirOwnRoleOnly(): void
+    {
+        $this->withSession($this->member)->get('admin/notifications/feed')->assertRedirectTo('/login');
+        $this->withSession($this->member)->withHeaders(['X-Background-Poll' => '1'])->get('member/notifications/feed')->assertOK();
+    }
 }
