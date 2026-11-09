@@ -737,6 +737,12 @@ class Admin extends BaseController
             session()->setFlashdata('error', "Account {$account['account_number']} is no longer active, so loan #{$id} cannot be approved. Reject it instead.");
             return redirect()->to('/admin/loans');
         }
+        // Applications made before the minimum existed are refused here too.
+        if ((float) $loan['loan_amount'] < CooperativeAccountModel::LOAN_MIN) {
+            session()->setFlashdata('error', "Loan #{$id} (PHP " . number_format((float) $loan['loan_amount'], 2) . ') is below the minimum loan of PHP '
+                . number_format(CooperativeAccountModel::LOAN_MIN, 2) . '. Reject it instead.');
+            return redirect()->to('/admin/loans');
+        }
         $limit = $loanService->checkMaxLoanLimit((int) $loan['account_id']);
         if ((float) $loan['loan_amount'] > $limit + 0.004) {
             session()->setFlashdata('error', "Loan #{$id} (PHP " . number_format((float) $loan['loan_amount'], 2) . ') is now above this member\'s limit of PHP '

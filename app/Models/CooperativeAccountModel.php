@@ -34,6 +34,9 @@ class CooperativeAccountModel extends Model
     public const CONTRIBUTION_MIN = 300.00;
     public const CONTRIBUTION_MAX = 3600.00;
 
+    /** Smallest loan the cooperative releases (PHP); the most is twice the contribution balance. */
+    public const LOAN_MIN = 300.00;
+
     protected $table            = 'cooperative_accounts';
     protected $primaryKey       = 'account_id';
     protected $useAutoIncrement = true;

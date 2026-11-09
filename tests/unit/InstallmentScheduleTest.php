@@ -62,4 +62,19 @@ final class InstallmentScheduleTest extends CIUnitTestCase
         $this->assertSame(1000.0, round(array_sum(array_column($rows, 'principal_amount')), 2));
         $this->assertSame(20.0, (float) $rows[0]['interest_amount']);
     }
+
+    /** Rounding each month up must never leave the last month negative (PHP 1.00 over 18 months gave -0.02). */
+    public function testNoMonthIsEverNegative(): void
+    {
+        foreach ([3, 6, 12, 18, 24] as $term) {
+            for ($centavos = 1; $centavos <= 1000; $centavos++) {
+                $rows = (new LoanService())->calculateInstallments([
+                    'loan_amount' => $centavos / 100, 'interest_rate' => 5, 'loan_term_months' => $term, 'release_date' => '2026-10-15',
+                ]);
+                $parts = array_map(fn($r) => (int) round($r['principal_amount'] * 100), $rows);
+                $this->assertGreaterThanOrEqual(0, min($parts), "PHP " . ($centavos / 100) . " over {$term} months");
+                $this->assertSame($centavos, array_sum($parts), 'Principal still adds up to the loan');
+            }
+        }
+    }
 }
