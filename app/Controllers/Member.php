@@ -331,8 +331,8 @@ class Member extends BaseController
         // Rate is fixed by account type; never taken from the form.
         $interestRate = CooperativeAccountModel::LOAN_INTEREST_RATE[$account['account_type']] ?? 5.00;
 
-        if ($loanAmount <= 0) {
-            session()->setFlashdata('error', 'Loan amount must be greater than zero.');
+        if ($loanAmount < CooperativeAccountModel::LOAN_MIN) {
+            session()->setFlashdata('error', 'The minimum loan is PHP ' . number_format(CooperativeAccountModel::LOAN_MIN, 2) . '.');
             return redirect()->to('/member/loans');
         }
 

@@ -47,7 +47,7 @@ class DataImportService
         'Loans' => [
             'loan_ref*'         => 'Your own ID for this loan (unique in this file). Used to link payments.',
             'account_ref*'      => 'account_ref on the Accounts sheet.',
-            'loan_amount*'      => 'Principal released.',
+            'loan_amount*'      => 'Principal released, at least PHP 300.',
             'term_months*'      => '3, 6, 12, 18 or 24.',
             'application_date*' => 'Date the member applied.',
             'release_date*'     => 'Date the money was released. The monthly schedule starts from here.',
@@ -310,8 +310,8 @@ class DataImportService
             } elseif (! $acct) {
                 $this->error('Loans', $row, 'account_ref', "No account with account_ref \"{$l['account']}\" on the Accounts sheet.");
             }
-            if ($l['amount'] !== null && $l['amount'] <= 0) {
-                $this->error('Loans', $row, 'loan_amount', 'Must be more than zero.');
+            if ($l['amount'] !== null && $l['amount'] < CooperativeAccountModel::LOAN_MIN) {
+                $this->error('Loans', $row, 'loan_amount', 'Must be at least PHP ' . number_format(CooperativeAccountModel::LOAN_MIN, 2) . ' (the minimum loan).');
             }
             if ($l['term'] !== null && ! in_array($l['term'], self::LOAN_TERMS, true)) {
                 $this->error('Loans', $row, 'term_months', 'Must be one of ' . implode(', ', self::LOAN_TERMS) . '.');

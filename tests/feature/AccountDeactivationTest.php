@@ -98,7 +98,7 @@ final class AccountDeactivationTest extends CIUnitTestCase
         $this->withSession($this->memberSession)->post('member/contributions/submit',
             ['account_id' => $this->firstAccount, 'contribution_period' => date('Y-m'), 'amount' => 300]);
         $this->withSession($this->memberSession)->post('member/loans/apply',
-            ['account_id' => $this->firstAccount, 'loan_amount' => 100, 'loan_term_months' => 3]);
+            ['account_id' => $this->firstAccount, 'loan_amount' => 300, 'loan_term_months' => 3]);
 
         $this->assertSame($before + 1, $this->db->table('contributions')->countAllResults());
         $this->assertSame('Inactive', $this->accountStatus($this->firstAccount), 'Contributing does not reactivate it.');

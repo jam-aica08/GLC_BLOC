@@ -62,23 +62,23 @@ final class LoanRulesTest extends CIUnitTestCase
 
     public function testFirstApplicationWithinTheLimitIsAccepted(): void
     {
-        $this->apply(100)->assertRedirectTo('/member/loans');
+        $this->apply(300)->assertRedirectTo('/member/loans');
         $this->assertSame(1, $this->openLoans());
     }
 
     public function testSecondApplicationIsRefusedWhileOneIsOpen(): void
     {
-        $this->apply(100);
-        $this->apply(100);
+        $this->apply(300);
+        $this->apply(300);
 
         $this->assertSame(1, $this->openLoans(), 'Only one loan may be pending or active per member.');
     }
 
     public function testAnotherLoanIsAllowedOnceThePreviousOneIsPaid(): void
     {
-        $this->apply(100);
+        $this->apply(300);
         $this->db->table('loans')->where('account_id', $this->accountId)->update(['loan_status' => 'Paid']);
-        $this->apply(100);
+        $this->apply(300);
 
         $this->assertSame(1, $this->openLoans());
     }
@@ -95,7 +95,7 @@ final class LoanRulesTest extends CIUnitTestCase
 
     public function testApprovalIsRefusedWhenTheLoanIsNowAboveTheLimit(): void
     {
-        $this->apply(100)->assertRedirectTo('/member/loans');
+        $this->apply(300)->assertRedirectTo('/member/loans');
         $loanId = (int) $this->db->table('loans')->where('account_id', $this->accountId)->get()->getRow('loan_id');
 
         // The contribution behind the limit is rejected after the application.
@@ -111,7 +111,7 @@ final class LoanRulesTest extends CIUnitTestCase
 
     public function testApprovalWithinTheLimitStillWorks(): void
     {
-        $this->apply(100);
+        $this->apply(300);
         $loanId = (int) $this->db->table('loans')->where('account_id', $this->accountId)->get()->getRow('loan_id');
 
         $admin = ['user_id' => 1, 'username' => 'admin', 'role' => 'Admin', 'logged_in' => true];
@@ -123,18 +123,44 @@ final class LoanRulesTest extends CIUnitTestCase
 
     public function testInvalidTermIsRefused(): void
     {
-        $this->apply(100, 7);
+        $this->apply(300, 7);
 
         $this->assertSame(0, $this->openLoans());
     }
 
     public function testAmountIsKeptToTheCentavo(): void
     {
-        $this->apply(100.456);
+        $this->apply(300.456);
 
         $loan = $this->db->table('loans')->where('account_id', $this->accountId)->get()->getRowArray();
-        $this->assertSame('100.46', $loan['loan_amount']);
-        $this->assertSame('2.01', $loan['interest_amount'], '2% of 100.46, not of 100.456');
+        $this->assertSame('300.46', $loan['loan_amount']);
+        $this->assertSame('6.01', $loan['interest_amount'], '2% of 300.46, not of 300.456');
+    }
+
+    public function testAmountBelowTheMinimumIsRefused(): void
+    {
+        $this->apply(299.99);
+        $this->assertSame(0, $this->openLoans());
+        $this->assertSame('The minimum loan is PHP 300.00.', session()->getFlashdata('error'));
+
+        $this->apply(300)->assertRedirectTo('/member/loans');
+        $this->assertSame(1, $this->openLoans(), 'PHP 300 is allowed');
+    }
+
+    public function testApprovalRefusesAnOlderApplicationBelowTheMinimum(): void
+    {
+        // An application saved before the minimum existed.
+        $this->db->table('loans')->insert(['account_id' => $this->accountId, 'total_contributions' => 300, 'maximum_loan_limit' => 600,
+            'loan_amount' => 100, 'interest_rate' => 2, 'interest_amount' => 2, 'loan_term_months' => 3,
+            'application_date' => date('Y-m-d'), 'loan_status' => 'Pending']);
+        $loanId = (int) $this->db->insertID();
+
+        $admin = ['user_id' => 1, 'username' => 'admin', 'role' => 'Admin', 'logged_in' => true];
+        $this->withSession($admin)->post('admin/loans/approve/' . $loanId)->assertRedirectTo('/admin/loans');
+
+        $this->seeInDatabase('loans', ['loan_id' => $loanId, 'loan_status' => 'Pending']);
+        $this->dontSeeInDatabase('loan_installments', ['loan_id' => $loanId]);
+        $this->assertStringContainsString('below the minimum loan of PHP 300.00', (string) session()->getFlashdata('error'));
     }
 
     public function testOverLimitMessageShowsPesoAmounts(): void
@@ -146,7 +172,7 @@ final class LoanRulesTest extends CIUnitTestCase
 
     public function testApprovalIgnoresAnInvalidReleaseDate(): void
     {
-        $this->apply(100);
+        $this->apply(300);
         $loanId = (int) $this->db->table('loans')->where('account_id', $this->accountId)->get()->getRow('loan_id');
 
         $admin = ['user_id' => 1, 'username' => 'admin', 'role' => 'Admin', 'logged_in' => true];

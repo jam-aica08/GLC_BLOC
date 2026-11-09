@@ -41,6 +41,13 @@ class LoanService
         $interestAmount    = round($loanAmount * ($interestRate / 100), 2);
         $principalPerMonth = round($loanAmount / $termMonths, 2);
 
+        // Rounding each month up could leave the last month negative on a very
+        // small loan (PHP 1.00 over 18 months: 0.06 x 17 = 1.02). Round down
+        // instead, so the last month takes the leftover centavos.
+        if (round($principalPerMonth * ($termMonths - 1), 2) > $loanAmount) {
+            $principalPerMonth = floor(round($loanAmount * 100, 0) / $termMonths) / 100;
+        }
+
         // Adjust last installment for rounding remainder
         $totalPrincipal = $principalPerMonth * $termMonths;
         $roundingAdj    = round($loanAmount - $totalPrincipal, 2);

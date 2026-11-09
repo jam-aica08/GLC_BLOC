@@ -162,9 +162,11 @@
                             <div class="input-group">
                                 <span class="input-group-text">&#8369;</span>
                                 <input type="number" class="form-control" id="loan_amount" name="loan_amount"
-                                       placeholder="e.g. 10000.00" min="1" step="0.01" required
+                                       placeholder="e.g. 10000.00" min="<?= number_format(\App\Models\CooperativeAccountModel::LOAN_MIN, 2, '.', '') ?>" step="0.01" required
+                                       aria-describedby="loan_amount_help"
                                        value="<?= esc(old('loan_amount')) ?>">
                             </div>
+                            <div id="loan_amount_help" class="form-text">At least &#8369;<?= number_format(\App\Models\CooperativeAccountModel::LOAN_MIN, 2) ?>, up to twice your contribution balance.</div>
                         </div>
                         <div class="col-md-6">
                             <label for="loan_term_months" class="form-label fw-semibold small">Desired Term (months) <span class="text-danger">*</span></label>
