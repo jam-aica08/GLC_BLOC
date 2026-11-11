@@ -17,6 +17,7 @@ class AuditLog
         'admin/members/add'                  => ['Added member', 'member'],
         'admin/members/deactivate'           => ['Deactivated member', 'member'],
         'admin/members/reactivate'           => ['Reactivated member', 'member'],
+        'admin/members/reset-password'       => ['PASSWORD_RESET', 'member'],   // never the password itself
         'admin/members/accounts/add'         => ['Opened account for member', 'member'],
         'admin/members/accounts/deactivate'  => ['Deactivated account', 'cooperative_account'],
         'admin/members/accounts/reactivate'  => ['Reactivated account', 'cooperative_account'],

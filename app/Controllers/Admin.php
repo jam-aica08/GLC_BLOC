@@ -181,6 +181,8 @@ class Admin extends BaseController
             'search'           => $search,
             'accountRequests'  => (new \App\Services\AccountRequestService())->pending(),
             'canDeactivateAccounts' => \App\Services\AccountStatusService::available(),
+            // The Reset Password button is for the super administrator only (the action checks again).
+            'canResetPasswords'     => $this->isSuperAdmin(),
         ]);
     }
 
@@ -436,6 +438,87 @@ class Admin extends BaseController
         $memberModel->update($id, ['membership_status' => 'Inactive']);
         db_connect()->table('users')->where('user_id', (int) $memberModel->find($id)['user_id'])->update(['account_status' => 'Inactive']);
         session()->setFlashdata('success', 'Member deactivated. They can no longer sign in.');
+        return redirect()->to('/admin/members');
+    }
+
+    /**
+     * POST (superadmin only): give a member a temporary password. The
+     * superadmin hands it over privately; the member must choose a new
+     * password at the next sign-in. Hashed like every other password, never
+     * logged or shown again. The member's open sign-ins end (the password
+     * mark changes, see AuthFilter). Recorded in the SHA-256 ledger chain as
+     * PASSWORD_RESET (IDs and time only) and, by AuditFilter, in the audit log.
+     */
+    public function resetMemberPassword(int $id)
+    {
+        $this->requireAdmin();
+
+        if (! $this->request->is('post')) {
+            return redirect()->to('/admin/members');
+        }
+        // Checked in the database on every request, not from the session or the button.
+        if (! $this->isSuperAdmin()) {
+            session()->setFlashdata('error', 'Only the super administrator can reset member passwords.');
+            return redirect()->to('/admin/dashboard');
+        }
+        if (! \App\Libraries\DatabaseUpdates::passwordResetReady()) {
+            session()->setFlashdata('error', 'Password reset needs a database update. Open Settings and apply database updates.');
+            return redirect()->to('/admin/members');
+        }
+
+        $db     = db_connect();
+        $member = $db->table('members m')
+                     ->select('m.member_id, m.first_name, m.last_name, u.user_id, u.username, r.role_name')
+                     ->join('users u', 'u.user_id = m.user_id')
+                     ->join('roles r', 'r.role_id = u.role_id', 'left')
+                     ->where('m.member_id', $id)
+                     ->get()->getRowArray();
+        // Members only: an administrator's password is never reset from here.
+        if (! $member || strtolower((string) $member['role_name']) !== 'member') {
+            session()->setFlashdata('error', 'Member not found.');
+            return redirect()->to('/admin/members');
+        }
+
+        $temporary = (string) $this->request->getPost('temporary_password');
+        $confirm   = (string) $this->request->getPost('confirm_password');
+        if ($this->request->getPost('confirm_reset') !== '1') {
+            session()->setFlashdata('error', 'Tick the confirmation box to reset the password. Nothing was changed.');
+            return redirect()->to('/admin/members');
+        }
+        if (! hash_equals($temporary, $confirm)) {
+            session()->setFlashdata('error', 'The two temporary passwords do not match. Nothing was changed.');
+            return redirect()->to('/admin/members');
+        }
+        if ($problem = \App\Libraries\PasswordPolicy::problem($temporary, (string) $member['username'])) {
+            session()->setFlashdata('error', $problem . ' Nothing was changed.');
+            return redirect()->to('/admin/members');
+        }
+
+        $superId = (int) session()->get('user_id');
+        $db->transBegin();
+        try {
+            $db->table('users')->where('user_id', (int) $member['user_id'])->update([
+                'password_hash'        => password_hash($temporary, PASSWORD_DEFAULT),
+                'must_change_password' => 1,
+            ]);
+            $block = (new LedgerService())->createEvent(LedgerService::EVENT_PASSWORD_RESET, $superId, (int) $member['member_id']);
+            if ($db->transStatus() === false) {
+                throw new \RuntimeException('database error');
+            }
+            $db->transCommit();
+        } catch (\Throwable $e) {
+            $db->transRollback();
+            // The class only: a database message could quote the statement, and with it the new hash.
+            log_message('error', 'Password reset for member #{id} failed ({type}).', ['id' => (int) $member['member_id'], 'type' => get_class($e)]);
+            session()->setFlashdata('error', 'The password could not be reset. Nothing was changed. Please try again.');
+            return redirect()->to('/admin/members');
+        }
+
+        $name = trim($member['first_name'] . ' ' . $member['last_name']);
+        session()->setFlashdata('success', "Password reset for {$name} (member #{$member['member_id']}). "
+            . 'Give them the temporary password privately; they must choose a new password when they next sign in, '
+            . "and any open sign-in has ended. Recorded in the ledger as block #{$block['ledger_sequence']}.");
+
         return redirect()->to('/admin/members');
     }
 
@@ -1583,6 +1666,9 @@ class Admin extends BaseController
                     ->select('bl.ledger_id, bl.financial_record_id, bl.ledger_sequence AS sequence, bl.transaction_hash AS hash, bl.previous_hash, bl.recorded_at, bl.verification_status AS status, fr.record_type, fr.amount, fr.approval_status')
                     ->join('financial_records fr', 'fr.financial_record_id = bl.financial_record_id', 'left')
                     ->orderBy('bl.ledger_sequence', 'DESC');
+        if (\App\Libraries\DatabaseUpdates::passwordResetReady()) {
+            $query->select('bl.event_type, bl.event_actor_id, bl.event_subject_id');   // security events such as PASSWORD_RESET
+        }
 
         // Search by block / record number, hash prefix or record type.
         $search = trim((string) $this->request->getGet('q'));

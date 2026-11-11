@@ -243,6 +243,16 @@
                                         </button>
                                     </form>
                                 <?php endif; ?>
+                                <?php if (! empty($canResetPasswords) && ! empty($member['username'])): ?>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary mt-1"
+                                            data-bs-toggle="modal" data-bs-target="#resetPasswordModal"
+                                            data-member-id="<?= esc($member['id']) ?>"
+                                            data-member-name="<?= esc(($member['first_name'] ?? '') . ' ' . ($member['last_name'] ?? '')) ?>"
+                                            data-username="<?= esc($member['username']) ?>"
+                                            title="Give this member a temporary password">
+                                        <i class="fa-solid fa-key me-1"></i>Reset Password
+                                    </button>
+                                <?php endif; ?>
                             </td>
                         </tr>
                         <?php endforeach; ?>
@@ -364,6 +374,61 @@
         </div>
     </div>
 </div>
+
+<?php if (! empty($canResetPasswords)): ?>
+<!-- Reset Password Modal (super admin only) -->
+<div class="modal fade" id="resetPasswordModal" tabindex="-1" aria-labelledby="resetPasswordModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header modal-header-brand">
+                <h5 class="modal-title text-white" id="resetPasswordModalLabel">
+                    <i class="fa-solid fa-key me-2 glc-icon"></i>Reset Password
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="resetPasswordForm" method="post" action="" autocomplete="off">
+                <?= csrf_field() ?>
+                <div class="modal-body p-4">
+                    <p class="mb-3">Set a temporary password for <strong id="resetPasswordName"></strong> (<span id="resetPasswordUsername"></span>). Their current password stops working at once.</p>
+                    <div class="mb-3">
+                        <label for="temporary_password" class="form-label fw-semibold small">Temporary Password <span class="text-danger">*</span></label>
+                        <div class="input-group">
+                            <input type="password" class="form-control font-monospace" id="temporary_password" name="temporary_password"
+                                   minlength="<?= \App\Libraries\PasswordPolicy::MIN_LENGTH ?>" maxlength="<?= \App\Libraries\PasswordPolicy::MAX_BYTES ?>"
+                                   required autocomplete="new-password" spellcheck="false" aria-describedby="temporaryPasswordHelp">
+                            <button type="button" class="btn btn-outline-secondary" id="toggleTemporaryPassword" aria-pressed="false" aria-label="Show password">
+                                <i class="fa-solid fa-eye"></i>
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary" id="generateTemporaryPassword">
+                                <i class="fa-solid fa-wand-magic-sparkles me-1"></i>Generate
+                            </button>
+                        </div>
+                        <div class="form-text" id="temporaryPasswordHelp"><?= esc(\App\Libraries\PasswordPolicy::DESCRIPTION) ?></div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="confirm_temporary_password" class="form-label fw-semibold small">Confirm Temporary Password <span class="text-danger">*</span></label>
+                        <input type="password" class="form-control font-monospace" id="confirm_temporary_password" name="confirm_password"
+                               required autocomplete="new-password" spellcheck="false">
+                        <div class="invalid-feedback">The two passwords do not match.</div>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" value="1" id="confirm_reset" name="confirm_reset" required>
+                        <label class="form-check-label small" for="confirm_reset">
+                            I will give this temporary password to the member privately. They must choose a new password when they next sign in.
+                        </label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger" id="resetPasswordSubmit">
+                        <i class="fa-solid fa-key me-2"></i>Reset Password
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
 
 <!-- View Accounts Modal -->
 <div class="modal fade" id="viewAccountsModal" tabindex="-1" aria-labelledby="viewAccountsModalLabel" aria-hidden="true">
@@ -558,6 +623,80 @@
         });
     });
 })();
+<?php if (! empty($canResetPasswords)): ?>
+(function () {
+    const modal    = document.getElementById('resetPasswordModal');
+    const form     = document.getElementById('resetPasswordForm');
+    const password = document.getElementById('temporary_password');
+    const confirm  = document.getElementById('confirm_temporary_password');
+    const toggle   = document.getElementById('toggleTemporaryPassword');
+    const submit   = document.getElementById('resetPasswordSubmit');
+    let username   = '';
+
+    function show(visible) {
+        [password, confirm].forEach(function (input) { input.type = visible ? 'text' : 'password'; });
+        toggle.setAttribute('aria-pressed', visible ? 'true' : 'false');
+        toggle.setAttribute('aria-label', visible ? 'Hide password' : 'Show password');
+        toggle.firstElementChild.className = visible ? 'fa-solid fa-eye-slash' : 'fa-solid fa-eye';
+    }
+
+    // Same rule as the server (PasswordPolicy); the server checks again.
+    function problem(value) {
+        if (value.length < <?= \App\Libraries\PasswordPolicy::MIN_LENGTH ?>) return 'At least <?= \App\Libraries\PasswordPolicy::MIN_LENGTH ?> characters.';
+        if (/\s/.test(value)) return 'No spaces.';
+        if (!/\p{Lu}/u.test(value) || !/\p{Ll}/u.test(value) || !/\d/.test(value) || !/[^\p{L}\d]/u.test(value)) {
+            return 'Include an uppercase letter, a lowercase letter, a number and a symbol.';
+        }
+        if (username && value.toLowerCase().includes(username.toLowerCase())) return 'Must not contain the username.';
+        return '';
+    }
+
+    function check() {
+        password.setCustomValidity(problem(password.value));
+        const mismatch = confirm.value !== '' && confirm.value !== password.value;
+        confirm.setCustomValidity(mismatch ? 'The two passwords do not match.' : '');
+        confirm.classList.toggle('is-invalid', mismatch);
+    }
+
+    // 12 random characters with at least one of each kind; no look-alikes (0/O, 1/l/I).
+    function generate() {
+        const sets = ['ABCDEFGHJKLMNPQRSTUVWXYZ', 'abcdefghijkmnpqrstuvwxyz', '23456789', '!@#$%&*?-_+='];
+        const all = sets.join('');
+        const random = function (n) { const a = new Uint32Array(1); crypto.getRandomValues(a); return a[0] % n; };
+        const chars = sets.map(function (set) { return set[random(set.length)]; });
+        while (chars.length < 12) chars.push(all[random(all.length)]);
+        for (let i = chars.length - 1; i > 0; i--) { const j = random(i + 1); [chars[i], chars[j]] = [chars[j], chars[i]]; }
+        return chars.join('');
+    }
+
+    modal.addEventListener('show.bs.modal', function (e) {
+        const btn = e.relatedTarget;
+        username = btn.dataset.username || '';
+        form.action = <?= json_encode(rtrim(base_url('admin/members'), '/') . '/') ?> + encodeURIComponent(btn.dataset.memberId) + '/reset-password';
+        document.getElementById('resetPasswordName').textContent = btn.dataset.memberName;
+        document.getElementById('resetPasswordUsername').textContent = username;
+    });
+    modal.addEventListener('shown.bs.modal', function () { password.focus(); });
+    // Nothing typed stays on the page after the dialog closes.
+    modal.addEventListener('hidden.bs.modal', function () {
+        form.reset(); show(false); check(); confirm.classList.remove('is-invalid'); submit.disabled = false;
+    });
+
+    toggle.addEventListener('click', function () { show(password.type === 'password'); });
+    document.getElementById('generateTemporaryPassword').addEventListener('click', function () {
+        password.value = confirm.value = generate();
+        show(true);   // so it can be read out or copied for the member
+        check();
+    });
+    password.addEventListener('input', check);
+    confirm.addEventListener('input', check);
+    form.addEventListener('submit', function (e) {
+        check();
+        if (!form.checkValidity()) { e.preventDefault(); form.reportValidity(); return; }
+        submit.disabled = true;
+    });
+})();
+<?php endif; ?>
 document.getElementById('addAccountModal').addEventListener('show.bs.modal', function (e) {
     const btn = e.relatedTarget;
     document.getElementById('addAccountForm').action =

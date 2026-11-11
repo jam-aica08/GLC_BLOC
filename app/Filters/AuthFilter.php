@@ -17,7 +17,12 @@ class AuthFilter implements FilterInterface
     public const IDLE_MINUTES = 20;
 
     /** Session keys of a sign-in. */
-    public const SIGN_IN_KEYS = ['user_id', 'username', 'role', 'member_id', 'is_super_admin', 'logged_in', 'last_activity', 'password_mark', 'activity_day'];
+    public const SIGN_IN_KEYS = ['user_id', 'username', 'role', 'member_id', 'is_super_admin', 'logged_in', 'last_activity', 'password_mark', 'activity_day', 'must_change_password'];
+
+    public const MUST_CHANGE_MESSAGE = 'Your password was reset by the Superadmin. Please choose a new password to continue.';
+
+    /** The only pages open while a temporary password must be changed (sign-out is not behind this filter). */
+    private const CHANGE_PASSWORD_PATHS = ['member/settings', 'member/settings/password', 'admin/settings', 'admin/settings/password'];
 
     public function before(RequestInterface $request, $arguments = null)
     {
@@ -57,6 +62,22 @@ class AuthFilter implements FilterInterface
             session()->set('password_mark', $mark);   // signed in before marks existed
         } elseif (! hash_equals((string) session()->get('password_mark'), $mark)) {
             return $this->signedOut($request, 'Your password was changed. Please sign in with the new password.', true);
+        }
+
+        // Signed in with a temporary password: nothing else opens until it is changed.
+        if (session()->get('must_change_password')) {
+            // The route path: without the site's sub-folder or index.php.
+            $path = $request instanceof \CodeIgniter\HTTP\IncomingRequest
+                ? trim($request->getPath(), '/')
+                : preg_replace('#^index\.php/#', '', trim($request->getUri()->getPath(), '/'));
+            if (! in_array($path, self::CHANGE_PASSWORD_PATHS, true)) {
+                if ($request instanceof \CodeIgniter\HTTP\IncomingRequest && $request->isAJAX()) {
+                    return service('response')->setStatusCode(403)->setJSON(['mustChangePassword' => true, 'message' => self::MUST_CHANGE_MESSAGE]);
+                }
+                $role = strtolower((string) session()->get('role'));
+
+                return redirect()->to($role === 'admin' ? '/admin/settings' : '/member/settings')->with('error', self::MUST_CHANGE_MESSAGE);
+            }
         }
 
         // Check role-based access (FIX 4.9: server-side role enforcement)

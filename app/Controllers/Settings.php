@@ -37,6 +37,7 @@ class Settings extends BaseController
             'isAdmin' => $this->role() === 'admin',
             'isSuper' => $this->isSuper(),
             'user'    => model(UserModel::class)->find((int) session()->get('user_id')),
+            'mustChangePassword' => (bool) session()->get('must_change_password'),
             'dbStatus' => $this->role() === 'admin' ? DatabaseUpdates::status() : null,
             'recentErrors' => $this->role() === 'admin' ? $this->recentErrors() : [],
         ]);
@@ -183,11 +184,21 @@ class Settings extends BaseController
             return redirect()->to($this->home())->with('error', 'The new password must be different from the current one.');
         }
 
+        $changes = ['password_hash' => $hash = password_hash($new, PASSWORD_DEFAULT)];
+        if (\App\Libraries\DatabaseUpdates::passwordResetReady()) {
+            $changes['must_change_password'] = 0;   // a temporary password from the superadmin is replaced
+        }
         db_connect()->table('users')
                     ->where('user_id', $user['user_id'])
-                    ->update(['password_hash' => $hash = password_hash($new, PASSWORD_DEFAULT)]);
+                    ->update($changes);
         // This session stays signed in; every other sign-in of the account ends (AuthFilter).
         session()->set('password_mark', AccountAccess::passwordMark($hash));
+        if (session()->get('must_change_password')) {
+            session()->remove('must_change_password');
+
+            return redirect()->to($this->role() === 'admin' ? '/admin/dashboard' : '/member/dashboard')
+                ->with('success', 'Your new password is set. Welcome back.');
+        }
 
         return redirect()->to($this->home())->with('success', 'Your password has been changed.');
     }

@@ -114,7 +114,12 @@
                         <tr class="<?= $isValid ? '' : 'table-danger' ?>">
                             <td class="px-4 py-3"><code><?= esc($entry['ledger_id'] ?? $entry['id'] ?? '-') ?></code></td>
                             <td class="py-3">
+                                <?php if (! empty($entry['event_type'])): ?>
+                                    <div><i class="fa-solid fa-key me-1 text-muted"></i><?= esc($entry['event_type'] === 'PASSWORD_RESET' ? 'Password reset' : $entry['event_type']) ?></div>
+                                    <div class="small text-muted">Member #<?= esc($entry['event_subject_id']) ?> · by user #<?= esc($entry['event_actor_id']) ?></div>
+                                <?php else: ?>
                                 <div><?= esc($entry['record_type'] ?? 'Record') ?> <code>#<?= esc($entry['financial_record_id'] ?? '-') ?></code></div>
+                                <?php endif; ?>
                                 <?php if (isset($entry['amount'])): ?><div class="small text-muted">₱<?= number_format((float) $entry['amount'], 2) ?></div><?php endif; ?>
                             </td>
                             <td class="py-3">

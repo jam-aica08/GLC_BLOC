@@ -147,6 +147,14 @@
                                 <i class="fa-solid fa-eye" id="toggleIcon"></i>
                             </button>
                         </div>
+                        <div class="text-end mt-2">
+                            <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none" id="forgotPasswordLink"
+                                    aria-expanded="false" aria-controls="forgotPasswordNote">Forgot Password?</button>
+                        </div>
+                        <div class="alert alert-info small mt-2 mb-0" id="forgotPasswordNote" role="status" hidden>
+                            <i class="fa-solid fa-circle-info me-1"></i>
+                            <span>Forgot your password? Please contact your Superadmin to request a password reset. Only the Superadmin can reset member passwords.</span>
+                        </div>
                     </div>
 
                     <button type="submit" class="btn btn-gradient btn-login">
@@ -175,6 +183,17 @@
             togglePassword.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
             toggleIcon.classList.toggle('fa-eye', !show);
             toggleIcon.classList.toggle('fa-eye-slash', show);
+        });
+    }
+
+    // Forgot Password: only the Superadmin resets passwords, so just say whom to contact.
+    const forgotLink = document.getElementById('forgotPasswordLink');
+    const forgotNote = document.getElementById('forgotPasswordNote');
+    if (forgotLink && forgotNote) {
+        forgotLink.addEventListener('click', function () {
+            const open = forgotNote.hidden;
+            forgotNote.hidden = !open;
+            forgotLink.setAttribute('aria-expanded', open ? 'true' : 'false');
         });
     }
 </script>

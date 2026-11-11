@@ -26,6 +26,7 @@ $routes->group('admin', ['filter' => 'auth:admin'], function ($routes) {
     $routes->post('members/add', 'Admin::addMember');
     $routes->post('members/deactivate/(:num)', 'Admin::deactivateMember/$1');
     $routes->post('members/reactivate/(:num)', 'Admin::reactivateMember/$1');
+    $routes->post('members/(:num)/reset-password', 'Admin::resetMemberPassword/$1');   // super admin only
     $routes->post('members/(:num)/accounts/add', 'Admin::addAccount/$1');
     $routes->post('members/accounts/(:num)/deactivate', 'Admin::deactivateAccount/$1');
     $routes->post('members/accounts/(:num)/reactivate', 'Admin::reactivateAccount/$1');
