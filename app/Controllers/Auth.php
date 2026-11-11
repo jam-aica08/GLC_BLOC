@@ -146,10 +146,17 @@ class Auth extends BaseController
             'logged_in'      => true,
             'last_activity'  => time(),   // AuthFilter ends the sign-in after IDLE_MINUTES without a request
             'password_mark'  => AccountAccess::passwordMark($user['password_hash']),   // a password change ends other sign-ins
+            // Signed in with a temporary password from the superadmin: only Change Password is open (AuthFilter).
+            'must_change_password' => ! empty($user['must_change_password']),
         ]);
         AuditLog::record('Logged in', 'user', $user['user_id']);
         \App\Services\RetentionService::touch((int) $user['user_id']);   // inactivity is counted from here
         $session->set('activity_day', date('Y-m-d'));
+
+        if (! empty($user['must_change_password'])) {
+            $session->setFlashdata('error', \App\Filters\AuthFilter::MUST_CHANGE_MESSAGE);
+            return redirect()->to(strtolower($roleName) === 'admin' ? '/admin/settings' : '/member/settings');
+        }
 
         // Redirect to role dashboard
         if (strtolower($roleName) === 'admin') {

@@ -65,6 +65,12 @@
         <div class="card shadow-sm">
             <div class="card-header fw-semibold bg-white"><i class="fa-solid fa-key me-2"></i>Change Password</div>
             <div class="card-body">
+                <?php if (! empty($mustChangePassword)): ?>
+                    <div class="alert alert-warning small mb-3" role="alert">
+                        <i class="fa-solid fa-triangle-exclamation me-1"></i>
+                        Your password was reset by the Superadmin. Enter the temporary password as your <strong>Current Password</strong>, then choose a new one. Other pages open once it is changed.
+                    </div>
+                <?php endif; ?>
                 <form method="post" action="<?= base_url($base . '/password') ?>" autocomplete="off">
                     <?= csrf_field() ?>
                     <div class="mb-3">

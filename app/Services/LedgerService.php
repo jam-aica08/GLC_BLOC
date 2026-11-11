@@ -34,6 +34,42 @@ class LedgerService
      */
     public function createEntry(int $financialRecordId, array $payload): array
     {
+        return $this->append(['financial_record_id' => $financialRecordId], $this->buildCanonicalPayload($payload));
+    }
+
+    /** Security events kept in the chain (no amount, no financial record). */
+    public const EVENT_PASSWORD_RESET = 'PASSWORD_RESET';
+
+    /**
+     * Append a security event (e.g. PASSWORD_RESET) to the same SHA-256 chain
+     * as the financial records: who did it, to which member, and when. Never
+     * a password or a password hash. Hashed from the ledger row itself, so
+     * changing any of these fields later fails verification.
+     *
+     * @return array ['ledger_id', 'transaction_hash', 'ledger_sequence']
+     * @throws \RuntimeException on DB failure
+     */
+    public function createEvent(string $eventType, int $actorUserId, int $subjectMemberId): array
+    {
+        $event = [
+            'financial_record_id' => null,
+            'event_type'          => $eventType,
+            'event_actor_id'      => $actorUserId,
+            'event_subject_id'    => $subjectMemberId,
+            'recorded_at'         => date('Y-m-d H:i:s'),
+        ];
+
+        return $this->append($event, $this->buildEventPayload($event));
+    }
+
+    /**
+     * Add one entry after the latest, under the append lock, so two requests
+     * never take the same sequence number.
+     *
+     * @param array $row columns of the new entry besides the hash fields
+     */
+    private function append(array $row, string $canonicalPayload): array
+    {
         $db = db_connect();
 
         // Acquire advisory lock to serialise concurrent ledger appends.
@@ -57,12 +93,10 @@ class LedgerService
             $previousHash = $latest['transaction_hash'] ?? null;
             $nextSequence = $latest ? ((int) $latest['ledger_sequence'] + 1) : 1;
 
-            // Build canonical string and compute hash
-            $canonicalPayload = $this->buildCanonicalPayload($payload);
-            $transactionHash  = hash('sha256', $canonicalPayload . ($previousHash ?? ''));
+            // Hash = SHA-256 of the canonical payload followed by the previous hash
+            $transactionHash = hash('sha256', $canonicalPayload . ($previousHash ?? ''));
 
-            $insertData = [
-                'financial_record_id' => $financialRecordId,
+            $insertData = $row + [
                 'transaction_hash'    => $transactionHash,
                 'previous_hash'       => $previousHash,
                 'ledger_sequence'     => $nextSequence,
@@ -184,7 +218,7 @@ class LedgerService
         // The records behind the entries, fetched 500 at a time instead of one
         // query per entry (the ledger grows with every transaction).
         $records = [];
-        foreach (array_chunk(array_unique(array_map('intval', array_column($entries, 'financial_record_id'))), 500) as $ids) {
+        foreach (array_chunk(array_unique(array_map('intval', array_filter(array_column($entries, 'financial_record_id'), static fn ($id) => $id !== null))), 500) as $ids) {
             foreach ($db->table('financial_records')->whereIn('financial_record_id', $ids)->get()->getResultArray() as $row) {
                 $records[(int) $row['financial_record_id']] = $row;
             }
@@ -245,6 +279,29 @@ class LedgerService
                     $chainBroken = true;
                     continue;
                 }
+            }
+
+            // --- Check 3a: a security event is hashed from its own fields -----
+            if (($entry['event_type'] ?? null) !== null && $entry['event_type'] !== '') {
+                $computedHash = hash('sha256', $this->buildEventPayload($entry) . ($storedPrevHash ?? ''));
+                if ($entry['financial_record_id'] !== null || ! hash_equals($computedHash, (string) $entry['transaction_hash'])) {
+                    $this->markTampered($db, $ledgerId);
+                    $tampered++;
+                    $firstFailure = [
+                        'ledger_id'    => $ledgerId,
+                        'sequence'     => $seq,
+                        'failure_type' => 'hash_mismatch',
+                    ];
+                    $chainBroken = true;
+                    continue;
+                }
+                if (($entry['verification_status'] ?? 'Valid') !== 'Valid') {
+                    $db->table('blockchain_ledger')->where('ledger_id', $ledgerId)->update(['verification_status' => 'Valid']);
+                }
+                $valid++;
+                $prevHash     = $entry['transaction_hash'];
+                $prevSequence = $seq;
+                continue;
             }
 
             // --- Check 3: recompute transaction_hash from original record ----
@@ -376,6 +433,24 @@ class LedgerService
             $amount,
             (string) ($record['approval_status']     ?? ''),
             (string) $processedBy,
+        ]);
+    }
+
+    /**
+     * Canonical string of a security event entry. Holds only IDs, the event
+     * type and the time: never a password or a password hash.
+     * Format: "e1|{event_type}|{event_actor_id}|{event_subject_id}|{recorded_at}"
+     */
+    private function buildEventPayload(array $entry): string
+    {
+        $ts = strtotime((string) ($entry['recorded_at'] ?? ''));
+
+        return implode('|', [
+            'e1',
+            (string) ($entry['event_type']       ?? ''),
+            (string) ($entry['event_actor_id']   ?? ''),
+            (string) ($entry['event_subject_id'] ?? ''),
+            $ts ? date('Y-m-d H:i:s', $ts) : (string) ($entry['recorded_at'] ?? ''),
         ]);
     }
 

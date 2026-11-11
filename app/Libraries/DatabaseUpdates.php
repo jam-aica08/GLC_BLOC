@@ -64,6 +64,9 @@ class DatabaseUpdates
             if (! $db->tableExists('withdrawals', false) || ! $db->fieldExists('admin_share', 'dividend_distributions')) {
                 $status['problems'][] = 'withdrawals, loan offsets or the administration dividend share are missing';
             }
+            if (! $db->fieldExists('must_change_password', 'users') || ! self::ledgerAcceptsEvents($db)) {
+                $status['problems'][] = 'superadmin password reset columns (users.must_change_password, ledger security events) are missing';
+            }
             if ($db->fieldExists('carried_over', 'loan_installments') && ($lost = \App\Services\LoanService::lostCarryOver())) {
                 $status['problems'][] = count($lost) . ' loan(s) lost unpaid amounts from missed months (PHP '
                     . number_format(array_sum($lost), 2) . ' in all: loan ' . implode(', ', array_map(fn($id) => '#' . $id, array_keys($lost)))
@@ -355,7 +358,79 @@ class DatabaseUpdates
             ]);
         }
 
+        self::addPasswordResetSchema($db, $forge);
         $db->resetDataCache();
+    }
+
+    /**
+     * Superadmin password reset: users.must_change_password (the member must
+     * choose a new password at the next sign-in), and security events in the
+     * one SHA-256 ledger chain (blockchain_ledger.event_* columns; such an
+     * entry has no financial record). One column per ALTER, for TiDB.
+     */
+    private static function addPasswordResetSchema($db, $forge): void
+    {
+        $db->resetDataCache();
+        if (! $db->fieldExists('must_change_password', 'users')) {
+            $forge->addColumn('users', [
+                'must_change_password' => ['type' => 'TINYINT', 'constraint' => 1, 'default' => 0, 'null' => false],
+            ]);
+        }
+
+        $columns = [
+            'event_type'       => ['type' => 'VARCHAR', 'constraint' => 30, 'null' => true],
+            'event_actor_id'   => ['type' => 'INT', 'unsigned' => true, 'null' => true],   // users.user_id of the superadmin
+            'event_subject_id' => ['type' => 'INT', 'unsigned' => true, 'null' => true],   // members.member_id affected
+        ];
+        foreach ($columns as $name => $definition) {
+            $db->resetDataCache();
+            if (! $db->fieldExists($name, 'blockchain_ledger')) {
+                $forge->addColumn('blockchain_ledger', [$name => $definition]);
+            }
+        }
+
+        if (! self::ledgerAcceptsEvents($db)) {
+            try {
+                $db->query('ALTER TABLE blockchain_ledger MODIFY financial_record_id INT UNSIGNED NULL');
+            } catch (\Throwable $e) {
+                // Some servers refuse to change a column that has a foreign key: change it without, then put the key back.
+                $db->query('ALTER TABLE blockchain_ledger DROP FOREIGN KEY fk_blockchain_financial_record');
+                $db->query('ALTER TABLE blockchain_ledger MODIFY financial_record_id INT UNSIGNED NULL');
+                $db->query('ALTER TABLE blockchain_ledger ADD CONSTRAINT fk_blockchain_financial_record
+                    FOREIGN KEY (financial_record_id) REFERENCES financial_records(financial_record_id) ON DELETE RESTRICT ON UPDATE CASCADE');
+            }
+        }
+        $db->resetDataCache();
+    }
+
+    /** blockchain_ledger can hold security events (event columns, and financial_record_id may be empty). */
+    private static function ledgerAcceptsEvents($db): bool
+    {
+        if (! $db->fieldExists('event_type', 'blockchain_ledger')) {
+            return false;
+        }
+        foreach ($db->getFieldData('blockchain_ledger') as $field) {
+            if ($field->name === 'financial_record_id') {
+                return (bool) $field->nullable;
+            }
+        }
+
+        return false;
+    }
+
+    /** The database has what the superadmin password reset needs (remembered once true). */
+    public static function passwordResetReady(): bool
+    {
+        try {
+            return SchemaCache::passes('password_reset', static function (): bool {
+                $db = db_connect();
+                $db->resetDataCache();
+
+                return $db->fieldExists('must_change_password', 'users') && self::ledgerAcceptsEvents($db);
+            });
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
     /** Shown as a banner on the dashboard. Once the database is up to date, that is remembered for an hour. */
